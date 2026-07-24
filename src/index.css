@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Share Tech Mono', ui-monospace, monospace;
+
+  /* Cyber Industrial Palette (Accenti Arancione/Giallo/Verde, sfondi scuri, NO viola) */
+  --color-cyber-bg: #090B0E;
+  --color-cyber-card: #11141C;
+  --color-cyber-card-hover: #181D28;
+  --color-cyber-border: #222936;
+  --color-cyber-border-active: #3C4B63;
+  --color-cyber-orange: #FF6600;
+  --color-cyber-yellow: #FFB800;
+  --color-cyber-green: #00FF66;
+  --color-cyber-red: #FF3333;
+  
+  --color-cyber-text: #E3E8F0;
+  --color-cyber-text-muted: #64748B;
+  --color-cyber-text-dark: #090B0E;
+
+  --animate-scanline: scanline 8s linear infinite;
+  --animate-pulse-glow: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes scanline {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 0 100%;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Custom Base Styling */
+body {
+  background-color: #090B0E;
+  color: #E3E8F0;
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Griglia Tech di Sfondo (Industrial HUD overlay) */
+body::before {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: 
+    linear-gradient(rgba(18, 24, 38, 0.03) 50%, rgba(0, 0, 0, 0.12) 50%),
+    linear-gradient(90deg, rgba(255, 102, 0, 0.01), rgba(0, 255, 102, 0.01));
+  background-size: 100% 4px, 6px 100%;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+/* Effetto di scansione orizzontale */
+body::after {
+  content: "";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    0deg,
+    rgba(255, 102, 0, 0) 0%,
+    rgba(255, 102, 0, 0.02) 10%,
+    rgba(255, 102, 0, 0) 20%
+  );
+  background-size: 100% 1000px;
+  animation: scanline 25s linear infinite;
+  z-index: 9998;
+  pointer-events: none;
+}
+
+/* Rimuove i bordi arrotondati ovunque per rispettare lo stile geometrico a spigoli vivi */
+* {
+  border-radius: 0px !important;
+  box-sizing: border-box;
+}
+
+/* Scrollbar personalizzata nello stile Cyber-Industrial */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090B0E;
+  border-left: 1px solid #222936;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #FF6600;
+  border: 1px solid #090B0E;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #FFB800;
+}
+
+/* Utilità di focus */
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #FF6600 !important;
+  box-shadow: 0 0 8px rgba(255, 102, 0, 0.2);
+}
