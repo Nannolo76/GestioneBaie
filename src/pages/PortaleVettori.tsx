@@ -59,13 +59,13 @@ export const PortaleVettori: React.FC = () => {
     return (
       <Card title="Portale Accesso Vettori" accent="red">
         <div className="p-4 text-center font-mono space-y-4">
-          <div className="text-cyber-red font-bold text-lg uppercase">
+          <div className="text-red-500 font-bold text-lg uppercase">
             // ACCESSO NEGATO
           </div>
-          <p className="text-cyber-text">
+          <p className="text-black">
             Il vettore selezionato ({loggedInCarrier?.name || 'Sconosciuto'}) non è ancora approvato o è stato rifiutato dall'amministrazione.
           </p>
-          <p className="text-xs text-cyber-text-muted">
+          <p className="text-xs text-ticket-muted">
             Utilizza la console di simulazione a sinistra per passare ad un utente approvato o approva questo vettore nella scheda Amministratore.
           </p>
         </div>
@@ -76,17 +76,17 @@ export const PortaleVettori: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Intestazione */}
-      <div className="flex justify-between items-center border-b border-cyber-border pb-4">
+      <div className="flex justify-between items-center border-b border-black/10 pb-4">
         <div>
-          <h2 className="text-2xl font-mono font-bold text-cyber-orange uppercase tracking-wide">
+          <h2 className="text-xl font-sans font-bold text-ticket-accent uppercase tracking-wide">
             // AREA RISERVATA VETTORE: {loggedInCarrier.name.toUpperCase()}
           </h2>
-          <p className="text-xs text-cyber-text-muted mt-1 uppercase tracking-widest font-mono">
+          <p className="text-[10px] text-ticket-muted mt-1 uppercase tracking-widest font-mono">
             Registrazione slot di carico/scarico e monitoraggio delle consegne attive
           </p>
         </div>
         <div className="text-right font-mono">
-          <span className="text-[10px] text-cyber-text-muted uppercase">Account ID: </span>
+          <span className="text-[10px] text-ticket-muted uppercase">Account ID: </span>
           <Badge variant="success">{loggedInCarrier.id}</Badge>
         </div>
       </div>
@@ -97,12 +97,12 @@ export const PortaleVettori: React.FC = () => {
           <Card title="Richiedi Nuovo Slot Prenotazione" accent="orange">
             <form onSubmit={handleSubmitBooking} className="space-y-4">
               {formError && (
-                <div className="p-2 border border-cyber-red bg-cyber-red/10 text-cyber-red font-mono text-xs">
+                <div className="p-2 border border-red-200 bg-red-50 text-red-600 font-mono text-xs rounded-lg">
                   {formError}
                 </div>
               )}
               {successMsg && (
-                <div className="p-2 border border-cyber-green bg-cyber-green/10 text-cyber-green font-mono text-xs">
+                <div className="p-2 border border-emerald-200 bg-emerald-50 text-emerald-600 font-mono text-xs rounded-lg">
                   {successMsg}
                 </div>
               )}
@@ -187,7 +187,7 @@ export const PortaleVettori: React.FC = () => {
                   accessor: (b) => (
                     <div className="text-xs">
                       <div className="font-bold font-mono">{b.licensePlate}</div>
-                      <div className="text-cyber-text-muted">{b.driverName}</div>
+                      <div className="text-ticket-muted">{b.driverName}</div>
                     </div>
                   ),
                 },
@@ -230,7 +230,7 @@ export const PortaleVettori: React.FC = () => {
                         </Button>
                       );
                     }
-                    return <span className="text-xs text-cyber-text-muted">In Corso...</span>;
+                    return <span className="text-xs text-ticket-muted">In Corso...</span>;
                   },
                 },
               ]}

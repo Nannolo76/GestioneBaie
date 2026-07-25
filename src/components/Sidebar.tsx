@@ -21,7 +21,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
 
   const handleRoleChange = (role: 'ADMIN' | 'VETTORE' | 'OPERATORE') => {
     setCurrentRole(role);
-    // Set some defaults when switching roles
     if (role === 'OPERATORE') {
       setActiveTab('yard-monitor');
     } else if (role === 'VETTORE') {
@@ -35,55 +34,59 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
   const currentDepotName = depots.find((d) => d.id === selectedDepotId)?.name || 'Milano';
 
   return (
-    <div className="w-80 bg-cyber-card border-r border-cyber-border flex flex-col justify-between h-screen sticky top-0 text-cyber-text select-none">
-      {/* Header & Logo */}
+    <div className="w-80 bg-gradient-to-br from-[#003a75] via-[#004B97] to-[#0062b8] flex flex-col justify-between h-screen sticky top-0 text-white select-none shrink-0 border-r border-white/10">
+      {/* Brand */}
       <div>
-        <div className="p-6 border-b border-cyber-border">
-          <div className="flex items-center space-x-3">
-            <div className="w-3 h-3 bg-cyber-orange animate-pulse-glow" />
-            <h1 className="text-lg font-mono font-bold tracking-wider uppercase text-cyber-text">
-              YARD & DOCK <span className="text-cyber-orange">MGR</span>
-            </h1>
-          </div>
-          <div className="text-[10px] font-mono text-cyber-text-muted mt-1 uppercase tracking-widest">
-            LOGISTICA UNO // VER. 1.0.0
+        <div className="px-5 py-5 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white font-black text-sm shadow border border-white/20 select-none shrink-0">
+              L1
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-extrabold text-white tracking-tight uppercase leading-none truncate">
+                Logistica Uno
+              </h2>
+              <span className="text-[9px] font-mono text-white/50 tracking-widest uppercase mt-0.5 block">
+                YARD & DOCK PORTAL
+              </span>
+            </div>
           </div>
         </div>
 
         {/* CONTROLLER DI SIMULAZIONE (RUOLI) */}
-        <div className="p-4 border-b border-cyber-border bg-cyber-bg/30 m-4 border border-dashed">
-          <div className="text-xs font-mono font-bold uppercase tracking-wider text-cyber-orange mb-3">
-            [ SIMULATORE CONSOLE ]
+        <div className="p-4 bg-white/5 rounded-xl border border-white/10 m-4 shadow-inner">
+          <div className="text-[9px] font-mono font-bold uppercase tracking-widest text-white/50 mb-3">
+            [ SIMULATORE RUOLI ]
           </div>
           
           {/* Pulsanti Ruolo */}
           <div className="grid grid-cols-3 gap-1 mb-3">
             <button
               onClick={() => handleRoleChange('OPERATORE')}
-              className={`p-1.5 text-[10px] font-mono font-bold uppercase border transition-all text-center ${
+              className={`p-1.5 text-[9px] font-mono font-bold uppercase border transition-all text-center rounded-lg cursor-pointer ${
                 currentRole === 'OPERATORE'
-                  ? 'bg-cyber-green text-cyber-bg border-cyber-green'
-                  : 'bg-transparent text-cyber-text-muted border-cyber-border hover:border-cyber-text-muted'
+                  ? 'bg-emerald-500/30 text-white border-emerald-400/50'
+                  : 'bg-transparent text-white/60 border-white/10 hover:bg-white/5'
               }`}
             >
               Guardia
             </button>
             <button
               onClick={() => handleRoleChange('VETTORE')}
-              className={`p-1.5 text-[10px] font-mono font-bold uppercase border transition-all text-center ${
+              className={`p-1.5 text-[9px] font-mono font-bold uppercase border transition-all text-center rounded-lg cursor-pointer ${
                 currentRole === 'VETTORE'
-                  ? 'bg-cyber-orange text-cyber-bg border-cyber-orange'
-                  : 'bg-transparent text-cyber-text-muted border-cyber-border hover:border-cyber-text-muted'
+                  ? 'bg-[#11BCEC]/30 text-white border-[#11BCEC]/50'
+                  : 'bg-transparent text-white/60 border-white/10 hover:bg-white/5'
               }`}
             >
               Vettore
             </button>
             <button
               onClick={() => handleRoleChange('ADMIN')}
-              className={`p-1.5 text-[10px] font-mono font-bold uppercase border transition-all text-center ${
+              className={`p-1.5 text-[9px] font-mono font-bold uppercase border transition-all text-center rounded-lg cursor-pointer ${
                 currentRole === 'ADMIN'
-                  ? 'bg-cyber-yellow text-cyber-bg border-cyber-yellow'
-                  : 'bg-transparent text-cyber-text-muted border-cyber-border hover:border-cyber-text-muted'
+                  ? 'bg-amber-500/30 text-white border-amber-400/50'
+                  : 'bg-transparent text-white/60 border-white/10 hover:bg-white/5'
               }`}
             >
               Admin
@@ -93,14 +96,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           {/* Dettaglio Ruolo / Configurazione */}
           {currentRole === 'VETTORE' ? (
             <div className="flex flex-col space-y-1">
-              <label className="text-[10px] font-mono text-cyber-text-muted uppercase">Vettore Selezionato</label>
+              <label className="text-[8px] font-mono text-white/40 uppercase tracking-wider">Vettore Selezionato</label>
               <select
                 value={currentCarrierId}
                 onChange={(e) => setCurrentCarrierId(e.target.value)}
-                className="bg-cyber-bg border border-cyber-border text-xs text-cyber-text font-mono p-1.5 focus:border-cyber-orange focus:ring-0 w-full"
+                className="bg-black/20 border border-white/10 text-xs text-white font-mono p-2 rounded-lg focus:border-[#11BCEC] focus:ring-0 w-full cursor-pointer"
               >
                 {carriers.map((c) => (
-                  <option key={c.id} value={c.id}>
+                  <option key={c.id} value={c.id} className="bg-[#004B97] text-white">
                     {c.name} {c.status !== 'APPROVATO' ? `(${c.status.replace('_', ' ')})` : ''}
                   </option>
                 ))}
@@ -108,14 +111,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             </div>
           ) : (
             <div className="flex flex-col space-y-1">
-              <label className="text-[10px] font-mono text-cyber-text-muted uppercase">Magazzino Attivo</label>
+              <label className="text-[8px] font-mono text-white/40 uppercase tracking-wider">Magazzino Attivo</label>
               <select
                 value={selectedDepotId}
                 onChange={(e) => setSelectedDepotId(e.target.value)}
-                className="bg-cyber-bg border border-cyber-border text-xs text-cyber-text font-mono p-1.5 focus:border-cyber-orange focus:ring-0 w-full"
+                className="bg-black/20 border border-white/10 text-xs text-white font-mono p-2 rounded-lg focus:border-[#11BCEC] focus:ring-0 w-full cursor-pointer"
               >
                 {depots.map((d) => (
-                  <option key={d.id} value={d.id}>
+                  <option key={d.id} value={d.id} className="bg-[#004B97] text-white">
                     {d.name}
                   </option>
                 ))}
@@ -125,9 +128,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         </div>
 
         {/* NAVIGAZIONE MENU */}
-        <div className="px-4 py-2 flex flex-col space-y-1 font-mono">
-          <div className="text-[10px] font-bold tracking-wider text-cyber-text-muted uppercase px-2 mb-2">
-            Navigazione
+        <div className="px-4 py-2 flex flex-col space-y-1 font-sans">
+          <div className="text-[9px] font-mono font-bold tracking-widest text-white/35 uppercase px-3 mb-2">
+            Pagine Consolle
           </div>
 
           {/* Viste Amministratore */}
@@ -135,23 +138,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             <>
               <button
                 onClick={() => setActiveTab('admin-dashboard')}
-                className={`flex items-center space-x-3 px-3 py-2 text-sm uppercase transition-all w-full text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-dashboard'
-                    ? 'bg-cyber-yellow/10 text-cyber-yellow border-l-2 border-cyber-yellow'
-                    : 'text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-card-hover'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
                 <span>⚙️ Configurazione Baie</span>
+                {activeTab === 'admin-dashboard' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
               </button>
               <button
                 onClick={() => setActiveTab('admin-carriers')}
-                className={`flex items-center space-x-3 px-3 py-2 text-sm uppercase transition-all w-full text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-carriers'
-                    ? 'bg-cyber-yellow/10 text-cyber-yellow border-l-2 border-cyber-yellow'
-                    : 'text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-card-hover'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
                 <span>🚛 Registri & Vettori</span>
+                {activeTab === 'admin-carriers' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
               </button>
             </>
           )}
@@ -161,13 +170,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             <>
               <button
                 onClick={() => setActiveTab('carrier-portal')}
-                className={`flex items-center space-x-3 px-3 py-2 text-sm uppercase transition-all w-full text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'carrier-portal'
-                    ? 'bg-cyber-orange/10 text-cyber-orange border-l-2 border-cyber-orange'
-                    : 'text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-card-hover'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
                 <span>📅 Prenotazioni Vettore</span>
+                {activeTab === 'carrier-portal' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
               </button>
             </>
           )}
@@ -177,39 +189,49 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             <>
               <button
                 onClick={() => setActiveTab('yard-monitor')}
-                className={`flex items-center space-x-3 px-3 py-2 text-sm uppercase transition-all w-full text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'yard-monitor'
-                    ? 'bg-cyber-green/10 text-cyber-green border-l-2 border-cyber-green'
-                    : 'text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-card-hover'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
                 <span>🎛️ Monitor Yard Live</span>
+                {activeTab === 'yard-monitor' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
               </button>
               <button
                 onClick={() => setActiveTab('analytics')}
-                className={`flex items-center space-x-3 px-3 py-2 text-sm uppercase transition-all w-full text-left ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'analytics'
-                    ? 'bg-cyber-green/10 text-cyber-green border-l-2 border-cyber-green'
-                    : 'text-cyber-text-muted hover:text-cyber-text hover:bg-cyber-card-hover'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
                 <span>📊 Analytics & Tempi</span>
+                {activeTab === 'analytics' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
               </button>
             </>
           )}
         </div>
       </div>
 
-      {/* Footer Info & Reset */}
-      <div className="p-4 border-t border-cyber-border">
-        <div className="p-3 bg-cyber-bg/50 border border-cyber-border mb-3 font-mono text-[10px] text-cyber-text-muted space-y-1">
-          <div><span className="text-cyber-orange">UTENTE:</span> {currentRole}</div>
-          {currentRole === 'VETTORE' ? (
-            <div className="truncate"><span className="text-cyber-orange">CARRIER:</span> {currentCarrierName}</div>
-          ) : (
-            <div className="truncate"><span className="text-cyber-orange">HUB:</span> {currentDepotName}</div>
-          )}
-          <div><span className="text-cyber-orange">STAZIONE:</span> TERMINAL-01</div>
+      {/* User profile + logout */}
+      <div className="px-3 pb-4 pt-3 border-t border-white/10 space-y-3">
+        <div className="flex items-center gap-3 p-3 bg-white/10 rounded-xl border border-white/10">
+          <div className="h-8 w-8 rounded-lg bg-[#11BCEC]/30 border border-[#11BCEC]/40 flex items-center justify-center font-black text-white text-xs uppercase select-none shrink-0">
+            {currentRole === 'OPERATORE' ? 'OP' : currentRole === 'VETTORE' ? 'VT' : 'AD'}
+          </div>
+          <div className="min-w-0 flex-grow">
+            <span className="block text-xs font-bold text-white truncate leading-tight">
+              {currentRole === 'OPERATORE' ? 'Operatore Yard' : currentRole === 'VETTORE' ? 'Area Vettori' : 'System Admin'}
+            </span>
+            <span className="block text-[8px] font-mono text-white/40 uppercase tracking-widest mt-0.5 truncate">
+              {currentRole === 'VETTORE' ? currentCarrierName : currentDepotName}
+            </span>
+          </div>
         </div>
 
         <button
@@ -219,7 +241,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               alert('Database ripristinato.');
             }
           }}
-          className="w-full border border-cyber-red/50 text-cyber-red font-mono text-xs font-bold tracking-wider uppercase py-2 bg-transparent hover:bg-cyber-red hover:text-cyber-text transition-all duration-150 cursor-pointer active:scale-95 text-center"
+          className="w-full border border-red-500/30 text-red-200 font-mono text-[9px] font-bold tracking-wider uppercase py-2 bg-red-500/10 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-150 cursor-pointer active:scale-95 text-center"
         >
           🚨 Ripristina Database
         </button>

@@ -12,20 +12,20 @@ export const Button: React.FC<ButtonProps> = ({
   className = '',
   ...props
 }) => {
-  const baseStyle = 'inline-flex items-center justify-center font-mono font-bold tracking-wider uppercase transition-all duration-150 active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
+  const baseStyle = 'inline-flex items-center justify-center font-sans font-bold tracking-wider uppercase transition-all duration-150 rounded-lg active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer border';
   
   const variants = {
-    primary: 'bg-cyber-orange text-cyber-bg hover:bg-cyber-yellow hover:shadow-[0_0_10px_rgba(255,184,0,0.4)] border border-transparent',
-    secondary: 'bg-cyber-card text-cyber-text hover:text-cyber-orange border border-cyber-border hover:border-cyber-orange',
-    success: 'bg-cyber-green text-cyber-bg hover:shadow-[0_0_10px_rgba(0,255,102,0.4)] border border-transparent',
-    danger: 'bg-cyber-red text-cyber-text hover:shadow-[0_0_10px_rgba(255,51,51,0.4)] border border-transparent',
-    warning: 'bg-cyber-yellow text-cyber-bg hover:shadow-[0_0_10px_rgba(255,184,0,0.4)] border border-transparent',
+    primary: 'bg-[#11BCEC] hover:bg-[#004B97] text-white border-transparent shadow-xs',
+    secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-700 border-black/10 shadow-xs',
+    success: 'bg-emerald-500 hover:bg-emerald-600 text-white border-transparent shadow-xs',
+    danger: 'bg-red-500 hover:bg-red-600 text-white border-transparent shadow-xs',
+    warning: 'bg-amber-500 hover:bg-amber-600 text-white border-transparent shadow-xs',
   };
 
   const sizes = {
-    sm: 'text-xs px-3 py-1.5 border-b-2 active:border-b-0',
-    md: 'text-sm px-5 py-2.5 border-b-4 active:border-b-0',
-    lg: 'text-base px-7 py-3 border-b-4 active:border-b-0',
+    sm: 'text-[10px] px-3 py-1.5',
+    md: 'text-xs px-5 py-2.5',
+    lg: 'text-sm px-7 py-3',
   };
 
   return (

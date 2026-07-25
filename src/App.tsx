@@ -28,7 +28,7 @@ function AppContent() {
   };
 
   return (
-    <div className="flex bg-cyber-bg min-h-screen w-full relative">
+    <div className="flex bg-ticket-bg min-h-screen w-full relative">
       {/* Barra di Navigazione & Simulazione Ruoli */}
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 

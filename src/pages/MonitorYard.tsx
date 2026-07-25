@@ -86,12 +86,12 @@ export const MonitorYard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Intestazione */}
-      <div className="flex justify-between items-center border-b border-cyber-border pb-4">
+      <div className="flex justify-between items-center border-b border-black/10 pb-4">
         <div>
-          <h2 className="text-2xl font-mono font-bold text-cyber-orange uppercase tracking-wide">
+          <h2 className="text-xl font-sans font-bold text-ticket-accent uppercase tracking-wide">
             // MONITOR MONITORAGGIO LIVE PIAZZALE (YARD)
           </h2>
-          <p className="text-xs text-cyber-text-muted mt-1 uppercase tracking-widest font-mono">
+          <p className="text-[10px] text-ticket-muted mt-1 uppercase tracking-widest font-mono">
             Punto di controllo operativo: {activeDepot?.name} ({activeDepot?.city})
           </p>
         </div>
@@ -118,17 +118,17 @@ export const MonitorYard: React.FC = () => {
             return (
               <div
                 key={bay.id}
-                className={`border p-4 transition-all duration-200 flex flex-col justify-between min-h-[160px] ${
+                className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[160px] ${
                   bay.status === 'DISPONIBILE'
-                    ? 'border-cyber-green/50 bg-cyber-green/5 hover:border-cyber-green'
+                    ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400'
                     : bay.status === 'OCCUPATA'
-                    ? 'border-cyber-orange/50 bg-cyber-orange/5 hover:border-cyber-orange shadow-[inset_0_0_10px_rgba(255,102,0,0.05)]'
-                    : 'border-cyber-red/30 bg-cyber-red/5 hover:border-cyber-red'
+                    ? 'border-[#11BCEC]/30 bg-[#11BCEC]/5 hover:border-[#11BCEC] shadow-2xs'
+                    : 'border-red-200 bg-red-50/30 hover:border-red-400'
                 }`}
               >
                 {/* Header Baia */}
-                <div className="flex justify-between items-center border-b border-cyber-border/40 pb-2">
-                  <span className="font-mono font-bold text-sm text-cyber-text">{bay.name}</span>
+                <div className="flex justify-between items-center border-b border-black/5 pb-2">
+                  <span className="font-mono font-bold text-sm text-black">{bay.name}</span>
                   <Badge
                     variant={
                       bay.status === 'DISPONIBILE'
@@ -148,31 +148,31 @@ export const MonitorYard: React.FC = () => {
 
                 {/* Body Baia (Dettagli veicolo occupante) */}
                 <div className="py-3 flex-grow">
-                  {bay.status === 'OCCUPATA' && activeBooking ? (
+                   {bay.status === 'OCCUPATA' && activeBooking ? (
                     <div className="font-mono text-xs space-y-1">
                       <div className="flex justify-between">
-                        <span className="text-cyber-text-muted">Targa:</span>
-                        <span className="font-bold text-cyber-orange">{activeBooking.licensePlate}</span>
+                        <span className="text-ticket-muted">Targa:</span>
+                        <span className="font-bold text-ticket-accent">{activeBooking.licensePlate}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-cyber-text-muted">Vettore:</span>
+                        <span className="text-ticket-muted">Vettore:</span>
                         <span className="truncate max-w-[140px] text-right font-bold">{carrierName}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-cyber-text-muted">Tipo:</span>
+                        <span className="text-ticket-muted">Tipo:</span>
                         <span className="font-bold">{activeBooking.activityType}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-cyber-text-muted">Ingresso:</span>
-                        <span className="text-cyber-yellow font-bold">{formatTime(activeBooking.timeInBay)}</span>
+                        <span className="text-ticket-muted">Ingresso:</span>
+                        <span className="text-amber-600 font-bold">{formatTime(activeBooking.timeInBay)}</span>
                       </div>
                     </div>
                   ) : bay.status === 'MANUTENZIONE' ? (
-                    <div className="text-center py-4 text-xs font-mono text-cyber-red font-bold">
+                    <div className="text-center py-4 text-xs font-mono text-red-500 font-bold">
                       // BAIA FUORI SERVIZIO
                     </div>
                   ) : (
-                    <div className="text-center py-4 text-xs font-mono text-cyber-green font-bold">
+                    <div className="text-center py-4 text-xs font-mono text-emerald-600 font-bold">
                       // PRONTA AL CARICO
                     </div>
                   )}
@@ -206,14 +206,14 @@ export const MonitorYard: React.FC = () => {
               columns={[
                 {
                   header: 'Arrivo',
-                  accessor: (b) => <span className="text-cyber-yellow font-bold">{formatTime(b.timeInGate)}</span>,
+                  accessor: (b) => <span className="text-amber-600 font-bold">{formatTime(b.timeInGate)}</span>,
                 },
                 {
                   header: 'Targa / Autista',
                   accessor: (b) => (
                     <div>
                       <span className="font-bold">{b.licensePlate}</span>
-                      <span className="text-xs text-cyber-text-muted ml-2">({b.driverName})</span>
+                      <span className="text-xs text-ticket-muted ml-2">({b.driverName})</span>
                     </div>
                   ),
                 },
@@ -236,7 +236,7 @@ export const MonitorYard: React.FC = () => {
                           onChange={(e) =>
                             setTempBayAssignment((prev) => ({ ...prev, [b.id]: e.target.value }))
                           }
-                          className="bg-cyber-bg border border-cyber-border text-xs text-cyber-text font-mono p-1 focus:ring-0 focus:outline-none"
+                          className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer"
                         >
                           <option value="">Seleziona...</option>
                           {availableBays.map((bay) => (
@@ -279,7 +279,7 @@ export const MonitorYard: React.FC = () => {
                   accessor: (b) => (
                     <div>
                       <span className="font-mono">{b.licensePlate}</span>
-                      <span className="text-xs text-cyber-text-muted ml-2">({b.driverName})</span>
+                      <span className="text-xs text-ticket-muted ml-2">({b.driverName})</span>
                     </div>
                   ),
                 },
@@ -351,20 +351,20 @@ export const MonitorYard: React.FC = () => {
           <Card title="Log Attività Cantiere (Live)">
             <div className="space-y-2 max-h-[300px] overflow-y-auto font-mono text-[11px] pr-2">
               {activeLogs.length === 0 ? (
-                <div className="text-cyber-text-muted text-center py-4">// NESSUN LOG REGISTRATO</div>
+                <div className="text-ticket-muted text-center py-4">// NESSUN LOG REGISTRATO</div>
               ) : (
                 activeLogs.map((log) => (
-                  <div key={log.id} className="border-b border-cyber-border/40 pb-2">
-                    <div className="flex justify-between text-[10px] text-cyber-text-muted">
+                  <div key={log.id} className="border-b border-black/5 pb-2">
+                    <div className="flex justify-between text-[10px] text-ticket-muted">
                       <span>{new Date(log.timestamp).toLocaleTimeString('it-IT')}</span>
                       <span className={
-                        log.type === 'SUCCESS' ? 'text-cyber-green' :
-                        log.type === 'WARNING' ? 'text-cyber-red' : 'text-cyber-orange'
+                        log.type === 'SUCCESS' ? 'text-emerald-600' :
+                        log.type === 'WARNING' ? 'text-rose-500' : 'text-[#11BCEC]'
                       }>
                         [{log.type}]
                       </span>
                     </div>
-                    <div className="text-cyber-text mt-0.5">{log.message}</div>
+                    <div className="text-black mt-0.5">{log.message}</div>
                   </div>
                 ))
               )}

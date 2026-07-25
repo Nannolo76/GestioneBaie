@@ -15,29 +15,29 @@ export const Card: React.FC<CardProps> = ({
   ...props
 }) => {
   const accentBorders = {
-    none: 'border-t-cyber-border',
-    orange: 'border-t-2 border-t-cyber-orange',
-    yellow: 'border-t-2 border-t-cyber-yellow',
-    green: 'border-t-2 border-t-cyber-green',
-    red: 'border-t-2 border-t-cyber-red',
+    none: 'border-t-black/10',
+    orange: 'border-t-2 border-t-amber-500',
+    yellow: 'border-t-2 border-t-yellow-500',
+    green: 'border-t-2 border-t-emerald-500',
+    red: 'border-t-2 border-t-red-500',
   };
 
   return (
     <div
-      className={`bg-cyber-card border border-cyber-border ${accentBorders[accent]} p-5 transition-all duration-200 hover:border-cyber-border-active ${className}`}
+      className={`bg-white/80 backdrop-blur-md border border-black/10 rounded-xl p-5 shadow-xs transition-all duration-200 hover:border-black/20 ${accentBorders[accent]} ${className}`}
       {...props}
     >
       {(title || headerAction) && (
-        <div className="flex justify-between items-center mb-4 pb-3 border-b border-cyber-border font-mono">
+        <div className="flex justify-between items-center mb-4 pb-3 border-b border-black/5 font-mono">
           {title && (
-            <h3 className="text-sm font-bold uppercase tracking-wider text-cyber-orange">
-              // {title}
+            <h3 className="text-xs font-bold uppercase tracking-widest text-[#11BCEC]">
+              [ {title} ]
             </h3>
           )}
           {headerAction && <div>{headerAction}</div>}
         </div>
       )}
-      <div>{children}</div>
+      <div className="text-sm text-black">{children}</div>
     </div>
   );
 };

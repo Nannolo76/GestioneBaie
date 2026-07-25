@@ -1,7 +1,7 @@
-# Gestione Baie e Yard - Piano di Progetto
+# Gestione Baie e Yard - Piano di Progetto (Allineamento Grafico Ticket)
 
 ## Overview
-Creazione di un'applicazione web in lingua **italiana** per la gestione delle baie di carico/scarico e del piazzale (Yard & Dock Management). L'app consentirà ai vettori di effettuare prenotazioni, e agli operatori e guardie di magazzino di gestire l'intero ciclo di vita dell'ingresso, sosta e uscita dei veicoli tramite un pannello di controllo interattivo con estetica Cyber-Industrial Dark Mode.
+Creazione di un'applicazione web in lingua **italiana** per la gestione delle baie di carico/scarico e del piazzale (Yard & Dock Management) per Logistica Uno Europe. L'app consentirà ai vettori di effettuare prenotazioni, e alle guardie/operatori di gestire il piazzale in tempo reale. Lo stile grafico viene allineato a quello del **Portale Ticket** esistente (sfondo grigio/beige chiaro, superfici bianche con angoli arrotondati 12px, bordi sottili e sidebar con sfumatura blu aziendale).
 
 ---
 
@@ -12,24 +12,30 @@ Creazione di un'applicazione web in lingua **italiana** per la gestione delle ba
 
 ## Success Criteria
 1. Interfaccia completamente in **italiano**.
-2. Estetica **Cyber-Industrial Dark Mode** coerente: sfondo grigio scuro/nero, spigoli netti (`rounded-none`), contrasto con Arancione e Giallo Cantiere, e Verde Neon.
-3. Simulazione di 3 ruoli (Amministratore, Vettore, Operatore/Guardia) con uno switcher istantaneo per i test.
-4. Flusso completo del camion funzionante: Prenotato -> Arrivato al cancello -> Baia assegnata -> Attività avviata -> Attività terminata -> Uscito.
-5. Log delle attività operatore visualizzato in tempo reale.
-6. Persistenza dei dati in `localStorage` con pulsante per ripristinare i valori predefiniti di fabbrica.
+2. Stile grafico allineato al **Portale Ticket**:
+   - Sfondo chiarissimo `#F5F0EB`.
+   - Card e pannelli in bianco semi-trasparente `bg-white/80 backdrop-blur-md` con angoli arrotondati `rounded-xl` (12px) e ombreggiature tenui.
+   - Bordi discreti `border-black/10`.
+   - Pulsanti primari in celeste `#11BCEC` con hover blu `#004B97` e angoli arrotondati.
+   - Sidebar aziendale con gradiente blu `bg-gradient-to-br from-[#003a75] via-[#004B97] to-[#0062b8]` e voci di menu arrotondate.
+3. Simulazione di 3 ruoli (Amministratore, Vettore, Operatore/Guardia) con switcher nella sidebar.
+4. Flusso completo del camion funzionante: Prenotato -> Arrivato al cancello -> Baia assegnata -> Attività avviata -> Attività terminata/Rilasciata -> Uscito.
+5. Log delle attività operatore in tempo reale.
+6. Persistenza in `localStorage` con pulsante di reset.
 7. Nessun errore di compilazione TypeScript o linter.
 
 ---
 
 ## Tech Stack
 - **Framework**: React 18 / 19 (con TypeScript)
-- **Tooling**: Vite (sviluppo super rapido e build ottimizzata)
-- **Styling**: Tailwind CSS v4 (approccio CSS-first, variabili di design integrate, senza componenti terzi pronti)
+- **Tooling**: Vite
+- **Styling**: Tailwind CSS v4 (approccio CSS-first, variabili di design integrate)
 - **Stato**: React AppContext + `localStorage` sync.
 
 ---
 
 ## File Structure
+*(Identica alla precedente, modifichiamo solo gli stili ed i componenti)*
 ```plaintext
 GestioneBaie/
 ├── index.html
@@ -59,72 +65,28 @@ GestioneBaie/
 
 ---
 
-## Task Breakdown
+## Task Breakdown (Fase Aggiornamento Grafico)
 
-### Fase 1: Inizializzazione Ambiente (P0)
-- **Task 1.1**: Inizializzare l'applicazione React con Vite e Tailwind CSS v4 in modo non interattivo.
-  - *Input*: Workspace vuoto.
-  - *Output*: File `package.json`, `index.html`, `vite.config.ts`, `src/main.tsx` e file CSS iniziale.
-  - *Verify*: Il build di base funziona ed è eseguibile.
-- **Task 1.2**: Scrivere `src/index.css` per definire il tema Cyber-Industrial Dark Mode (variabili colore, bordi netti, sfondi scuri, animazioni).
-  - *Input*: File CSS vuoto.
-  - *Output*: CSS globale configurato con lo stile personalizzato ad alto contrasto.
-  - *Verify*: Presenza di classi per bottoni piatti e contrasti forti.
+### Fase G1: Aggiornamento Stili Globali (P0)
+- **Task G1.1**: Riscrivere `src/index.css` per impostare il tema chiaro di sfondo (`#F5F0EB`), rimuovere la forzatura degli spigoli vivi a 0px, definire i font 'Inter' e le variabili di colore aziendali.
+  - *Verify*: Lo sfondo generale diventa beige chiaro e gli elementi riprendono ad usare i bordi arrotondati standard.
 
-### Fase 2: Tipi e Context di Stato (P0)
-- **Task 2.1**: Creare `src/types/index.ts` con i modelli dati italiani/inglesi (Magazzino, Baia, Vettore, Prenotazione, Log delle Operazioni).
-  - *Input*: File vuoto.
-  - *Output*: Tipi TypeScript definiti.
-  - *Verify*: La compilazione con `tsc --noEmit` passa.
-- **Task 2.2**: Creare `src/context/AppContext.tsx` con i dati iniziali di mock e le azioni di stato per gestire il ciclo dei camion.
-  - *Input*: Tipi TypeScript.
-  - *Output*: Provider React funzionante con persistenza `localStorage`.
-  - *Verify*: Le azioni di stato modificano correttamente le baie e le prenotazioni.
+### Fase G2: Aggiornamento Componenti Base (P1)
+- **Task G2.1**: Modificare `src/components/ui/Button.tsx` per rimuovere lo spessore inferiore, configurare gli angoli arrotondati e impostare il colore celeste `#11BCEC`.
+- **Task G2.2**: Modificare `src/components/ui/Card.tsx` per cambiare lo stile in bianco semi-trasparente sfocato con bordo leggero.
+- **Task G2.3**: Modificare `src/components/ui/Badge.tsx`, `src/components/ui/Input.tsx` e `src/components/ui/Table.tsx` per allineare geometrie, bordi e colori.
+  - *Verify*: I pulsanti, i campi di input e le tabelle mostrano gli angoli arrotondati e i colori chiari del portale ticket.
 
-### Fase 3: Componenti UI Base e Layout (P1)
-- **Task 3.1**: Creare i componenti grafici spigolosi in `src/components/ui/` (`Button`, `Card`, `Table`, `Badge`, `Input`).
-  - *Input*: Classi Tailwind v4.
-  - *Output*: Componenti riutilizzabili.
-  - *Verify*: Rendono correttamente con bordo da 1px o 2px ed angoli retti.
-- **Task 3.2**: Creare `src/components/Sidebar.tsx` con la barra di navigazione e lo switcher rapido dei ruoli in test.
-  - *Input*: Componenti UI di base.
-  - *Output*: Sidebar con visualizzazione del ruolo simulato attivo.
-  - *Verify*: Lo switcher dei ruoli modifica lo stato di simulazione globale.
-
-### Fase 4: Moduli Amministrazione & Portale Vettori (P1)
-- **Task 4.1**: Creare la pagina amministrativa `src/pages/DashboardAdmin.tsx` (configurazione hub/baie, elenco vettori, approvazione).
-  - *Input*: AppContext.
-  - *Output*: Interfaccia amministratore completa.
-  - *Verify*: È possibile aggiungere baie e approvare vettori in sospeso.
-- **Task 4.2**: Creare la pagina `src/pages/PortaleVettori.tsx` (richiesta prenotazioni e storico per vettori approvati).
-  - *Input*: AppContext.
-  - *Output*: Interfaccia portale vettori.
-  - *Verify*: Invio di prenotazioni per target date ed activity type.
-
-### Fase 5: Monitor Yard & Operazioni Baie (P1)
-- **Task 5.1**: Creare la pagina della dashboard live `src/pages/MonitorYard.tsx` (vista per operatori/guardia con gestione stati baie e camion).
-  - *Input*: AppContext.
-  - *Output*: Dashboard live in tempo reale con visualizzazione HUD delle baie.
-  - *Verify*: Flusso completo Cancello -> Assegnazione Baia -> Avvio Attività -> Rilascio -> Uscita.
-
-### Fase 6: Reporting & Analisi (P2)
-- **Task 6.1**: Creare `src/pages/ReportStatistiche.tsx` (tempi medi di sosta, occupazione baie, volumi giornalieri).
-  - *Input*: Storico delle prenotazioni completate.
-  - *Output*: Schermata reportistica ad alto contrasto.
-  - *Verify*: Calcolo matematico corretto dei parametri di efficienza.
+### Fase G3: Aggiornamento Layout e Sidebar (P1)
+- **Task G3.1**: Modificare `src/components/Sidebar.tsx` per applicare il gradiente blu (`#003a75` -> `#0062b8`), gli elementi di navigazione arrotondati `rounded-xl`, e la finitura del pannello utente in stile `bg-white/10 border-white/10`.
+  - *Verify*: La sidebar assume l'aspetto professionale del portale ticket originale.
 
 ---
 
 ## Phase X: Final Verification
-- [x] No purple/violet hex codes or styling gradients (Purple Ban)
-- [x] No rounded corners beyond `rounded-[2px]` (Sharp edges rule)
-- [x] Run Linter: `npm run lint`
-- [x] Run Type Check: `npx tsc --noEmit`
-- [x] Run Build: `npm run build`
-- [x] Run Dev Server and perform complete verification checklist
-
-## ✅ PHASE X COMPLETE
-- Lint: ✅ Pass
-- Security: ✅ No critical issues
-- Build: ✅ Success
-- Date: 2026-07-24
+- [ ] Angoli arrotondati `rounded-xl` / `rounded-lg` attivi su tutte le schede e pulsanti
+- [ ] Sidebar con gradiente blu aziendale e testi bianchi
+- [ ] Sfondo chiaro `#F5F0EB` e card bianche con ombreggiatura
+- [ ] Run Linter: `npm run lint`
+- [ ] Run Type Check: `npx tsc --noEmit`
+- [ ] Run Build: `npm run build`

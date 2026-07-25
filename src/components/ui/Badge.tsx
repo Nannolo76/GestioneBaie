@@ -11,14 +11,14 @@ export const Badge: React.FC<BadgeProps> = ({
   variant = 'info',
   className = '',
 }) => {
-  const baseStyle = 'inline-flex items-center px-2 py-0.5 text-xs font-mono font-bold tracking-wider uppercase border';
+  const baseStyle = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase border';
 
   const variants = {
-    primary: 'bg-cyber-orange/10 text-cyber-orange border-cyber-orange/30',
-    success: 'bg-cyber-green/10 text-cyber-green border-cyber-green/30',
-    warning: 'bg-cyber-yellow/10 text-cyber-yellow border-cyber-yellow/30',
-    danger: 'bg-cyber-red/10 text-cyber-red border-cyber-red/30',
-    info: 'text-cyber-text border-cyber-border bg-cyber-bg/50',
+    primary: 'bg-sky-50 text-[#11BCEC] border-sky-200/50',
+    success: 'bg-emerald-50 text-emerald-600 border-emerald-200/50',
+    warning: 'bg-amber-50 text-amber-600 border-amber-200/50',
+    danger: 'bg-rose-50 text-rose-600 border-rose-200/50',
+    info: 'bg-gray-100 text-gray-700 border-gray-200/50',
   };
 
   return (

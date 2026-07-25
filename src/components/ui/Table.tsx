@@ -14,32 +14,32 @@ interface TableProps<T> {
 
 export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato' }: TableProps<T>) {
   return (
-    <div className="w-full overflow-x-auto border border-cyber-border bg-cyber-card">
+    <div className="w-full overflow-x-auto border border-black/10 rounded-xl bg-white shadow-xs">
       <table className="w-full text-left border-collapse">
         <thead>
-          <tr className="bg-cyber-bg border-b border-cyber-border">
+          <tr className="bg-gray-50/50 border-b border-black/10">
             {columns.map((col, index) => (
               <th
                 key={index}
-                className={`p-3 text-xs font-mono font-bold uppercase tracking-wider text-cyber-orange ${col.className || ''}`}
+                className={`p-3 text-[9px] font-mono font-bold uppercase tracking-widest text-gray-400 ${col.className || ''}`}
               >
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-cyber-border font-mono text-sm">
+        <tbody className="divide-y divide-black/5 font-mono text-[11px]">
           {data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="p-8 text-center text-cyber-text-muted">
+              <td colSpan={columns.length} className="p-8 text-center text-gray-400">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
             data.map((row, rowIndex) => (
-              <tr key={rowIndex} className="hover:bg-cyber-card-hover transition-colors">
+              <tr key={rowIndex} className="hover:bg-gray-50/30 transition-colors">
                 {columns.map((col, colIndex) => (
-                  <td key={colIndex} className={`p-3 text-cyber-text ${col.className || ''}`}>
+                  <td key={colIndex} className={`p-3 text-black ${col.className || ''}`}>
                     {col.accessor(row)}
                   </td>
                 ))}
