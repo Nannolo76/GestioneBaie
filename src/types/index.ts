@@ -40,6 +40,12 @@ export interface Booking {
   bayId?: string; // Assigned during gate check-in
   licensePlate: string;
   driverName: string;
+  driverPhone?: string;
+  notes?: string;
+  palletPlaces?: number;
+  ticketNumber?: string;
+  isEditedInBay?: boolean;
+  bayChangeReason?: string;
   timeInGate?: string; // ISO string when truck arrived at gate
   timeInBay?: string;  // ISO string when loading/unloading started
   timeOutBay?: string; // ISO string when activity finished

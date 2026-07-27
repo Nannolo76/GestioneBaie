@@ -23,8 +23,27 @@ interface AppContextType {
   approveCarrier: (carrierId: string) => void;
   rejectCarrier: (carrierId: string) => void;
   updateCarrierProfile: (id: string, email: string, licensePlate?: string, phone?: string) => void;
-  addBooking: (depotId: string, date: string, activityType: string, licensePlate: string, driverName: string) => void;
-  updateBookingStatus: (bookingId: string, status: Booking['status'], bayId?: string) => void;
+  addBooking: (
+    depotId: string,
+    date: string,
+    activityType: string,
+    licensePlate: string,
+    driverName: string,
+    driverPhone?: string,
+    notes?: string,
+    palletPlaces?: number
+  ) => void;
+  updateBookingStatus: (
+    bookingId: string,
+    status: Booking['status'],
+    bayId?: string,
+    extra?: { driverPhone?: string; notes?: string }
+  ) => void;
+  updateBookingDetails: (
+    bookingId: string,
+    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number }
+  ) => void;
+  relocateBookingBay: (bookingId: string, newBayId: string, reason: string) => void;
   addActivityType: (name: string, code: string) => void;
   addReportSchedule: (name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => void;
   toggleReportSchedule: (id: string) => void;
@@ -37,7 +56,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'yard_management_system_state_v2';
+const LOCAL_STORAGE_KEY = 'yard_management_system_state_v3';
 
 const getTodayDateString = () => {
   return new Date().toISOString().split('T')[0];
@@ -105,6 +124,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'PRENOTATO',
       licensePlate: 'AA123BB',
       driverName: 'Marco Rossi',
+      driverPhone: '+39 347 1234567',
+      palletPlaces: 24,
+      ticketNumber: 'C-392',
+      notes: 'Materiale promozionale secco',
     },
     {
       id: 'book-milano-2',
@@ -115,6 +138,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'AL_CANCELLO',
       licensePlate: 'CC456DD',
       driverName: 'Giuseppe Bianchi',
+      driverPhone: '+39 333 9876543',
+      palletPlaces: 12,
+      ticketNumber: 'S-712',
+      notes: 'Carico a temperatura controllata fresco',
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 1)).toISOString(),
     },
     {
@@ -127,6 +154,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       bayId: 'bay-r-01',
       licensePlate: 'EE789FF',
       driverName: 'Luca Verdi',
+      driverPhone: '+39 320 1122334',
+      palletPlaces: 33,
+      ticketNumber: 'S-209',
+      notes: 'Sponda idraulica richiesta',
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 3)).toISOString(),
       timeInBay: new Date(new Date().setHours(new Date().getHours() - 2)).toISOString(),
     },
@@ -140,6 +171,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       bayId: 'bay-b-01',
       licensePlate: 'GG012HH',
       driverName: 'Giovanni Neri',
+      driverPhone: '+39 345 5566778',
+      palletPlaces: 8,
+      ticketNumber: 'C-881',
+      notes: 'Reso imballaggi',
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(),
       timeInBay: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(),
       timeOutBay: new Date(new Date().setHours(new Date().getHours() - 3)).toISOString(),
@@ -149,7 +184,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const defaultLogs: ActivityLog[] = [
     { id: 'log-1', timestamp: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(), depotId: 'depot-bari', message: 'Sistema avviato. Stato caricato correttamente.', type: 'INFO' },
-    { id: 'log-2', timestamp: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(), depotId: 'depot-bari', message: 'Vettore Freccia Rossa Trasporti registrato al cancello.', type: 'INFO' },
+    { id: 'log-2', timestamp: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(), depotId: 'depot-bari', message: 'Vettore Freccia Rossa Trasporti registrato al cancello con Ticket C-881.', type: 'INFO' },
     { id: 'log-3', timestamp: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(), depotId: 'depot-bari', message: 'Assegnata Baia B-01 a vettore Freccia Rossa Trasporti.', type: 'SUCCESS' },
     { id: 'log-4', timestamp: new Date(new Date().setHours(new Date().getHours() - 2.8)).toISOString(), depotId: 'depot-bari', message: 'Attività completata per veicolo GG012HH. Registrata uscita da Yard.', type: 'SUCCESS' },
   ];
@@ -196,7 +231,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, []);
 
-  // Salvataggio su LocalStorage ad ogni modifica
+  // Salvataggio su LocalStorage
   useEffect(() => {
     const stateToSave = {
       depots,
@@ -252,8 +287,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateBayStatus = (bayId: string, status: Bay['status']) => {
     setBays((prev) =>
       prev.map((b) => {
+        const updatedBay = { ...b, status };
         if (b.id === bayId) {
-          const updatedBay = { ...b, status };
           if (status === 'MANUTENZIONE') {
             updatedBay.currentBookingId = undefined;
           }
@@ -275,7 +310,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
       name,
       email,
-      status: 'APPROVATO', // Creato dall'admin è auto-approvato
+      status: 'APPROVATO',
       vatNumber,
       licensePlate,
     };
@@ -289,7 +324,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
       name,
       email,
-      status: 'ATTESA_APPROVAZIONE', // Registrazione spontanea, richiede validazione
+      status: 'ATTESA_APPROVAZIONE',
       vatNumber,
       licensePlate,
     };
@@ -329,10 +364,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     date: string,
     activityType: string,
     licensePlate: string,
-    driverName: string
+    driverName: string,
+    driverPhone?: string,
+    notes?: string,
+    palletPlaces?: number
   ) => {
     const id = `book-${Date.now()}`;
     const carrierId = currentRole === 'VETTORE' ? currentCarrierId : 'carrier-1';
+    
+    // Triage ticket number prefix from activity code
+    const prefix = activityType.substring(0, 1).toUpperCase() || 'T';
+    const randNum = Math.floor(100 + Math.random() * 900);
+    const ticketNumber = `${prefix}-${randNum}`;
+
     const newBooking: Booking = {
       id,
       carrierId,
@@ -342,17 +386,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'PRENOTATO',
       licensePlate: licensePlate.toUpperCase(),
       driverName,
+      driverPhone,
+      notes,
+      palletPlaces: palletPlaces ? Number(palletPlaces) : undefined,
+      ticketNumber,
+      isEditedInBay: false,
     };
+
     setBookings((prev) => [...prev, newBooking]);
     const carrier = carriers.find((c) => c.id === carrierId);
     logActivity(
       depotId,
-      `Prenotazione per attività di ${activityType} registrata da ${carrier?.name || 'Vettore'} per il ${date} (Veicolo: ${licensePlate.toUpperCase()})`,
+      `Prenotazione [Ticket: ${ticketNumber}] per attività di ${activityType} registrata da ${carrier?.name || 'Vettore'} (Veicolo: ${licensePlate.toUpperCase()}, Pallet: ${palletPlaces || 'N/D'})`,
       'INFO'
     );
   };
 
-  const updateBookingStatus = (bookingId: string, status: Booking['status'], bayId?: string) => {
+  const updateBookingStatus = (
+    bookingId: string,
+    status: Booking['status'],
+    bayId?: string,
+    extra?: { driverPhone?: string; notes?: string }
+  ) => {
     let oldBooking: Booking | undefined;
     let targetDepotId = selectedDepotId;
 
@@ -363,6 +418,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           targetDepotId = b.depotId;
 
           const updated = { ...b, status };
+
+          // Aggiungi dati extra dal check-in se forniti
+          if (extra) {
+            if (extra.driverPhone !== undefined) updated.driverPhone = extra.driverPhone;
+            if (extra.notes !== undefined) updated.notes = extra.notes;
+          }
 
           // Timestamp in base alla transizione
           if (status === 'AL_CANCELLO' && !b.timeInGate) {
@@ -383,6 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             updated.timeInBay = undefined;
             updated.timeOutBay = undefined;
             updated.timeOutGate = undefined;
+            updated.isEditedInBay = false;
           }
 
           return updated;
@@ -394,6 +456,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Gestione dello stato delle baie
     if (oldBooking) {
       const carrierName = carriers.find((c) => c.id === oldBooking?.carrierId)?.name || 'Vettore';
+      const ticketText = oldBooking.ticketNumber || oldBooking.id;
 
       // 1. Libera la baia precedente
       if (oldBooking.bayId) {
@@ -418,26 +481,104 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const targetBayName = bays.find((b) => b.id === bayId)?.name || 'Baia';
         logActivity(
           targetDepotId,
-          `Mezzo ${oldBooking.licensePlate} (${carrierName}) in baia ${targetBayName}. Avviata attività di ${oldBooking.activityType}.`,
+          `Mezzo ${oldBooking.licensePlate} [${ticketText}] (${carrierName}) in baia ${targetBayName}. Avviata attività di ${oldBooking.activityType}.`,
           'SUCCESS'
         );
       } else if (status === 'AL_CANCELLO') {
         logActivity(
           targetDepotId,
-          `Check-In al cancello per veicolo ${oldBooking.licensePlate} (${carrierName}). Registrato ingresso.`,
+          `Check-In al cancello per veicolo ${oldBooking.licensePlate} [${ticketText}] (${carrierName}). Registrato ingresso.`,
           'INFO'
         );
       } else if (status === 'COMPLETATO') {
         const targetBayName = bays.find((b) => b.id === oldBooking?.bayId)?.name || 'Baia';
         logActivity(
           targetDepotId,
-          `Attività conclusa per veicolo ${oldBooking.licensePlate} (${carrierName}) presso ${targetBayName}. Mezzo uscito da Plant.`,
+          `Attività conclusa per veicolo ${oldBooking.licensePlate} [${ticketText}] (${carrierName}) presso ${targetBayName}. Mezzo uscito da Plant.`,
           'SUCCESS'
         );
       } else if (status === 'ANNULLATO') {
-        logActivity(targetDepotId, `Prenotazione slot per ${oldBooking.licensePlate} annullata.`, 'WARNING');
+        logActivity(targetDepotId, `Prenotazione slot per ${oldBooking.licensePlate} [${ticketText}] annullata.`, 'WARNING');
       }
     }
+  };
+
+  // Aggiorna dettagli attività/note e attiva il flag contorno evidenziato
+  const updateBookingDetails = (
+    bookingId: string,
+    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number }
+  ) => {
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === bookingId) {
+          const updated = {
+            ...b,
+            ...updates,
+          };
+          // Se il camion è in baia, imposta l'allerta contorno a true
+          if (b.status === 'IN_BAIA') {
+            updated.isEditedInBay = true;
+          }
+          return updated;
+        }
+        return b;
+      })
+    );
+
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (booking) {
+      const ticketText = booking.ticketNumber || booking.id;
+      logActivity(booking.depotId, `Aggiornati dettagli operativi per prenotazione [${ticketText}].`, 'INFO');
+    }
+  };
+
+  // Spostamento di baia con motivazione registrata
+  const relocateBookingBay = (bookingId: string, newBayId: string, reason: string) => {
+    let targetDepotId = selectedDepotId;
+    let oldBayId: string | undefined;
+
+    setBookings((prevBookings) =>
+      prevBookings.map((b) => {
+        if (b.id === bookingId) {
+          targetDepotId = b.depotId;
+          oldBayId = b.bayId;
+          return {
+            ...b,
+            bayId: newBayId,
+            bayChangeReason: reason,
+            isEditedInBay: true, // Lo spostamento attiva l'evidenziazione contorno!
+            notes: b.notes ? `${b.notes} | Spostato da baia: ${reason}` : `Spostato da baia: ${reason}`,
+          };
+        }
+        return b;
+      })
+    );
+
+    // Aggiorna lo stato delle baie fisiche
+    setBays((prevBays) =>
+      prevBays.map((b) => {
+        // Libera la vecchia
+        if (oldBayId && b.id === oldBayId) {
+          return { ...b, status: 'DISPONIBILE' as const, currentBookingId: undefined };
+        }
+        // Blocca la nuova
+        if (b.id === newBayId) {
+          return { ...b, status: 'OCCUPATA' as const, currentBookingId: bookingId };
+        }
+        return b;
+      })
+    );
+
+    const bNameOld = bays.find((b) => b.id === oldBayId)?.name || 'Vecchia Baia';
+    const bNameNew = bays.find((b) => b.id === newBayId)?.name || 'Nuova Baia';
+    const booking = bookings.find(b => b.id === bookingId);
+    const ticketText = booking?.ticketNumber || bookingId;
+
+    logActivity(
+      targetDepotId,
+      `Riassegnazione baia per [${ticketText}]: spostato da ${bNameOld} a ${bNameNew}. Motivazione: ${reason}`,
+      'WARNING'
+    );
   };
 
   // --- ATTIVITA' E SCHEDULATORI ---
@@ -503,6 +644,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCarrierProfile,
         addBooking,
         updateBookingStatus,
+        updateBookingDetails,
+        relocateBookingBay,
         addActivityType,
         addReportSchedule,
         toggleReportSchedule,

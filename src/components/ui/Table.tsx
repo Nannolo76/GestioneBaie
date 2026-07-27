@@ -10,9 +10,10 @@ interface TableProps<T> {
   columns: TableColumn<T>[];
   data: T[];
   emptyMessage?: string;
+  rowClassName?: (row: T) => string;
 }
 
-export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato' }: TableProps<T>) {
+export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato', rowClassName }: TableProps<T>) {
   return (
     <div className="w-full overflow-x-auto border border-black/10 rounded-xl bg-white shadow-xs">
       <table className="w-full text-left border-collapse">
@@ -36,15 +37,18 @@ export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato' }
               </td>
             </tr>
           ) : (
-            data.map((row, rowIndex) => (
-              <tr key={rowIndex} className="hover:bg-gray-50/30 transition-colors">
-                {columns.map((col, colIndex) => (
-                  <td key={colIndex} className={`p-3 text-black ${col.className || ''}`}>
-                    {col.accessor(row)}
-                  </td>
-                ))}
-              </tr>
-            ))
+            data.map((row, rowIndex) => {
+              const customClass = rowClassName ? rowClassName(row) : '';
+              return (
+                <tr key={rowIndex} className={`hover:bg-gray-50/30 transition-colors ${customClass}`}>
+                  {columns.map((col, colIndex) => (
+                    <td key={colIndex} className={`p-3 text-black ${col.className || ''}`}>
+                      {col.accessor(row)}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>

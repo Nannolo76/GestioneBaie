@@ -27,6 +27,9 @@ export const PortaleVettori: React.FC = () => {
   const [selectedActivityCode, setSelectedActivityCode] = useState(activityTypes[0]?.code || 'SCARICO');
   const [licensePlate, setLicensePlate] = useState(loggedInCarrier?.licensePlate || '');
   const [driverName, setDriverName] = useState('');
+  const [driverPhone, setDriverPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [palletPlaces, setPalletPlaces] = useState<number | ''>('');
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -49,9 +52,23 @@ export const PortaleVettori: React.FC = () => {
       return;
     }
 
-    addBooking(targetDepotId, targetDate, selectedActivityCode, licensePlate, driverName);
+    addBooking(
+      targetDepotId,
+      targetDate,
+      selectedActivityCode,
+      licensePlate,
+      driverName,
+      driverPhone || undefined,
+      notes || undefined,
+      palletPlaces ? Number(palletPlaces) : undefined
+    );
     setSuccessMsg('Prenotazione registrata con successo!');
+    
+    // Reset form
     setDriverName('');
+    setDriverPhone('');
+    setNotes('');
+    setPalletPlaces('');
   };
 
   const handleUpdateProfile = (e: React.FormEvent) => {
@@ -149,20 +166,44 @@ export const PortaleVettori: React.FC = () => {
                 }}
               />
 
-              <Input
-                label="Targa Automezzo"
-                placeholder="Es. AA123BB"
-                value={licensePlate}
-                onChange={(e) => setLicensePlate(e.target.value)}
-                required
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Targa Automezzo *"
+                  placeholder="Es. AA123BB"
+                  value={licensePlate}
+                  onChange={(e) => setLicensePlate(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Posti Pallet (Ind.)"
+                  type="number"
+                  placeholder="Es. 33"
+                  value={palletPlaces === '' ? '' : palletPlaces}
+                  onChange={(e) => setPalletPlaces(e.target.value === '' ? '' : Number(e.target.value))}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Nominativo Autista *"
+                  placeholder="Es. Mario Rossi"
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Telefono Autista"
+                  placeholder="Es. 3331234567"
+                  value={driverPhone}
+                  onChange={(e) => setDriverPhone(e.target.value)}
+                />
+              </div>
 
               <Input
-                label="Nominativo Autista"
-                placeholder="Es. Mario Rossi"
-                value={driverName}
-                onChange={(e) => setDriverName(e.target.value)}
-                required
+                label="Note Operative / Particolari"
+                placeholder="Es. Sponda idraulica, merce fresca..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
               />
 
               <Button type="submit" className="w-full">
@@ -229,6 +270,14 @@ export const PortaleVettori: React.FC = () => {
               emptyMessage="Nessuna prenotazione inserita da questo vettore."
               columns={[
                 {
+                  header: 'Ticket',
+                  accessor: (b) => (
+                    <span className="font-mono font-bold text-xs bg-gray-100 border border-black/10 px-2 py-0.5 rounded text-gray-800">
+                      {b.ticketNumber || 'N/D'}
+                    </span>
+                  )
+                },
+                {
                   header: 'Data Slot',
                   accessor: (b) => <span className="font-bold">{b.date}</span>,
                 },
@@ -243,8 +292,14 @@ export const PortaleVettori: React.FC = () => {
                   header: 'Veicolo / Autista',
                   accessor: (b) => (
                     <div className="text-xs">
-                      <div className="font-bold font-mono">{b.licensePlate}</div>
-                      <div className="text-ticket-muted">{b.driverName}</div>
+                      <div className="font-bold font-mono">
+                        {b.licensePlate} 
+                        {b.palletPlaces && <span className="text-[10px] text-[#11BCEC] font-sans ml-1">({b.palletPlaces} PL)</span>}
+                      </div>
+                      <div className="text-ticket-muted">
+                        {b.driverName} {b.driverPhone && <span className="text-[10px] font-mono">({b.driverPhone})</span>}
+                      </div>
+                      {b.notes && <div className="text-[10px] italic text-gray-400 truncate max-w-[150px]">{b.notes}</div>}
                     </div>
                   ),
                 },
