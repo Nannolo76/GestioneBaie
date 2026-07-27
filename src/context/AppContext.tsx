@@ -1,24 +1,35 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Depot, Bay, Carrier, Booking, ActivityLog } from '../types';
+import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User } from '../types';
 
 interface AppContextType {
   depots: Depot[];
+  warehouseModules: WarehouseModule[];
   bays: Bay[];
   carriers: Carrier[];
   bookings: Booking[];
   activityLogs: ActivityLog[];
-  currentRole: 'ADMIN' | 'VETTORE' | 'OPERATORE';
+  activityTypes: ActivityType[];
+  reportSchedules: ReportSchedule[];
+  currentRole: 'ADMIN' | 'GUARDIA' | 'VETTORE' | null;
+  currentUser: User | null;
   currentCarrierId: string;
   selectedDepotId: string;
   addDepot: (name: string, city: string) => void;
-  addBay: (depotId: string, name: string) => void;
+  addWarehouseModule: (depotId: string, name: string, description?: string) => void;
+  addBay: (depotId: string, name: string, moduleId?: string) => void;
   updateBayStatus: (bayId: string, status: 'DISPONIBILE' | 'OCCUPATA' | 'MANUTENZIONE') => void;
-  addCarrier: (name: string, email: string, licensePlate?: string) => void;
+  addCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
+  registerCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
   approveCarrier: (carrierId: string) => void;
   rejectCarrier: (carrierId: string) => void;
-  addBooking: (depotId: string, date: string, activityType: 'CARICO' | 'SCARICO', licensePlate: string, driverName: string) => void;
+  updateCarrierProfile: (id: string, email: string, licensePlate?: string, phone?: string) => void;
+  addBooking: (depotId: string, date: string, activityType: string, licensePlate: string, driverName: string) => void;
   updateBookingStatus: (bookingId: string, status: Booking['status'], bayId?: string) => void;
-  setCurrentRole: (role: 'ADMIN' | 'VETTORE' | 'OPERATORE') => void;
+  addActivityType: (name: string, code: string) => void;
+  addReportSchedule: (name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => void;
+  toggleReportSchedule: (id: string) => void;
+  setCurrentRole: (role: 'ADMIN' | 'GUARDIA' | 'VETTORE' | null) => void;
+  setCurrentUser: (user: User | null) => void;
   setCurrentCarrierId: (carrierId: string) => void;
   setSelectedDepotId: (depotId: string) => void;
   resetState: () => void;
@@ -26,9 +37,8 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'yard_management_system_state';
+const LOCAL_STORAGE_KEY = 'yard_management_system_state_v2';
 
-// Generatore di data odierna in formato YYYY-MM-DD
 const getTodayDateString = () => {
   return new Date().toISOString().split('T')[0];
 };
@@ -36,33 +46,51 @@ const getTodayDateString = () => {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // --- DATI DI DEFAULT (MOCK DATABASE) ---
   const defaultDepots: Depot[] = [
-    { id: 'depot-milano', name: 'Milano Logistics Hub', city: 'Milano (MI)' },
-    { id: 'depot-roma', name: 'Roma Distribution Center', city: 'Roma (RM)' },
-    { id: 'depot-bari', name: 'Bari Port Hub', city: 'Bari (BA)' },
+    { id: 'depot-milano', name: 'Milano Logistics Plant', city: 'Milano (MI)' },
+    { id: 'depot-roma', name: 'Roma Logistics Plant', city: 'Roma (RM)' },
+    { id: 'depot-bari', name: 'Bari Logistics Plant', city: 'Bari (BA)' },
+  ];
+
+  const defaultWarehouseModules: WarehouseModule[] = [
+    { id: 'module-m-1', depotId: 'depot-milano', name: 'Modulo A (Secco)' },
+    { id: 'module-m-2', depotId: 'depot-milano', name: 'Modulo B (Fresco)' },
+    { id: 'module-r-1', depotId: 'depot-roma', name: 'Modulo Unico' },
+    { id: 'module-b-1', depotId: 'depot-bari', name: 'Modulo Est' },
   ];
 
   const defaultBays: Bay[] = [
     // Milano
-    { id: 'bay-m-01', depotId: 'depot-milano', name: 'Baia M-01', status: 'DISPONIBILE' },
-    { id: 'bay-m-02', depotId: 'depot-milano', name: 'Baia M-02', status: 'DISPONIBILE' },
-    { id: 'bay-m-03', depotId: 'depot-milano', name: 'Baia M-03', status: 'DISPONIBILE' },
-    { id: 'bay-m-04', depotId: 'depot-milano', name: 'Baia M-04', status: 'DISPONIBILE' },
+    { id: 'bay-m-01', depotId: 'depot-milano', moduleId: 'module-m-1', name: 'Baia M-01 (Dry)', status: 'DISPONIBILE' },
+    { id: 'bay-m-02', depotId: 'depot-milano', moduleId: 'module-m-1', name: 'Baia M-02 (Dry)', status: 'DISPONIBILE' },
+    { id: 'bay-m-03', depotId: 'depot-milano', moduleId: 'module-m-2', name: 'Baia M-03 (Cold)', status: 'DISPONIBILE' },
+    { id: 'bay-m-04', depotId: 'depot-milano', moduleId: 'module-m-2', name: 'Baia M-04 (Cold)', status: 'DISPONIBILE' },
     // Roma
-    { id: 'bay-r-01', depotId: 'depot-roma', name: 'Baia R-01', status: 'OCCUPATA', currentBookingId: 'book-roma-active' },
-    { id: 'bay-r-02', depotId: 'depot-roma', name: 'Baia R-02', status: 'DISPONIBILE' },
-    { id: 'bay-r-03', depotId: 'depot-roma', name: 'Baia R-03', status: 'DISPONIBILE' },
-    { id: 'bay-r-04', depotId: 'depot-roma', name: 'Baia R-04', status: 'MANUTENZIONE' },
+    { id: 'bay-r-01', depotId: 'depot-roma', moduleId: 'module-r-1', name: 'Baia R-01', status: 'OCCUPATA', currentBookingId: 'book-roma-active' },
+    { id: 'bay-r-02', depotId: 'depot-roma', moduleId: 'module-r-1', name: 'Baia R-02', status: 'DISPONIBILE' },
+    { id: 'bay-r-03', depotId: 'depot-roma', moduleId: 'module-r-1', name: 'Baia R-03', status: 'DISPONIBILE' },
+    { id: 'bay-r-04', depotId: 'depot-roma', moduleId: 'module-r-1', name: 'Baia R-04', status: 'MANUTENZIONE' },
     // Bari
-    { id: 'bay-b-01', depotId: 'depot-bari', name: 'Baia B-01', status: 'DISPONIBILE' },
-    { id: 'bay-b-02', depotId: 'depot-bari', name: 'Baia B-02', status: 'DISPONIBILE' },
-    { id: 'bay-b-03', depotId: 'depot-bari', name: 'Baia B-03', status: 'DISPONIBILE' },
+    { id: 'bay-b-01', depotId: 'depot-bari', moduleId: 'module-b-1', name: 'Baia B-01', status: 'DISPONIBILE' },
+    { id: 'bay-b-02', depotId: 'depot-bari', moduleId: 'module-b-1', name: 'Baia B-02', status: 'DISPONIBILE' },
+    { id: 'bay-b-03', depotId: 'depot-bari', moduleId: 'module-b-1', name: 'Baia B-03', status: 'DISPONIBILE' },
   ];
 
   const defaultCarriers: Carrier[] = [
-    { id: 'carrier-1', name: 'Logistica Uno Europe', email: 'info@logisticauno.com', status: 'APPROVATO', licensePlate: 'AA123BB' },
-    { id: 'carrier-2', name: 'Freccia Rossa Trasporti', email: 'operations@frecciarossa.it', status: 'APPROVATO', licensePlate: 'CC456DD' },
-    { id: 'carrier-3', name: 'Adriatica Cargo Srl', email: 'logistic@adriaticacargo.it', status: 'ATTESA_APPROVAZIONE', licensePlate: 'EE789FF' },
-    { id: 'carrier-4', name: 'Euro Shipping Spedizioni', email: 'book@euroshipping.com', status: 'ATTESA_APPROVAZIONE' },
+    { id: 'carrier-1', name: 'Logistica Uno Europe', email: 'info@logisticauno.com', status: 'APPROVATO', licensePlate: 'AA123BB', vatNumber: 'IT12345678901' },
+    { id: 'carrier-2', name: 'Freccia Rossa Trasporti', email: 'operations@frecciarossa.it', status: 'APPROVATO', licensePlate: 'CC456DD', vatNumber: 'IT98765432109' },
+    { id: 'carrier-3', name: 'Adriatica Cargo Srl', email: 'logistic@adriaticacargo.it', status: 'ATTESA_APPROVAZIONE', licensePlate: 'EE789FF', vatNumber: 'IT11112222333' },
+    { id: 'carrier-4', name: 'Euro Shipping Spedizioni', email: 'book@euroshipping.com', status: 'ATTESA_APPROVAZIONE', vatNumber: 'IT44445555666' },
+  ];
+
+  const defaultActivityTypes: ActivityType[] = [
+    { id: 'act-1', name: 'Scarico Standard', code: 'SCARICO' },
+    { id: 'act-2', name: 'Carico Standard', code: 'CARICO' },
+    { id: 'act-3', name: 'Reso Fornitore', code: 'RESO' },
+  ];
+
+  const defaultReportSchedules: ReportSchedule[] = [
+    { id: 'rep-1', name: 'Saturazione Giornaliera Baie', frequency: 'GIORNALIERO', recipients: 'milano.ops@logisticauno.it', reportType: 'Saturazione Baie', active: true },
+    { id: 'rep-2', name: 'Performance Tempi Turnaround Vettori', frequency: 'SETTIMANALE', recipients: 'direzione.logistica@logisticauno.it', reportType: 'Tempi Turnaround', active: true }
   ];
 
   const today = getTodayDateString();
@@ -128,14 +156,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- STATO INIZIALIZZATO DA LOCALSTORAGE O DEFAULT ---
   const [depots, setDepots] = useState<Depot[]>(defaultDepots);
+  const [warehouseModules, setWarehouseModules] = useState<WarehouseModule[]>(defaultWarehouseModules);
   const [bays, setBays] = useState<Bay[]>(defaultBays);
   const [carriers, setCarriers] = useState<Carrier[]>(defaultCarriers);
   const [bookings, setBookings] = useState<Booking[]>(defaultBookings);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(defaultLogs);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>(defaultActivityTypes);
+  const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>(defaultReportSchedules);
 
-  // Stati di simulazione utente
-  const [currentRole, setCurrentRole] = useState<'ADMIN' | 'VETTORE' | 'OPERATORE'>('OPERATORE');
-  const [currentCarrierId, setCurrentCarrierId] = useState<string>('carrier-1');
+  // Stati di sessione (Simulazione d'accesso)
+  const [currentRole, setCurrentRole] = useState<'ADMIN' | 'GUARDIA' | 'VETTORE' | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentCarrierId, setCurrentCarrierId] = useState<string>('');
   const [selectedDepotId, setSelectedDepotId] = useState<string>('depot-milano');
 
   // Caricamento iniziale da LocalStorage
@@ -145,13 +177,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const parsed = JSON.parse(savedState);
         if (parsed.depots) setDepots(parsed.depots);
+        if (parsed.warehouseModules) setWarehouseModules(parsed.warehouseModules);
         if (parsed.bays) setBays(parsed.bays);
         if (parsed.carriers) setCarriers(parsed.carriers);
         if (parsed.bookings) setBookings(parsed.bookings);
         if (parsed.activityLogs) setActivityLogs(parsed.activityLogs);
-        if (parsed.currentRole) setCurrentRole(parsed.currentRole);
-        if (parsed.currentCarrierId) setCurrentCarrierId(parsed.currentCarrierId);
-        if (parsed.selectedDepotId) setSelectedDepotId(parsed.selectedDepotId);
+        if (parsed.activityTypes) setActivityTypes(parsed.activityTypes);
+        if (parsed.reportSchedules) setReportSchedules(parsed.reportSchedules);
+        
+        // Mantieni la sessione se presente
+        if (parsed.currentRole !== undefined) setCurrentRole(parsed.currentRole);
+        if (parsed.currentUser !== undefined) setCurrentUser(parsed.currentUser);
+        if (parsed.currentCarrierId !== undefined) setCurrentCarrierId(parsed.currentCarrierId);
+        if (parsed.selectedDepotId !== undefined) setSelectedDepotId(parsed.selectedDepotId);
       } catch (e) {
         console.error('Errore nel caricamento del localStorage', e);
       }
@@ -162,16 +200,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const stateToSave = {
       depots,
+      warehouseModules,
       bays,
       carriers,
       bookings,
       activityLogs,
+      activityTypes,
+      reportSchedules,
       currentRole,
+      currentUser,
       currentCarrierId,
       selectedDepotId,
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [depots, bays, carriers, bookings, activityLogs, currentRole, currentCarrierId, selectedDepotId]);
+  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, currentRole, currentUser, currentCarrierId, selectedDepotId]);
 
   // --- OPERAZIONI DI LOG ---
   const logActivity = (depotId: string, message: string, type: ActivityLog['type'] = 'INFO') => {
@@ -190,12 +232,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `depot-${Date.now()}`;
     const newDepot: Depot = { id, name, city };
     setDepots((prev) => [...prev, newDepot]);
-    logActivity(id, `Creato nuovo Hub: ${name} (${city})`, 'SUCCESS');
+    logActivity(id, `Creato nuovo stabilimento Plant: ${name} (${city})`, 'SUCCESS');
   };
 
-  const addBay = (depotId: string, name: string) => {
+  const addWarehouseModule = (depotId: string, name: string, description?: string) => {
+    const id = `module-${Date.now()}`;
+    const newModule: WarehouseModule = { id, depotId, name, description };
+    setWarehouseModules((prev) => [...prev, newModule]);
+    logActivity(depotId, `Creato nuovo modulo di magazzino: ${name}`, 'SUCCESS');
+  };
+
+  const addBay = (depotId: string, name: string, moduleId?: string) => {
     const id = `bay-${Date.now()}`;
-    const newBay: Bay = { id, depotId, name, status: 'DISPONIBILE' };
+    const newBay: Bay = { id, depotId, moduleId, name, status: 'DISPONIBILE' };
     setBays((prev) => [...prev, newBay]);
     logActivity(depotId, `Aggiunta nuova baia: ${name}`, 'SUCCESS');
   };
@@ -204,7 +253,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBays((prev) =>
       prev.map((b) => {
         if (b.id === bayId) {
-          // Se la baia viene messa in manutenzione, disconnetti eventuali prenotazioni associate
           const updatedBay = { ...b, status };
           if (status === 'MANUTENZIONE') {
             updatedBay.currentBookingId = undefined;
@@ -221,13 +269,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- AZIONI VETTORI ---
-  const addCarrier = (name: string, email: string, licensePlate?: string) => {
+  const addCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string) => {
     const id = `carrier-${Date.now()}`;
     const newCarrier: Carrier = {
       id,
       name,
       email,
-      status: 'ATTESA_APPROVAZIONE',
+      status: 'APPROVATO', // Creato dall'admin è auto-approvato
+      vatNumber,
+      licensePlate,
+    };
+    setCarriers((prev) => [...prev, newCarrier]);
+    logActivity(selectedDepotId, `Creato anagrafica vettore da Admin: ${name}`, 'SUCCESS');
+  };
+
+  const registerCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string) => {
+    const id = `carrier-${Date.now()}`;
+    const newCarrier: Carrier = {
+      id,
+      name,
+      email,
+      status: 'ATTESA_APPROVAZIONE', // Registrazione spontanea, richiede validazione
+      vatNumber,
       licensePlate,
     };
     setCarriers((prev) => [...prev, newCarrier]);
@@ -239,7 +302,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     const carrier = carriers.find((c) => c.id === carrierId);
     if (carrier) {
-      logActivity(selectedDepotId, `Approvato nuovo vettore: ${carrier.name} (Generata credenziale fittizia)`, 'SUCCESS');
+      logActivity(selectedDepotId, `Approvato vettore: ${carrier.name}. Generata abilitazione all'accesso.`, 'SUCCESS');
     }
   };
 
@@ -253,18 +316,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateCarrierProfile = (id: string, email: string, licensePlate?: string, phone?: string) => {
+    setCarriers((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, email, licensePlate, phone } : c))
+    );
+    logActivity(selectedDepotId, `Vettore ${id} ha aggiornato il proprio profilo anagrafico.`, 'INFO');
+  };
+
   // --- AZIONI PRENOTAZIONI ---
   const addBooking = (
     depotId: string,
     date: string,
-    activityType: 'CARICO' | 'SCARICO',
+    activityType: string,
     licensePlate: string,
     driverName: string
   ) => {
     const id = `book-${Date.now()}`;
+    const carrierId = currentRole === 'VETTORE' ? currentCarrierId : 'carrier-1';
     const newBooking: Booking = {
       id,
-      carrierId: currentCarrierId,
+      carrierId,
       depotId,
       date,
       activityType,
@@ -273,10 +344,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverName,
     };
     setBookings((prev) => [...prev, newBooking]);
-    const carrier = carriers.find((c) => c.id === currentCarrierId);
+    const carrier = carriers.find((c) => c.id === carrierId);
     logActivity(
       depotId,
-      `Nuova prenotazione per ${activityType === 'CARICO' ? 'carico' : 'scarico'} registrata da ${carrier?.name || 'Vettore'} per il ${date} (Targa: ${licensePlate.toUpperCase()})`,
+      `Prenotazione per attività di ${activityType} registrata da ${carrier?.name || 'Vettore'} per il ${date} (Veicolo: ${licensePlate.toUpperCase()})`,
       'INFO'
     );
   };
@@ -293,7 +364,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           const updated = { ...b, status };
 
-          // Aggiungi timestamp in base alla transizione
+          // Timestamp in base alla transizione
           if (status === 'AL_CANCELLO' && !b.timeInGate) {
             updated.timeInGate = new Date().toISOString();
           } else if (status === 'IN_BAIA') {
@@ -307,7 +378,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             updated.timeOutBay = new Date().toISOString();
             updated.timeOutGate = new Date().toISOString();
           } else if (status === 'PRENOTATO') {
-            // Rollback
             updated.bayId = undefined;
             updated.timeInGate = undefined;
             updated.timeInBay = undefined;
@@ -325,7 +395,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (oldBooking) {
       const carrierName = carriers.find((c) => c.id === oldBooking?.carrierId)?.name || 'Vettore';
 
-      // 1. Libera la baia precedente se esisteva
+      // 1. Libera la baia precedente
       if (oldBooking.bayId) {
         setBays((prevBays) =>
           prevBays.map((b) =>
@@ -336,7 +406,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }
 
-      // 2. Se lo stato attuale assegna una baia (IN_BAIA), bloccala
+      // 2. Se in baia, bloccala
       if (status === 'IN_BAIA' && bayId) {
         setBays((prevBays) =>
           prevBays.map((b) =>
@@ -348,62 +418,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const targetBayName = bays.find((b) => b.id === bayId)?.name || 'Baia';
         logActivity(
           targetDepotId,
-          `Camion ${oldBooking.licensePlate} (${carrierName}) assegnato alla ${targetBayName}. Inizio attività di ${oldBooking.activityType === 'CARICO' ? 'CARICO' : 'SCARICO'}.`,
+          `Mezzo ${oldBooking.licensePlate} (${carrierName}) in baia ${targetBayName}. Avviata attività di ${oldBooking.activityType}.`,
           'SUCCESS'
         );
       } else if (status === 'AL_CANCELLO') {
         logActivity(
           targetDepotId,
-          `Camion ${oldBooking.licensePlate} (${carrierName}) registrato all'ingresso. In attesa di assegnazione baia.`,
+          `Check-In al cancello per veicolo ${oldBooking.licensePlate} (${carrierName}). Registrato ingresso.`,
           'INFO'
         );
       } else if (status === 'COMPLETATO') {
         const targetBayName = bays.find((b) => b.id === oldBooking?.bayId)?.name || 'Baia';
         logActivity(
           targetDepotId,
-          `Attività completata per veicolo ${oldBooking.licensePlate} (${carrierName}) presso ${targetBayName}. Registrata uscita dallo Yard.`,
+          `Attività conclusa per veicolo ${oldBooking.licensePlate} (${carrierName}) presso ${targetBayName}. Mezzo uscito da Plant.`,
           'SUCCESS'
         );
       } else if (status === 'ANNULLATO') {
-        logActivity(targetDepotId, `Prenotazione per veicolo ${oldBooking.licensePlate} annullata.`, 'WARNING');
+        logActivity(targetDepotId, `Prenotazione slot per ${oldBooking.licensePlate} annullata.`, 'WARNING');
       }
     }
+  };
+
+  // --- ATTIVITA' E SCHEDULATORI ---
+  const addActivityType = (name: string, code: string) => {
+    const id = `act-${Date.now()}`;
+    const newAct: ActivityType = { id, name, code: code.toUpperCase() };
+    setActivityTypes((prev) => [...prev, newAct]);
+  };
+
+  const addReportSchedule = (name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => {
+    const id = `rep-${Date.now()}`;
+    const newRep: ReportSchedule = { id, name, frequency, recipients, reportType, active: true };
+    setReportSchedules((prev) => [...prev, newRep]);
+  };
+
+  const toggleReportSchedule = (id: string) => {
+    setReportSchedules((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r))
+    );
   };
 
   // --- RIPRISTINO STATO ---
   const resetState = () => {
     setDepots(defaultDepots);
+    setWarehouseModules(defaultWarehouseModules);
     setBays(defaultBays);
     setCarriers(defaultCarriers);
     setBookings(defaultBookings);
     setActivityLogs(defaultLogs);
-    setCurrentRole('OPERATORE');
-    setCurrentCarrierId('carrier-1');
+    setActivityTypes(defaultActivityTypes);
+    setReportSchedules(defaultReportSchedules);
+    setCurrentRole(null);
+    setCurrentUser(null);
+    setCurrentCarrierId('');
     setSelectedDepotId('depot-milano');
     localStorage.removeItem(LOCAL_STORAGE_KEY);
-    logActivity('depot-milano', 'Database ripristinato ai dati iniziali.', 'WARNING');
+    logActivity('depot-milano', 'Database ripristinato.', 'WARNING');
   };
 
   return (
     <AppContext.Provider
       value={{
         depots,
+        warehouseModules,
         bays,
         carriers,
         bookings,
         activityLogs,
+        activityTypes,
+        reportSchedules,
         currentRole,
+        currentUser,
         currentCarrierId,
         selectedDepotId,
         addDepot,
+        addWarehouseModule,
         addBay,
         updateBayStatus,
         addCarrier,
+        registerCarrier,
         approveCarrier,
         rejectCarrier,
+        updateCarrierProfile,
         addBooking,
         updateBookingStatus,
+        addActivityType,
+        addReportSchedule,
+        toggleReportSchedule,
         setCurrentRole,
+        setCurrentUser,
         setCurrentCarrierId,
         setSelectedDepotId,
         resetState,

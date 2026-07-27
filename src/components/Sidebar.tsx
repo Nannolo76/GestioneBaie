@@ -9,24 +9,21 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
   const {
     currentRole,
-    setCurrentRole,
+    currentUser,
     carriers,
     currentCarrierId,
-    setCurrentCarrierId,
     depots,
     selectedDepotId,
-    setSelectedDepotId,
-    resetState,
+    setCurrentRole,
+    setCurrentUser,
+    setCurrentCarrierId,
   } = useApp();
 
-  const handleRoleChange = (role: 'ADMIN' | 'VETTORE' | 'OPERATORE') => {
-    setCurrentRole(role);
-    if (role === 'OPERATORE') {
-      setActiveTab('yard-monitor');
-    } else if (role === 'VETTORE') {
-      setActiveTab('carrier-portal');
-    } else if (role === 'ADMIN') {
-      setActiveTab('admin-dashboard');
+  const handleLogout = () => {
+    if (confirm('Sei sicuro di voler effettuare il logout?')) {
+      setCurrentRole(null);
+      setCurrentUser(null);
+      setCurrentCarrierId('');
     }
   };
 
@@ -47,93 +44,46 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                 Logistica Uno
               </h2>
               <span className="text-[9px] font-mono text-white/50 tracking-widest uppercase mt-0.5 block">
-                YARD & DOCK PORTAL
+                YARD & DOCK SYSTEM
               </span>
             </div>
           </div>
         </div>
 
-        {/* CONTROLLER DI SIMULAZIONE (RUOLI) */}
-        <div className="p-4 bg-white/5 rounded-xl border border-white/10 m-4 shadow-inner">
-          <div className="text-[9px] font-mono font-bold uppercase tracking-widest text-white/50 mb-3">
-            [ SIMULATORE RUOLI ]
+        {/* INFO CONTESTO ATTIVO (PLANT / VETTORE LOGGATO) */}
+        <div className="px-5 py-4 border-b border-white/10 bg-white/5 font-sans">
+          <div className="text-[9px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
+            [ sessione attiva ]
           </div>
-          
-          {/* Pulsanti Ruolo */}
-          <div className="grid grid-cols-3 gap-1 mb-3">
-            <button
-              onClick={() => handleRoleChange('OPERATORE')}
-              className={`p-1.5 text-[9px] font-mono font-bold uppercase border transition-all text-center rounded-lg cursor-pointer ${
-                currentRole === 'OPERATORE'
-                  ? 'bg-emerald-500/30 text-white border-emerald-400/50'
-                  : 'bg-transparent text-white/60 border-white/10 hover:bg-white/5'
-              }`}
-            >
-              Guardia
-            </button>
-            <button
-              onClick={() => handleRoleChange('VETTORE')}
-              className={`p-1.5 text-[9px] font-mono font-bold uppercase border transition-all text-center rounded-lg cursor-pointer ${
-                currentRole === 'VETTORE'
-                  ? 'bg-[#11BCEC]/30 text-white border-[#11BCEC]/50'
-                  : 'bg-transparent text-white/60 border-white/10 hover:bg-white/5'
-              }`}
-            >
-              Vettore
-            </button>
-            <button
-              onClick={() => handleRoleChange('ADMIN')}
-              className={`p-1.5 text-[9px] font-mono font-bold uppercase border transition-all text-center rounded-lg cursor-pointer ${
-                currentRole === 'ADMIN'
-                  ? 'bg-amber-500/30 text-white border-amber-400/50'
-                  : 'bg-transparent text-white/60 border-white/10 hover:bg-white/5'
-              }`}
-            >
-              Admin
-            </button>
+          <div className="text-xs space-y-1">
+            <div className="flex justify-between">
+              <span className="text-white/60">Ruolo:</span>
+              <span className="font-bold text-[#11BCEC] uppercase">
+                {currentRole === 'ADMIN' ? 'Amministratore' : currentRole === 'GUARDIA' ? 'Guardiola' : 'Vettore'}
+              </span>
+            </div>
+            {currentRole === 'GUARDIA' && (
+              <div className="flex justify-between">
+                <span className="text-white/60">Plant:</span>
+                <span className="font-bold truncate max-w-[150px] text-right">{currentDepotName}</span>
+              </div>
+            )}
+            {currentRole === 'VETTORE' && (
+              <div className="flex justify-between">
+                <span className="text-white/60">Rag. Soc:</span>
+                <span className="font-bold truncate max-w-[150px] text-right">{currentCarrierName}</span>
+              </div>
+            )}
           </div>
-
-          {/* Dettaglio Ruolo / Configurazione */}
-          {currentRole === 'VETTORE' ? (
-            <div className="flex flex-col space-y-1">
-              <label className="text-[8px] font-mono text-white/40 uppercase tracking-wider">Vettore Selezionato</label>
-              <select
-                value={currentCarrierId}
-                onChange={(e) => setCurrentCarrierId(e.target.value)}
-                className="bg-black/20 border border-white/10 text-xs text-white font-mono p-2 rounded-lg focus:border-[#11BCEC] focus:ring-0 w-full cursor-pointer"
-              >
-                {carriers.map((c) => (
-                  <option key={c.id} value={c.id} className="bg-[#004B97] text-white">
-                    {c.name} {c.status !== 'APPROVATO' ? `(${c.status.replace('_', ' ')})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="flex flex-col space-y-1">
-              <label className="text-[8px] font-mono text-white/40 uppercase tracking-wider">Magazzino Attivo</label>
-              <select
-                value={selectedDepotId}
-                onChange={(e) => setSelectedDepotId(e.target.value)}
-                className="bg-black/20 border border-white/10 text-xs text-white font-mono p-2 rounded-lg focus:border-[#11BCEC] focus:ring-0 w-full cursor-pointer"
-              >
-                {depots.map((d) => (
-                  <option key={d.id} value={d.id} className="bg-[#004B97] text-white">
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
 
-        {/* NAVIGAZIONE MENU */}
-        <div className="px-4 py-2 flex flex-col space-y-1 font-sans">
+        {/* NAVIGAZIONE DI RUOLO */}
+        <div className="px-4 py-4 flex flex-col space-y-1 font-sans">
           <div className="text-[9px] font-mono font-bold tracking-widest text-white/35 uppercase px-3 mb-2">
-            Pagine Consolle
+            Menu Operazioni
           </div>
 
-          {/* Viste Amministratore */}
+          {/* MENU: AMMINISTRATORE */}
           {currentRole === 'ADMIN' && (
             <>
               <button
@@ -144,8 +94,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <span>⚙️ Configurazione Baie</span>
+                <span>⚙️ Stabilimenti & Baie</span>
                 {activeTab === 'admin-dashboard' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('admin-modules')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                  activeTab === 'admin-modules'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
+                }`}
+              >
+                <span>📦 Moduli Magazzino</span>
+                {activeTab === 'admin-modules' && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
                 )}
               </button>
@@ -157,15 +120,62 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <span>🚛 Registri & Vettori</span>
+                <span>🚛 Validazione Vettori</span>
                 {activeTab === 'admin-carriers' && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
                 )}
               </button>
+              <button
+                onClick={() => setActiveTab('admin-activities')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                  activeTab === 'admin-activities'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
+                }`}
+              >
+                <span>📋 Tipologie Attività</span>
+                {activeTab === 'admin-activities' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
+              </button>
+              <button
+                onClick={() => setActiveTab('admin-reports')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                  activeTab === 'admin-reports'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
+                }`}
+              >
+                <span>📅 Pianificazione Report</span>
+                {activeTab === 'admin-reports' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
+              </button>
+              <div className="my-2 border-t border-white/10" />
+              <button
+                onClick={() => setActiveTab('yard-monitor')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                  activeTab === 'yard-monitor'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
+                }`}
+              >
+                <span>🎛️ Vista Live Monitor</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                  activeTab === 'analytics'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
+                }`}
+              >
+                <span>📊 Analytics & Performance</span>
+              </button>
             </>
           )}
 
-          {/* Viste Vettore */}
+          {/* MENU: VETTORE */}
           {currentRole === 'VETTORE' && (
             <>
               <button
@@ -176,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <span>📅 Prenotazioni Vettore</span>
+                <span>📅 Prenotazione Slot & Profilo</span>
                 {activeTab === 'carrier-portal' && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
                 )}
@@ -184,8 +194,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             </>
           )}
 
-          {/* Viste Operative (Per Operatore e Admin) */}
-          {(currentRole === 'OPERATORE' || currentRole === 'ADMIN') && (
+          {/* MENU: GUARDIA / GUARDIOLA */}
+          {currentRole === 'GUARDIA' && (
             <>
               <button
                 onClick={() => setActiveTab('yard-monitor')}
@@ -195,21 +205,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <span>🎛️ Monitor Yard Live</span>
+                <span>🎛️ Monitor Live Piazzale</span>
                 {activeTab === 'yard-monitor' && (
-                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
-                )}
-              </button>
-              <button
-                onClick={() => setActiveTab('analytics')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
-                  activeTab === 'analytics'
-                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
-                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
-                }`}
-              >
-                <span>📊 Analytics & Tempi</span>
-                {activeTab === 'analytics' && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
                 )}
               </button>
@@ -218,32 +215,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         </div>
       </div>
 
-      {/* User profile + logout */}
+      {/* Footer Profilo & Logout */}
       <div className="px-3 pb-4 pt-3 border-t border-white/10 space-y-3">
         <div className="flex items-center gap-3 p-3 bg-white/10 rounded-xl border border-white/10">
           <div className="h-8 w-8 rounded-lg bg-[#11BCEC]/30 border border-[#11BCEC]/40 flex items-center justify-center font-black text-white text-xs uppercase select-none shrink-0">
-            {currentRole === 'OPERATORE' ? 'OP' : currentRole === 'VETTORE' ? 'VT' : 'AD'}
+            {currentUser?.name ? currentUser.name.substring(0, 2).toUpperCase() : 'US'}
           </div>
           <div className="min-w-0 flex-grow">
             <span className="block text-xs font-bold text-white truncate leading-tight">
-              {currentRole === 'OPERATORE' ? 'Operatore Yard' : currentRole === 'VETTORE' ? 'Area Vettori' : 'System Admin'}
+              {currentUser?.name || 'Utente Portale'}
             </span>
             <span className="block text-[8px] font-mono text-white/40 uppercase tracking-widest mt-0.5 truncate">
-              {currentRole === 'VETTORE' ? currentCarrierName : currentDepotName}
+              {currentUser?.email || 'utente@logisticauno.it'}
             </span>
           </div>
         </div>
 
         <button
-          onClick={() => {
-            if (confirm('Sei sicuro di voler ripristinare il database allo stato iniziale?')) {
-              resetState();
-              alert('Database ripristinato.');
-            }
-          }}
-          className="w-full border border-red-500/30 text-red-200 font-mono text-[9px] font-bold tracking-wider uppercase py-2 bg-red-500/10 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-150 cursor-pointer active:scale-95 text-center"
+          onClick={handleLogout}
+          className="w-full border border-white/20 text-white font-mono text-[9px] font-bold tracking-wider uppercase py-2.5 bg-white/5 hover:bg-white/20 rounded-xl transition-all duration-150 cursor-pointer active:scale-95 text-center flex items-center justify-center gap-2"
         >
-          🚨 Ripristina Database
+          <span>🚪</span> Esci dal Portale
         </button>
       </div>
     </div>

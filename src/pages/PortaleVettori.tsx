@@ -13,20 +13,28 @@ export const PortaleVettori: React.FC = () => {
     depots,
     bookings,
     bays,
+    activityTypes,
     addBooking,
     updateBookingStatus,
+    updateCarrierProfile,
   } = useApp();
 
   const loggedInCarrier = carriers.find((c) => c.id === currentCarrierId);
 
-  // Form states
+  // Form Booking States
   const [targetDepotId, setTargetDepotId] = useState(depots[0]?.id || '');
   const [targetDate, setTargetDate] = useState(new Date().toISOString().split('T')[0]);
-  const [activityType, setActivityType] = useState<'CARICO' | 'SCARICO'>('CARICO');
+  const [selectedActivityCode, setSelectedActivityCode] = useState(activityTypes[0]?.code || 'SCARICO');
   const [licensePlate, setLicensePlate] = useState(loggedInCarrier?.licensePlate || '');
   const [driverName, setDriverName] = useState('');
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Form Profilo States
+  const [profEmail, setProfEmail] = useState(loggedInCarrier?.email || '');
+  const [profPlate, setProfPlate] = useState(loggedInCarrier?.licensePlate || '');
+  const [profPhone, setProfPhone] = useState(loggedInCarrier?.phone || '');
+  const [profSuccess, setProfSuccess] = useState(false);
 
   // Filtra le prenotazioni del vettore corrente
   const myBookings = bookings.filter((b) => b.carrierId === currentCarrierId);
@@ -41,12 +49,17 @@ export const PortaleVettori: React.FC = () => {
       return;
     }
 
-    // Aggiungi la prenotazione nel context
-    addBooking(targetDepotId, targetDate, activityType, licensePlate, driverName);
+    addBooking(targetDepotId, targetDate, selectedActivityCode, licensePlate, driverName);
     setSuccessMsg('Prenotazione registrata con successo!');
-    
-    // Ripristina form (ma mantieni targa del vettore per comodità)
     setDriverName('');
+  };
+
+  const handleUpdateProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loggedInCarrier) return;
+    updateCarrierProfile(loggedInCarrier.id, profEmail, profPlate, profPhone);
+    setProfSuccess(true);
+    setTimeout(() => setProfSuccess(false), 3000);
   };
 
   const handleCancelBooking = (bookingId: string) => {
@@ -82,19 +95,19 @@ export const PortaleVettori: React.FC = () => {
             // AREA RISERVATA VETTORE: {loggedInCarrier.name.toUpperCase()}
           </h2>
           <p className="text-[10px] text-ticket-muted mt-1 uppercase tracking-widest font-mono">
-            Registrazione slot di carico/scarico e monitoraggio delle consegne attive
+            Registrazione slot di carico/scarico e gestione dell'anagrafica aziendale
           </p>
         </div>
         <div className="text-right font-mono">
-          <span className="text-[10px] text-ticket-muted uppercase">Account ID: </span>
+          <span className="text-[10px] text-ticket-muted uppercase">Cod. Vettore: </span>
           <Badge variant="success">{loggedInCarrier.id}</Badge>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Sinistra: Form Prenotazione Slot */}
-        <div>
-          <Card title="Richiedi Nuovo Slot Prenotazione" accent="orange">
+        {/* Sinistra: Form Prenotazione & Form Profilo */}
+        <div className="space-y-6">
+          <Card title="Richiedi Prenotazione Slot" accent="orange">
             <form onSubmit={handleSubmitBooking} className="space-y-4">
               {formError && (
                 <div className="p-2 border border-red-200 bg-red-50 text-red-600 font-mono text-xs rounded-lg">
@@ -108,10 +121,13 @@ export const PortaleVettori: React.FC = () => {
               )}
 
               <Select
-                label="Magazzino di Destinazione (Depot)"
+                label="Stabilimento di Destinazione (Plant)"
                 options={depots.map((d) => ({ value: d.id, label: `${d.name} (${d.city})` }))}
-                value={targetDepotId}
-                onChange={(e) => setTargetDepotId(e.target.value)}
+                value={depots.find(d => d.id === targetDepotId)?.name || targetDepotId}
+                onChange={(e) => {
+                  const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
+                  if (found) setTargetDepotId(found.id);
+                }}
               />
 
               <Input
@@ -125,12 +141,12 @@ export const PortaleVettori: React.FC = () => {
 
               <Select
                 label="Tipo di Attività"
-                options={[
-                  { value: 'CARICO', label: 'CARICO MERCE (Ritiro)' },
-                  { value: 'SCARICO', label: 'SCARICO MERCE (Consegna)' },
-                ]}
-                value={activityType}
-                onChange={(e) => setActivityType(e.target.value as any)}
+                options={activityTypes.map(act => ({ value: act.code, label: act.name }))}
+                value={activityTypes.find(a => a.code === selectedActivityCode)?.name || selectedActivityCode}
+                onChange={(e) => {
+                  const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
+                  if (found) setSelectedActivityCode(found.code);
+                }}
               />
 
               <Input
@@ -149,34 +165,75 @@ export const PortaleVettori: React.FC = () => {
                 required
               />
 
-              <Button type="submit" variant="primary" className="w-full">
-                Invia Richiesta Prenotazione
+              <Button type="submit" className="w-full">
+                Registra Prenotazione
+              </Button>
+            </form>
+          </Card>
+
+          {/* Registrazione Anagrafica Vettore (Profilo Vettore) */}
+          <Card title="Profilo Anagrafico Vettore" accent="yellow">
+            <form onSubmit={handleUpdateProfile} className="space-y-4">
+              {profSuccess && (
+                <div className="p-2 border border-emerald-200 bg-emerald-50 text-emerald-600 font-mono text-xs rounded-lg">
+                  Profilo aggiornato con successo.
+                </div>
+              )}
+
+              <Input
+                label="Ragione Sociale Vettore"
+                value={loggedInCarrier.name}
+                disabled
+              />
+
+              <Input
+                label="Partita IVA / P.IVA"
+                value={loggedInCarrier.vatNumber || 'Nessuna P.IVA'}
+                disabled
+              />
+
+              <Input
+                label="Email Contatto *"
+                type="email"
+                value={profEmail}
+                onChange={(e) => setProfEmail(e.target.value)}
+                required
+              />
+
+              <Input
+                label="Telefono Referente"
+                placeholder="Es. +39 02 123456"
+                value={profPhone}
+                onChange={(e) => setProfPhone(e.target.value)}
+              />
+
+              <Input
+                label="Targa Automezzo Predefinita"
+                placeholder="Es. AA123BB"
+                value={profPlate}
+                onChange={(e) => setProfPlate(e.target.value)}
+              />
+
+              <Button type="submit" variant="warning" className="w-full">
+                Aggiorna Anagrafica
               </Button>
             </form>
           </Card>
         </div>
 
-        {/* Destra: Elenco Storico Prenotazioni Vettore */}
+        {/* Destra: Elenco Prenotazioni Storiche del Vettore */}
         <div className="lg:col-span-2">
-          <Card title="Storico Prenotazioni & Stato in Tempo Reale">
+          <Card title="Storico Prenotazioni Slot Vettore">
             <Table
               data={myBookings}
               emptyMessage="Nessuna prenotazione inserita da questo vettore."
               columns={[
                 {
-                  header: 'Data Target',
+                  header: 'Data Slot',
                   accessor: (b) => <span className="font-bold">{b.date}</span>,
                 },
                 {
-                  header: 'Attività',
-                  accessor: (b) => (
-                    <Badge variant={b.activityType === 'CARICO' ? 'primary' : 'warning'}>
-                      {b.activityType}
-                    </Badge>
-                  ),
-                },
-                {
-                  header: 'Destinazione',
+                  header: 'Plant Destinazione',
                   accessor: (b) => {
                     const depotName = depots.find((d) => d.id === b.depotId)?.name || 'Magazzino';
                     return <span className="text-xs uppercase">{depotName}</span>;
