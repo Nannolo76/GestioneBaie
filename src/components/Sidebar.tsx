@@ -142,6 +142,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                 )}
               </button>
               <button
+                onClick={() => setActiveTab('admin-bayusages')}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                  activeTab === 'admin-bayusages'
+                    ? 'bg-white/20 text-white shadow-xs border border-white/20'
+                    : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
+                }`}
+              >
+                <span>🏷️ Uso Baie / Clienti</span>
+                {activeTab === 'admin-bayusages' && (
+                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
+                )}
+              </button>
+              <button
                 onClick={() => setActiveTab('admin-reports')}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-reports'

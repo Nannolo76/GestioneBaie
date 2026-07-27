@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert } from '../types';
+import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage } from '../types';
 
 interface AppContextType {
   depots: Depot[];
@@ -11,14 +11,18 @@ interface AppContextType {
   activityTypes: ActivityType[];
   reportSchedules: ReportSchedule[];
   checklistAlerts: ChecklistFailureAlert[];
+  bayUsages: BayUsage[];
   currentRole: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null;
   currentUser: User | null;
   currentCarrierId: string;
   selectedDepotId: string;
   addDepot: (name: string, city: string) => void;
   addWarehouseModule: (depotId: string, name: string, description?: string) => void;
-  addBay: (depotId: string, name: string, moduleId?: string) => void;
+  addBay: (depotId: string, name: string, moduleId?: string, bayUsageId?: string) => void;
   updateBayStatus: (bayId: string, status: 'DISPONIBILE' | 'OCCUPATA' | 'MANUTENZIONE') => void;
+  updateBayUsage: (bayId: string, bayUsageId?: string) => void;
+  addBayUsage: (name: string, description?: string) => void;
+  deleteBayUsage: (id: string) => void;
   addCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
   registerCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
   approveCarrier: (carrierId: string) => void;
@@ -32,17 +36,21 @@ interface AppContextType {
     driverName: string,
     driverPhone?: string,
     notes?: string,
-    palletPlaces?: number
+    palletPlaces?: number,
+    driverLicense?: string,
+    driverLicenseRelease?: string,
+    orderNumber?: string,
+    clientUsageId?: string
   ) => void;
   updateBookingStatus: (
     bookingId: string,
     status: Booking['status'],
     bayId?: string,
-    extra?: { driverPhone?: string; notes?: string }
+    extra?: { driverPhone?: string; notes?: string; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
   ) => void;
   updateBookingDetails: (
     bookingId: string,
-    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number }
+    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
   ) => void;
   relocateBookingBay: (bookingId: string, newBayId: string, reason: string) => void;
   addBookingNote: (bookingId: string, text: string) => void;
@@ -75,7 +83,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'yard_management_system_state_v4';
+const LOCAL_STORAGE_KEY = 'yard_management_system_state_v5';
 
 const getTodayDateString = () => {
   return new Date().toISOString().split('T')[0];
@@ -96,12 +104,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { id: 'module-b-1', depotId: 'depot-bari', name: 'Modulo Est' },
   ];
 
+  const defaultBayUsages: BayUsage[] = [
+    { id: 'bu-1', name: 'Crossdocking', description: 'Transiti rapidi e smistamento' },
+    { id: 'bu-2', name: 'Acqua / Bevande', description: 'Attracco preferenziale carichi pesanti di liquidi' },
+    { id: 'bu-3', name: 'Pallet vuoti', description: 'Stoccaggio e scarico rulliere pallet vuoti' },
+    { id: 'bu-4', name: 'Cliente Rossi', description: 'Rampa riservata spedizioni Cliente Rossi SpA' },
+  ];
+
   const defaultBays: Bay[] = [
     // Milano
-    { id: 'bay-m-01', depotId: 'depot-milano', moduleId: 'module-m-1', name: 'Baia M-01 (Dry)', status: 'DISPONIBILE' },
-    { id: 'bay-m-02', depotId: 'depot-milano', moduleId: 'module-m-1', name: 'Baia M-02 (Dry)', status: 'DISPONIBILE' },
-    { id: 'bay-m-03', depotId: 'depot-milano', moduleId: 'module-m-2', name: 'Baia M-03 (Cold)', status: 'DISPONIBILE' },
-    { id: 'bay-m-04', depotId: 'depot-milano', moduleId: 'module-m-2', name: 'Baia M-04 (Cold)', status: 'DISPONIBILE' },
+    { id: 'bay-m-01', depotId: 'depot-milano', moduleId: 'module-m-1', name: 'Baia M-01 (Dry)', status: 'DISPONIBILE', bayUsageId: 'bu-1' },
+    { id: 'bay-m-02', depotId: 'depot-milano', moduleId: 'module-m-1', name: 'Baia M-02 (Dry)', status: 'DISPONIBILE', bayUsageId: 'bu-4' },
+    { id: 'bay-m-03', depotId: 'depot-milano', moduleId: 'module-m-2', name: 'Baia M-03 (Cold)', status: 'DISPONIBILE', bayUsageId: 'bu-2' },
+    { id: 'bay-m-04', depotId: 'depot-milano', moduleId: 'module-m-2', name: 'Baia M-04 (Cold)', status: 'DISPONIBILE', bayUsageId: 'bu-3' },
     // Roma
     { id: 'bay-r-01', depotId: 'depot-roma', moduleId: 'module-r-1', name: 'Baia R-01', status: 'OCCUPATA', currentBookingId: 'book-roma-active' },
     { id: 'bay-r-02', depotId: 'depot-roma', moduleId: 'module-r-1', name: 'Baia R-02', status: 'DISPONIBILE' },
@@ -147,6 +162,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       palletPlaces: 24,
       ticketNumber: 'C-392',
       notes: 'Carico urgente merci secche',
+      orderNumber: 'ORD-2026-9923',
+      driverLicense: 'U19283748A',
+      driverLicenseRelease: '2024-05-12',
+      clientUsageId: 'bu-4',
       notesHistory: [
         { id: 'n-init-1', timestamp: new Date(new Date().setHours(new Date().getHours() - 10)).toISOString(), author: 'Vettore Logistica', text: 'Carico urgente merci secche' }
       ]
@@ -164,6 +183,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       palletPlaces: 12,
       ticketNumber: 'S-712',
       notes: 'Carico a temperatura controllata fresco',
+      clientUsageId: 'bu-2',
       notesHistory: [
         { id: 'n-init-2', timestamp: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(), author: 'Autista', text: 'Carico a temperatura controllata fresco' }
       ],
@@ -220,7 +240,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { id: 'log-4', timestamp: new Date(new Date().setHours(new Date().getHours() - 2.8)).toISOString(), depotId: 'depot-bari', message: 'Attività completata per veicolo GG012HH. Registrata uscita da Yard.', type: 'SUCCESS' },
   ];
 
-  // --- STATO INIZIALIZZATO DA LOCALSTORAGE O DEFAULT ---
+  // --- STATO INIZIALIZZATO ---
   const [depots, setDepots] = useState<Depot[]>(defaultDepots);
   const [warehouseModules, setWarehouseModules] = useState<WarehouseModule[]>(defaultWarehouseModules);
   const [bays, setBays] = useState<Bay[]>(defaultBays);
@@ -229,9 +249,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(defaultLogs);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>(defaultActivityTypes);
   const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>(defaultReportSchedules);
-  
-  // Allerte per checklist fallite (Guardiola)
   const [checklistAlerts, setChecklistAlerts] = useState<ChecklistFailureAlert[]>([]);
+  const [bayUsages, setBayUsages] = useState<BayUsage[]>(defaultBayUsages);
 
   // Stati di sessione
   const [currentRole, setCurrentRole] = useState<'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null>(null);
@@ -254,6 +273,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.activityTypes) setActivityTypes(parsed.activityTypes);
         if (parsed.reportSchedules) setReportSchedules(parsed.reportSchedules);
         if (parsed.checklistAlerts) setChecklistAlerts(parsed.checklistAlerts);
+        if (parsed.bayUsages) setBayUsages(parsed.bayUsages);
         
         if (parsed.currentRole !== undefined) setCurrentRole(parsed.currentRole);
         if (parsed.currentUser !== undefined) setCurrentUser(parsed.currentUser);
@@ -277,13 +297,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activityTypes,
       reportSchedules,
       checklistAlerts,
+      bayUsages,
       currentRole,
       currentUser,
       currentCarrierId,
       selectedDepotId,
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, checklistAlerts, currentRole, currentUser, currentCarrierId, selectedDepotId]);
+  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, checklistAlerts, bayUsages, currentRole, currentUser, currentCarrierId, selectedDepotId]);
 
   // --- OPERAZIONI DI LOG ---
   const logActivity = (depotId: string, message: string, type: ActivityLog['type'] = 'INFO') => {
@@ -312,9 +333,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logActivity(depotId, `Creato nuovo modulo di magazzino: ${name}`, 'SUCCESS');
   };
 
-  const addBay = (depotId: string, name: string, moduleId?: string) => {
+  const addBay = (depotId: string, name: string, moduleId?: string, bayUsageId?: string) => {
     const id = `bay-${Date.now()}`;
-    const newBay: Bay = { id, depotId, moduleId, name, status: 'DISPONIBILE' };
+    const newBay: Bay = { id, depotId, moduleId, name, status: 'DISPONIBILE', bayUsageId };
     setBays((prev) => [...prev, newBay]);
     logActivity(depotId, `Aggiunta nuova baia: ${name}`, 'SUCCESS');
   };
@@ -336,6 +357,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (targetBay) {
       logActivity(targetBay.depotId, `Stato della baia ${targetBay.name} modificato in: ${status}`, status === 'MANUTENZIONE' ? 'WARNING' : 'INFO');
     }
+  };
+
+  const updateBayUsage = (bayId: string, bayUsageId?: string) => {
+    setBays((prev) =>
+      prev.map((b) => (b.id === bayId ? { ...b, bayUsageId } : b))
+    );
+    const targetBay = bays.find((b) => b.id === bayId);
+    if (targetBay) {
+      logActivity(targetBay.depotId, `Aggiornato uso baia per ${targetBay.name}`, 'INFO');
+    }
+  };
+
+  const addBayUsage = (name: string, description?: string) => {
+    const id = `bu-${Date.now()}`;
+    const newUsage: BayUsage = { id, name, description };
+    setBayUsages((prev) => [...prev, newUsage]);
+    logActivity(selectedDepotId, `Creato nuovo Uso Baia: ${name}`, 'SUCCESS');
+  };
+
+  const deleteBayUsage = (id: string) => {
+    setBayUsages((prev) => prev.filter((bu) => bu.id !== id));
+    setBays((prevBays) =>
+      prevBays.map((b) => (b.bayUsageId === id ? { ...b, bayUsageId: undefined } : b))
+    );
+    setBookings((prevBookings) =>
+      prevBookings.map((b) => (b.clientUsageId === id ? { ...b, clientUsageId: undefined } : b))
+    );
+    logActivity(selectedDepotId, `Eliminato Uso Baia: ${id}`, 'WARNING');
   };
 
   // --- AZIONI VETTORI ---
@@ -402,7 +451,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     driverName: string,
     driverPhone?: string,
     notes?: string,
-    palletPlaces?: number
+    palletPlaces?: number,
+    driverLicense?: string,
+    driverLicenseRelease?: string,
+    orderNumber?: string,
+    clientUsageId?: string
   ) => {
     const id = `book-${Date.now()}`;
     const carrierId = currentRole === 'VETTORE' ? currentCarrierId : 'carrier-1';
@@ -436,6 +489,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       palletPlaces: palletPlaces ? Number(palletPlaces) : undefined,
       ticketNumber,
       isEditedInBay: false,
+      driverLicense,
+      driverLicenseRelease,
+      orderNumber,
+      clientUsageId,
     };
 
     setBookings((prev) => [...prev, newBooking]);
@@ -451,7 +508,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     bookingId: string,
     status: Booking['status'],
     bayId?: string,
-    extra?: { driverPhone?: string; notes?: string }
+    extra?: { driverPhone?: string; notes?: string; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
   ) => {
     let oldBooking: Booking | undefined;
     let targetDepotId = selectedDepotId;
@@ -464,9 +521,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           const updated = { ...b, status };
 
-          // Aggiungi dati extra dal check-in
+          // Aggiungi dati extra
           if (extra) {
             if (extra.driverPhone !== undefined) updated.driverPhone = extra.driverPhone;
+            if (extra.driverLicense !== undefined) updated.driverLicense = extra.driverLicense;
+            if (extra.driverLicenseRelease !== undefined) updated.driverLicenseRelease = extra.driverLicenseRelease;
+            if (extra.orderNumber !== undefined) updated.orderNumber = extra.orderNumber;
+            if (extra.clientUsageId !== undefined) updated.clientUsageId = extra.clientUsageId;
             if (extra.notes !== undefined) {
               updated.notes = extra.notes;
               const authorName = currentUser?.name || 'Guardiola';
@@ -554,7 +615,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Aggiungi una nota alla cronologia tabellata
   const addBookingNote = (bookingId: string, text: string) => {
     const authorName = currentUser?.name || (currentRole === 'GUARDIA' ? `Guardiola ${selectedDepotId}` : 'Preposto');
     const newNote: BookingNote = {
@@ -585,7 +645,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Compila e salva la Checklist Qualità
   const saveQualityChecklist = (
     bookingId: string,
     checklistData: {
@@ -603,8 +662,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   ) => {
     const prepostoName = currentUser?.name || 'Preposto Magazzino';
-    
-    // Fallimento critico: presenza sporco/infestanti o anomalie sigillo
     const isFailed =
       checklistData.pianaleSporco ||
       checklistData.presenzaInfestantiMezzo ||
@@ -626,7 +683,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return {
             ...b,
             checklist,
-            isEditedInBay: true, // Contorna in evidenza
+            isEditedInBay: true,
           };
         }
         return b;
@@ -666,7 +723,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Guardiola risponde all'allerta blocco checklist
   const resolveChecklistAlert = (alertId: string, action: 'PROCEDI' | 'RESPINTO', reason?: string) => {
     let alertObj: ChecklistFailureAlert | undefined;
 
@@ -695,7 +751,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               };
               return {
                 ...b,
-                isEditedInBay: false, // Rimuovi allerta contorno
+                isEditedInBay: false,
                 notesHistory: b.notesHistory ? [...b.notesHistory, resNote] : [resNote],
               };
             }
@@ -741,7 +797,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateBookingDetails = (
     bookingId: string,
-    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number }
+    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
   ) => {
     setBookings((prev) =>
       prev.map((b) => {
@@ -853,6 +909,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivityTypes(defaultActivityTypes);
     setReportSchedules(defaultReportSchedules);
     setChecklistAlerts([]);
+    setBayUsages(defaultBayUsages);
     setCurrentRole(null);
     setCurrentUser(null);
     setCurrentCarrierId('');
@@ -873,6 +930,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activityTypes,
         reportSchedules,
         checklistAlerts,
+        bayUsages,
         currentRole,
         currentUser,
         currentCarrierId,
@@ -881,6 +939,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addWarehouseModule,
         addBay,
         updateBayStatus,
+        updateBayUsage,
+        addBayUsage,
+        deleteBayUsage,
         addCarrier,
         registerCarrier,
         approveCarrier,

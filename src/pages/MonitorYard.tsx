@@ -19,6 +19,7 @@ export const MonitorYard: React.FC = () => {
     activityTypes,
     checklistAlerts,
     currentRole,
+    bayUsages,
     updateBookingStatus,
     addBooking,
     updateBookingDetails,
@@ -63,11 +64,20 @@ export const MonitorYard: React.FC = () => {
   const [manualNotes, setManualNotes] = useState('');
   const [manualCarrierId, setManualCarrierId] = useState(carriers.filter(c => c.status === 'APPROVATO')[0]?.id || '');
   const [manualActivityCode, setManualActivityCode] = useState(activityTypes[0]?.code || 'SCARICO');
+  
+  const [manualDriverLicense, setManualDriverLicense] = useState('');
+  const [manualDriverLicenseRelease, setManualDriverLicenseRelease] = useState('');
+  const [manualOrderNumber, setManualOrderNumber] = useState('');
+  const [manualClientUsageId, setManualClientUsageId] = useState('');
 
   // Stato Modali
   const [checkInBooking, setCheckInBooking] = useState<Booking | null>(null);
   const [checkInPhone, setCheckInPhone] = useState('');
   const [checkInNotes, setCheckInNotes] = useState('');
+  const [checkInLicense, setCheckInLicense] = useState('');
+  const [checkInLicenseRelease, setCheckInLicenseRelease] = useState('');
+  const [checkInOrderNumber, setCheckInOrderNumber] = useState('');
+  const [checkInClientUsageId, setCheckInClientUsageId] = useState('');
 
   // Dettaglio Baia
   const [activeBayDetail, setActiveBayDetail] = useState<{ bay: Bay; booking: Booking } | null>(null);
@@ -75,6 +85,10 @@ export const MonitorYard: React.FC = () => {
   const [detailPallets, setDetailPallets] = useState<number | ''>('');
   const [detailActivity, setDetailActivity] = useState('');
   const [newNoteText, setNewNoteText] = useState('');
+  const [detailLicense, setDetailLicense] = useState('');
+  const [detailLicenseRelease, setDetailLicenseRelease] = useState('');
+  const [detailOrderNumber, setDetailOrderNumber] = useState('');
+  const [detailClientUsageId, setDetailClientUsageId] = useState('');
 
   // Spostamento Baia
   const [relocateBayId, setRelocateBayId] = useState('');
@@ -107,6 +121,37 @@ export const MonitorYard: React.FC = () => {
   const pendingAlerts = checklistAlerts.filter(
     (a) => a.depotId === selectedDepotId && a.status === 'ATTESA_DECISIONE'
   );
+
+  // Pre-selezione automatica baia consigliata
+  React.useEffect(() => {
+    let hasChanged = false;
+    const nextAssignments = { ...tempBayAssignment };
+
+    gateBookings.forEach((b) => {
+      if (!nextAssignments[b.id]) {
+        const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
+        if (availableBays.length > 0) {
+          // Cerca baia con lo stesso uso consigliato
+          const matchingBay = b.clientUsageId
+            ? availableBays.find((bay) => bay.bayUsageId === b.clientUsageId)
+            : undefined;
+
+          if (matchingBay) {
+            nextAssignments[b.id] = matchingBay.id;
+            hasChanged = true;
+          } else {
+            // Pre-seleziona la prima baia libera generica
+            nextAssignments[b.id] = availableBays[0].id;
+            hasChanged = true;
+          }
+        }
+      }
+    });
+
+    if (hasChanged) {
+      setTempBayAssignment(nextAssignments);
+    }
+  }, [gateBookings, activeBays, tempBayAssignment]);
 
   // Trigger popup per la guardiola
   React.useEffect(() => {
@@ -155,7 +200,11 @@ export const MonitorYard: React.FC = () => {
       manualDriver,
       manualPhone || undefined,
       manualNotes || undefined,
-      manualPallets ? Number(manualPallets) : undefined
+      manualPallets ? Number(manualPallets) : undefined,
+      manualDriverLicense || undefined,
+      manualDriverLicenseRelease || undefined,
+      manualOrderNumber || undefined,
+      manualClientUsageId || undefined
     );
     
     setManualPlate('');
@@ -163,12 +212,20 @@ export const MonitorYard: React.FC = () => {
     setManualPhone('');
     setManualPallets('');
     setManualNotes('');
+    setManualDriverLicense('');
+    setManualDriverLicenseRelease('');
+    setManualOrderNumber('');
+    setManualClientUsageId('');
   };
 
   const handleOpenCheckInModal = (booking: Booking) => {
     setCheckInBooking(booking);
     setCheckInPhone(booking.driverPhone || '');
     setCheckInNotes(booking.notes || '');
+    setCheckInLicense(booking.driverLicense || '');
+    setCheckInLicenseRelease(booking.driverLicenseRelease || '');
+    setCheckInOrderNumber(booking.orderNumber || '');
+    setCheckInClientUsageId(booking.clientUsageId || '');
   };
 
   const handleConfirmCheckIn = () => {
@@ -176,6 +233,10 @@ export const MonitorYard: React.FC = () => {
     updateBookingStatus(checkInBooking.id, 'AL_CANCELLO', undefined, {
       driverPhone: checkInPhone || undefined,
       notes: checkInNotes || undefined,
+      driverLicense: checkInLicense || undefined,
+      driverLicenseRelease: checkInLicenseRelease || undefined,
+      orderNumber: checkInOrderNumber || undefined,
+      clientUsageId: checkInClientUsageId || undefined,
     });
     setCheckInBooking(null);
   };
@@ -205,6 +266,10 @@ export const MonitorYard: React.FC = () => {
     setDetailPhone(booking.driverPhone || '');
     setDetailPallets(booking.palletPlaces || '');
     setDetailActivity(booking.activityType);
+    setDetailLicense(booking.driverLicense || '');
+    setDetailLicenseRelease(booking.driverLicenseRelease || '');
+    setDetailOrderNumber(booking.orderNumber || '');
+    setDetailClientUsageId(booking.clientUsageId || '');
     setNewNoteText('');
     setRelocateBayId('');
     setRelocateReason('');
@@ -243,7 +308,6 @@ export const MonitorYard: React.FC = () => {
     if (!activeBayDetail || !newNoteText.trim()) return;
     addBookingNote(activeBayDetail.booking.id, newNoteText);
     setNewNoteText('');
-    // Refresh modal booking state
     const refreshed = bookings.find(b => b.id === activeBayDetail.booking.id);
     if (refreshed) {
       setActiveBayDetail({ bay: activeBayDetail.bay, booking: refreshed });
@@ -256,6 +320,10 @@ export const MonitorYard: React.FC = () => {
       activityType: detailActivity,
       driverPhone: detailPhone || undefined,
       palletPlaces: detailPallets ? Number(detailPallets) : undefined,
+      driverLicense: detailLicense || undefined,
+      driverLicenseRelease: detailLicenseRelease || undefined,
+      orderNumber: detailOrderNumber || undefined,
+      clientUsageId: detailClientUsageId || undefined,
     });
     setActiveBayDetail(null);
   };
@@ -276,7 +344,6 @@ export const MonitorYard: React.FC = () => {
       noteSigillo: noteSigillo || undefined,
     });
     setShowChecklistForm(false);
-    // Refresh active booking
     const refreshed = bookings.find(b => b.id === activeBayDetail.booking.id);
     if (refreshed) {
       setActiveBayDetail({ bay: activeBayDetail.bay, booking: refreshed });
@@ -328,7 +395,7 @@ export const MonitorYard: React.FC = () => {
   return (
     <div className="space-y-6 relative">
       
-      {/* AREA DI STAMPA COPERTA (Attiva solo in fase di stampa) */}
+      {/* AREA DI STAMPA COPERTA */}
       {printBooking && printBooking.checklist && (
         <div id="printable-area" className="hidden print:block p-8 bg-white text-black font-sans text-xs space-y-6">
           <div className="flex justify-between items-center border-b border-black pb-4">
@@ -348,6 +415,8 @@ export const MonitorYard: React.FC = () => {
             <div><strong>Data Attività:</strong> {printBooking.date}</div>
             <div><strong>Baia di Attracco:</strong> {bays.find(b => b.id === printBooking.bayId)?.name || 'N/D'}</div>
             <div><strong>Attività:</strong> {printBooking.activityType}</div>
+            <div><strong>Numero Ordine:</strong> {printBooking.orderNumber || 'Non inserito'}</div>
+            <div><strong>Patente Autista:</strong> {printBooking.driverLicense || 'Non inserito'} {printBooking.driverLicenseRelease && `(Ril. ${printBooking.driverLicenseRelease})`}</div>
           </div>
 
           <div className="border border-black rounded p-3 space-y-4">
@@ -485,7 +554,7 @@ export const MonitorYard: React.FC = () => {
               }
             >
               {filteredBays.length === 0 ? (
-                <p className="text-center py-6 text-xs text-gray-500 font-mono">Nessuna baia corrispondente.</p>
+                <p className="text-center py-6 text-xs text-gray-500 font-mono">Nessuna baia configurata.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {filteredBays.map((bay) => {
@@ -496,17 +565,17 @@ export const MonitorYard: React.FC = () => {
                       ? carriers.find((c) => c.id === activeBooking.carrierId)?.name
                       : '';
                     const moduleName = warehouseModules.find(m => m.id === bay.moduleId)?.name || 'Generico';
+                    const activeUsage = bayUsages.find(u => u.id === bay.bayUsageId);
 
                     // Allerta se modificata
                     const isModified = activeBooking?.isEditedInBay;
-                    // Allerta se checklist fallita
                     const isChecklistFailed = activeBooking?.checklist?.isFailed;
 
                     return (
                       <div
                         key={bay.id}
                         onClick={() => activeBooking && handleOpenBayDetail(bay, activeBooking)}
-                        className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[170px] cursor-pointer ${
+                        className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[180px] cursor-pointer ${
                           isChecklistFailed
                             ? 'border-rose-500 border-[3px] bg-rose-50/30 hover:border-rose-600 ring-4 ring-rose-500/10 shadow-md animate-pulse-glow'
                             : isModified
@@ -543,44 +612,43 @@ export const MonitorYard: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="py-3 flex-grow">
+                        <div className="py-2.5 flex-grow">
                           {bay.status === 'OCCUPATA' && activeBooking ? (
-                            <div className="font-mono text-xs space-y-1">
+                            <div className="font-mono text-[10px] space-y-0.5">
                               <div className="flex justify-between">
-                                <span className="text-ticket-muted text-[10px]">Targa:</span>
+                                <span className="text-ticket-muted">Targa:</span>
                                 <span className="font-bold text-black">{activeBooking.licensePlate}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-ticket-muted text-[10px]">Vettore:</span>
-                                <span className="truncate max-w-[125px] text-right font-bold text-gray-700">{carrierName}</span>
+                                <span className="text-ticket-muted">Vettore:</span>
+                                <span className="truncate max-w-[100px] text-right font-bold text-gray-700">{carrierName}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-ticket-muted text-[10px]">Attività:</span>
+                                <span className="text-ticket-muted">Attività:</span>
                                 <span className="font-bold">{activeBooking.activityType}</span>
                               </div>
-                              {activeBooking.checklist && (
+                              {activeBooking.orderNumber && (
                                 <div className="flex justify-between">
-                                  <span className="text-ticket-muted text-[10px]">Checklist:</span>
-                                  <span className={`font-bold ${isChecklistFailed ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                    {isChecklistFailed ? 'NON CONFORME' : 'CONFORME'}
-                                  </span>
+                                  <span className="text-ticket-muted">Ordine:</span>
+                                  <span className="font-bold text-gray-600 truncate max-w-[100px]">{activeBooking.orderNumber}</span>
                                 </div>
                               )}
                             </div>
                           ) : bay.status === 'MANUTENZIONE' ? (
                             <div className="text-center py-4 text-xs font-mono text-red-500 font-bold">
-                              // BAIA IN MANUTENZIONE
+                              // IN MANUTENZIONE
                             </div>
                           ) : (
-                            <div className="text-center py-4 text-xs font-mono text-emerald-600 font-bold">
-                              // PRONTA AL CARICO
+                            <div className="text-center py-3 space-y-1">
+                              <div className="text-xs font-mono text-emerald-600 font-bold">// PRONTA</div>
+                              <div className="text-[8px] font-mono text-gray-400 uppercase">Uso: {activeUsage?.name || 'Generico'}</div>
                             </div>
                           )}
                         </div>
 
                         {bay.status === 'OCCUPATA' ? (
                           <div className="text-[9px] text-center text-ticket-muted font-sans border-t border-black/5 pt-1.5 mt-1">
-                            {currentRole === 'PREPOSTO' ? 'Clicca per Checklist e Note ➔' : 'Clicca per gestire ➔'}
+                            {currentRole === 'PREPOSTO' ? 'Dettagli & Checklist ➔' : 'Gestisci Rampa ➔'}
                           </div>
                         ) : (
                           <div className="h-4" />
@@ -604,16 +672,30 @@ export const MonitorYard: React.FC = () => {
                     columns={[
                       {
                         header: 'Triage Ticket',
-                        accessor: (b) => renderTriageTicket(b.ticketNumber)
+                        accessor: (b) => {
+                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.clientUsageId;
+                          return (
+                            <div className="flex flex-col items-center gap-1.5">
+                              {renderTriageTicket(b.ticketNumber)}
+                              {isIncomplete && (
+                                <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
+                                  ⚠️ Incompleto
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
                       },
                       {
                         header: 'Vettore / Veicolo',
                         accessor: (b) => {
                           const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                          const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
                           return (
-                            <div className="text-xs">
+                            <div className="text-xs font-sans">
                               <div className="font-bold text-black">{cName}</div>
                               <div className="font-mono text-ticket-accent mt-0.5">{b.licensePlate} ({b.driverName})</div>
+                              <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso Richiesto: {usageName}</div>
                             </div>
                           );
                         }
@@ -623,8 +705,9 @@ export const MonitorYard: React.FC = () => {
                         accessor: (b) => (
                           <div className="text-xs max-w-[200px]">
                             {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
-                            {b.driverPhone && <div className="text-[10px] font-mono text-gray-400 mt-1">Tel: {b.driverPhone}</div>}
-                            {b.notes && <div className="text-[10px] italic text-amber-600 truncate">{b.notes}</div>}
+                            {b.orderNumber && <div className="text-[9px] font-mono text-gray-600 mt-1">Ordine: {b.orderNumber}</div>}
+                            {b.driverPhone && <div className="text-[10px] font-mono text-gray-400 mt-0.5">Tel: {b.driverPhone}</div>}
+                            {b.notes && <div className="text-[10px] italic text-amber-600 truncate mt-0.5">{b.notes}</div>}
                           </div>
                         )
                       },
@@ -633,6 +716,13 @@ export const MonitorYard: React.FC = () => {
                         accessor: (b) => {
                           const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
                           const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+
+                          // Ordina le baie libere proponendo prima quelle dello stesso uso consigliato
+                          const sortedBays = [...availableBays].sort((bayA, bayB) => {
+                            const matchA = b.clientUsageId && bayA.bayUsageId === b.clientUsageId ? 1 : 0;
+                            const matchB = b.clientUsageId && bayB.bayUsageId === b.clientUsageId ? 1 : 0;
+                            return matchB - matchA;
+                          });
 
                           return (
                             <div className="flex space-x-2">
@@ -645,11 +735,15 @@ export const MonitorYard: React.FC = () => {
                                 className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer disabled:opacity-50"
                               >
                                 <option value="">Seleziona baia...</option>
-                                {availableBays.map((bay) => (
-                                  <option key={bay.id} value={bay.id}>
-                                    {bay.name}
-                                  </option>
-                                ))}
+                                {sortedBays.map((bay) => {
+                                  const isRecommended = b.clientUsageId && bay.bayUsageId === b.clientUsageId;
+                                  const usageName = bayUsages.find(u => u.id === bay.bayUsageId)?.name || 'Generica';
+                                  return (
+                                    <option key={bay.id} value={bay.id} className={isRecommended ? 'font-bold text-emerald-600' : ''}>
+                                      {isRecommended ? `⭐ [CONSIGLIATA - ${usageName}] ` : ''}{bay.name}
+                                    </option>
+                                  );
+                                })}
                               </select>
                               <Button
                                 size="sm"
@@ -671,27 +765,46 @@ export const MonitorYard: React.FC = () => {
                 <Card title="Prenotazioni Slot Attese per Oggi (Attesa Arrivo)">
                   <Table
                     data={incomingBookings}
-                    emptyMessage="Nessun camion prenotato per oggi."
+                    emptyMessage="Nessun transito prenotato in attesa."
                     columns={[
                       {
                         header: 'Ticket',
-                        accessor: (b) => renderTriageTicket(b.ticketNumber)
-                      },
-                      {
-                        header: 'Dettagli Richiesta',
                         accessor: (b) => {
-                          const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.clientUsageId;
                           return (
-                            <div className="text-xs">
-                              <div className="font-bold text-black">{cName}</div>
-                              <div className="font-mono text-gray-500">{b.licensePlate} ({b.driverName})</div>
+                            <div className="flex flex-col items-center gap-1.5">
+                              {renderTriageTicket(b.ticketNumber)}
+                              {isIncomplete && (
+                                <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
+                                  ⚠️ Incompleto
+                                </span>
+                              )}
                             </div>
                           );
                         }
                       },
                       {
-                        header: 'Attività',
-                        accessor: (b) => <Badge variant="info">{b.activityType}</Badge>,
+                        header: 'Dettagli Richiesta',
+                        accessor: (b) => {
+                          const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                          const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                          return (
+                            <div className="text-xs">
+                              <div className="font-bold text-black">{cName}</div>
+                              <div className="font-mono text-gray-500 mt-0.5">{b.licensePlate} ({b.driverName})</div>
+                              <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso/Cliente: {usageName}</div>
+                            </div>
+                          );
+                        }
+                      },
+                      {
+                        header: 'Attività / Sped.',
+                        accessor: (b) => (
+                          <div className="text-xs font-mono">
+                            <Badge variant="info">{b.activityType}</Badge>
+                            {b.orderNumber && <div className="text-[9px] mt-1 text-gray-600">Ord: {b.orderNumber}</div>}
+                          </div>
+                        ),
                       },
                       {
                         header: 'Check-In',
@@ -722,7 +835,7 @@ export const MonitorYard: React.FC = () => {
                       Funzione riservata alla sola Guardiola.
                     </p>
                   ) : (
-                    <form onSubmit={handleRegisterManualArrival} className="space-y-4">
+                    <form onSubmit={handleRegisterManualArrival} className="space-y-3 text-xs font-sans">
                       <Select
                         label="Vettore Selezionato"
                         options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
@@ -764,6 +877,35 @@ export const MonitorYard: React.FC = () => {
                         />
                       </div>
                       <Select
+                        label="Riferimento Cliente / Uso Baia"
+                        options={[{ value: '', label: 'Nessuno specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
+                        value={bayUsages.find(u => u.id === manualClientUsageId)?.name || manualClientUsageId}
+                        onChange={(e) => {
+                          const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
+                          setManualClientUsageId(found ? found.id : e.target.value);
+                        }}
+                      />
+                      <Input
+                        label="Numero Ordine Cliente"
+                        placeholder="Riferimento d'ordine..."
+                        value={manualOrderNumber}
+                        onChange={(e) => setManualOrderNumber(e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          label="Patente Autista"
+                          placeholder="Es. U19283748"
+                          value={manualDriverLicense}
+                          onChange={(e) => setManualDriverLicense(e.target.value)}
+                        />
+                        <Input
+                          label="Data Rilascio"
+                          type="date"
+                          value={manualDriverLicenseRelease}
+                          onChange={(e) => setManualDriverLicenseRelease(e.target.value)}
+                        />
+                      </div>
+                      <Select
                         label="Attività Richiesta"
                         options={activityTypes.map(act => ({ value: act.code, label: act.name }))}
                         value={activityTypes.find(a => a.code === manualActivityCode)?.name || manualActivityCode}
@@ -786,7 +928,7 @@ export const MonitorYard: React.FC = () => {
                 </Card>
 
                 <Card title="Registro Log Operazioni">
-                  <div className="space-y-2 max-h-[220px] overflow-y-auto font-mono text-[11px] pr-2">
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto font-mono text-[11px] pr-2">
                     {activeLogs.length === 0 ? (
                       <div className="text-ticket-muted text-center py-4">// NESSUN LOG REGISTRATO</div>
                     ) : (
@@ -813,9 +955,9 @@ export const MonitorYard: React.FC = () => {
           </>
         )}
 
-        {/* --- VISTA: TABELLONE PROGRAMMAZIONE CON MINI-CALENDARIO HIGHLIGHT --- */}
+        {/* --- VISTA: TABELLONE PROGRAMMAZIONE --- */}
         {activeSubTab === 'schedule' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
             
             {/* MINI-CALENDARIO MENSILE HIGHLIGHT (Sinistra) */}
             <div className="lg:col-span-1">
@@ -870,11 +1012,8 @@ export const MonitorYard: React.FC = () => {
                       const dateStr = formatDateString(currentYear, currentMonth, day);
                       const isSelected = dateStr === scheduleDate;
                       
-                      // Filtra le prenotazioni per questo specifico giorno
                       const dayBookingsList = activeBookings.filter(b => b.date === dateStr);
                       const hasBookings = dayBookingsList.length > 0;
-                      
-                      // Verifica se sono tutte completate o annullate
                       const allDone = hasBookings && dayBookingsList.every(b => b.status === 'COMPLETATO' || b.status === 'ANNULLATO');
 
                       let dayBgClass = 'bg-white border border-black/5 hover:border-black/20 text-gray-700';
@@ -932,7 +1071,7 @@ export const MonitorYard: React.FC = () => {
               <Card title={`Programmazione Attività del Cantiere - Giorno: ${scheduleDate}`}>
                 <div className="space-y-4">
                   <p className="text-xs text-gray-500 font-sans">
-                    Elenco completo di tutti i transiti e slot prenotati in questa data presso lo stabilimento logistico. Le attività completate rimangono visibili per lo storico odierno.
+                    Elenco di tutti i transiti programmati. Le righe che presentano dati anagrafici non completati (es. patente o ordine) mostrano un badge di attenzione.
                   </p>
                   <Table
                     data={dayBookings}
@@ -941,7 +1080,19 @@ export const MonitorYard: React.FC = () => {
                     columns={[
                       {
                         header: 'Ticket',
-                        accessor: (b) => renderTriageTicket(b.ticketNumber)
+                        accessor: (b) => {
+                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.clientUsageId;
+                          return (
+                            <div className="flex flex-col items-center gap-1">
+                              {renderTriageTicket(b.ticketNumber)}
+                              {isIncomplete && (
+                                <span className="text-[7px] font-bold bg-amber-50 text-amber-600 border border-amber-300 px-1 py-0.5 rounded shadow-2xs select-none tracking-wider">
+                                  ⚠️ Incompleto
+                                </span>
+                              )}
+                            </div>
+                          );
+                        }
                       },
                       {
                         header: 'Targa Mezzo',
@@ -949,18 +1100,27 @@ export const MonitorYard: React.FC = () => {
                       },
                       {
                         header: 'Autista',
-                        accessor: (b) => (
-                          <div className="text-xs">
-                            <div>{b.driverName}</div>
-                            {b.driverPhone && <div className="text-[10px] font-mono text-gray-400">Tel: {b.driverPhone}</div>}
-                          </div>
-                        )
+                        accessor: (b) => {
+                          const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                          return (
+                            <div className="text-xs">
+                              <div className="font-bold">{b.driverName}</div>
+                              {b.driverPhone && <div className="text-[10px] font-mono text-gray-400">Tel: {b.driverPhone}</div>}
+                              <div className="text-[9px] font-mono text-gray-400 mt-0.5">Uso/Cliente: {usageName}</div>
+                            </div>
+                          );
+                        }
                       },
                       {
-                        header: 'Vettore',
+                        header: 'Vettore / Ordine',
                         accessor: (b) => {
                           const name = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
-                          return <span className="font-bold text-xs">{name}</span>;
+                          return (
+                            <div className="text-xs">
+                              <span className="font-bold block">{name}</span>
+                              <span className="font-mono text-[9px] text-gray-500">Ord: {b.orderNumber || 'N/D'}</span>
+                            </div>
+                          );
                         }
                       },
                       {
@@ -1084,7 +1244,7 @@ export const MonitorYard: React.FC = () => {
         </div>
       )}
 
-      {/* --- MODAL 1: CHECK-IN NOTE E TELEFONO (GUARDIOLA) --- */}
+      {/* --- MODAL 1: CHECK-IN NOTE E PATENTE (GUARDIOLA) --- */}
       {checkInBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-black/10 overflow-hidden">
@@ -1096,26 +1256,58 @@ export const MonitorYard: React.FC = () => {
                 Ticket: {checkInBooking.ticketNumber || 'N/D'} | Veicolo: {checkInBooking.licensePlate}
               </p>
             </div>
-            <div className="p-4 space-y-4 font-sans text-xs">
-              <div className="space-y-3">
+            <div className="p-4 space-y-3 font-sans text-xs">
+              <div className="grid grid-cols-2 gap-2">
                 <Input
                   label="Telefono Autista"
                   placeholder="Es. +39 347 1122334"
                   value={checkInPhone}
                   onChange={(e) => setCheckInPhone(e.target.value)}
                 />
-                <div>
-                  <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Nota di Check-In
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Note relative all'arrivo..."
-                    value={checkInNotes}
-                    onChange={(e) => setCheckInNotes(e.target.value)}
-                    className="w-full bg-[#F5F0EB]/40 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none"
-                  />
-                </div>
+                <Select
+                  label="Riferimento Uso Baia / Cliente"
+                  options={[{ value: '', label: 'Nessun uso specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
+                  value={bayUsages.find(u => u.id === checkInClientUsageId)?.name || checkInClientUsageId}
+                  onChange={(e) => {
+                    const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
+                    setCheckInClientUsageId(found ? found.id : e.target.value);
+                  }}
+                />
+              </div>
+
+              <Input
+                label="Numero Ordine Cliente (Rif. DDT)"
+                placeholder="Riferimento d'ordine..."
+                value={checkInOrderNumber}
+                onChange={(e) => setCheckInOrderNumber(e.target.value)}
+              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Patente Autista"
+                  placeholder="Numero patente..."
+                  value={checkInLicense}
+                  onChange={(e) => setCheckInLicense(e.target.value)}
+                />
+                <Input
+                  label="Data Rilascio Patente"
+                  type="date"
+                  value={checkInLicenseRelease}
+                  onChange={(e) => setCheckInLicenseRelease(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">
+                  Nota di Check-In
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Note relative all'arrivo..."
+                  value={checkInNotes}
+                  onChange={(e) => setCheckInNotes(e.target.value)}
+                  className="w-full bg-[#F5F0EB]/40 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
+                />
               </div>
             </div>
             <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50">
@@ -1159,7 +1351,7 @@ export const MonitorYard: React.FC = () => {
             <div className="p-5 space-y-5 font-sans text-xs">
               
               {/* Griglia Dati Veicolo */}
-              <div className="grid grid-cols-2 gap-4 border-b border-black/5 pb-4 bg-gray-50/50 p-3 rounded-lg font-mono">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 border-b border-black/5 pb-4 bg-gray-50/50 p-3 rounded-lg font-mono">
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase">Vettore</span>
                   <span className="font-bold text-black text-xs block truncate">
@@ -1168,14 +1360,26 @@ export const MonitorYard: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase">Veicolo (Targa)</span>
-                  <span className="font-bold text-ticket-accent text-xs block">
+                  <span className="font-bold text-ticket-accent text-xs block font-mono">
                     {activeBayDetail.booking.licensePlate}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase">Autista</span>
-                  <span className="font-bold text-black text-xs block">
+                  <span className="font-bold text-black text-xs block truncate">
                     {activeBayDetail.booking.driverName}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[9px] uppercase">Ordine N.</span>
+                  <span className="font-bold text-gray-700 text-xs block">
+                    {activeBayDetail.booking.orderNumber || 'Non inserito'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[9px] uppercase">Patente N.</span>
+                  <span className="font-bold text-gray-700 text-xs block truncate">
+                    {activeBayDetail.booking.driverLicense || 'Non inserito'}
                   </span>
                 </div>
                 <div>
@@ -1195,7 +1399,7 @@ export const MonitorYard: React.FC = () => {
                     </h4>
                     
                     <div className="border border-black/10 rounded-lg overflow-hidden bg-white">
-                      <div className="max-h-[140px] overflow-y-auto">
+                      <div className="max-h-[120px] overflow-y-auto">
                         <table className="w-full text-left border-collapse text-[10px] font-mono">
                           <thead>
                             <tr className="bg-gray-50 border-b border-black/10 text-gray-400 text-[8px] uppercase">
@@ -1230,7 +1434,7 @@ export const MonitorYard: React.FC = () => {
                         placeholder="Aggiungi una nota operativa..."
                         value={newNoteText}
                         onChange={(e) => setNewNoteText(e.target.value)}
-                        className="flex-grow bg-[#F5F0EB]/40 border border-black/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none"
+                        className="flex-grow bg-[#F5F0EB]/40 border border-black/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none font-sans"
                       />
                       <Button size="sm" onClick={handleAddNoteDetail}>Aggiungi Nota</Button>
                     </div>
@@ -1265,53 +1469,78 @@ export const MonitorYard: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Modifica Campi Generali (Solo Guardiola/Admin) */}
-                  {(currentRole === 'GUARDIA' || currentRole === 'ADMIN') && (
-                    <div className="space-y-3 pt-3 border-t border-black/5">
-                      <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
-                        Modifica Dettagli Veicolo
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          label="Telefono Autista"
-                          value={detailPhone}
-                          onChange={(e) => setDetailPhone(e.target.value)}
-                        />
-                        <Input
-                          label="Posti Pallet"
-                          type="number"
-                          value={detailPallets === '' ? '' : detailPallets}
-                          onChange={(e) => setDetailPallets(e.target.value === '' ? '' : Number(e.target.value))}
-                        />
-                      </div>
+                  {/* Modifica Campi Generali (Solo Guardiola/Admin/Preposto) */}
+                  <div className="space-y-3 pt-3 border-t border-black/5">
+                    <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
+                      Aggiornamento Anagrafica Veicolo
+                    </h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <Input
+                        label="Telefono Autista"
+                        value={detailPhone}
+                        onChange={(e) => setDetailPhone(e.target.value)}
+                      />
+                      <Input
+                        label="Posti Pallet"
+                        type="number"
+                        value={detailPallets === '' ? '' : detailPallets}
+                        onChange={(e) => setDetailPallets(e.target.value === '' ? '' : Number(e.target.value))}
+                      />
                       <Select
-                        label="Cambia Attività"
-                        options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
-                        value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
+                        label="Uso Baia / Riferimento"
+                        options={[{ value: '', label: 'Generico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
+                        value={bayUsages.find(u => u.id === detailClientUsageId)?.name || detailClientUsageId}
                         onChange={(e) => {
-                          const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
-                          if (found) setDetailActivity(found.code);
+                          const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
+                          setDetailClientUsageId(found ? found.id : e.target.value);
                         }}
                       />
-                      <Button size="sm" onClick={handleSaveBayDetailChanges} className="w-full">
-                        Salva Dettagli
-                      </Button>
                     </div>
-                  )}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <Input
+                        label="Numero d'Ordine"
+                        value={detailOrderNumber}
+                        onChange={(e) => setDetailOrderNumber(e.target.value)}
+                      />
+                      <Input
+                        label="Numero Patente"
+                        value={detailLicense}
+                        onChange={(e) => setDetailLicense(e.target.value)}
+                      />
+                      <Input
+                        label="Data Rilascio Patente"
+                        type="date"
+                        value={detailLicenseRelease}
+                        onChange={(e) => setDetailLicenseRelease(e.target.value)}
+                      />
+                    </div>
+                    <Select
+                      label="Cambia Tipo Attività"
+                      options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
+                      value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
+                      onChange={(e) => {
+                        const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
+                        if (found) setDetailActivity(found.code);
+                      }}
+                    />
+                    <Button size="sm" onClick={handleSaveBayDetailChanges} className="w-full">
+                      Salva Dettagli Anagrafici
+                    </Button>
+                  </div>
 
                   {/* Riassegnazione Spostamento Baia (Solo Guardiola/Admin) */}
                   {(currentRole === 'GUARDIA' || currentRole === 'ADMIN') && (
                     <div className="space-y-3 pt-3 border-t border-black/5">
                       <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-amber-600 border-b border-black/5 pb-1">
-                        Spostamento ad altra Baia Disponibile
+                        Spostamento ad altra Baia Libera
                       </h4>
                       
                       {activeBays.filter((b) => b.status === 'DISPONIBILE').length === 0 ? (
-                        <p className="text-[10px] text-rose-500 italic font-mono">// NESSUNA ALTRA BAIA DISPONIBILE PER LO SPOSTAMENTO</p>
+                        <p className="text-[10px] text-rose-500 italic font-mono">// NESSUNA ALTRA BAIA LIBERA DISPONIBILE PER IL MEZZO</p>
                       ) : (
                         <div className="space-y-2">
                           <Select
-                            label="Seleziona Baia di Destinazione"
+                            label="Seleziona Baia Libera"
                             options={[{ value: '', label: 'Scegli baia...' }, ...activeBays.filter(b => b.status === 'DISPONIBILE').map(b => ({ value: b.id, label: b.name }))]}
                             value={bays.find(b => b.id === relocateBayId)?.name || relocateBayId}
                             onChange={(e) => {
@@ -1321,7 +1550,7 @@ export const MonitorYard: React.FC = () => {
                           />
                           <Input
                             label="Motivazione dello Spostamento *"
-                            placeholder="Rampa non idonea, priorità..."
+                            placeholder="Inserisci motivazione..."
                             value={relocateReason}
                             onChange={(e) => setRelocateReason(e.target.value)}
                           />
@@ -1332,7 +1561,7 @@ export const MonitorYard: React.FC = () => {
                             disabled={!relocateBayId || !relocateReason}
                             className="w-full"
                           >
-                            Rilocazione Mezzo
+                            Conferma Spostamento Baia
                           </Button>
                         </div>
                       )}
@@ -1520,4 +1749,3 @@ const getBookingStatusBadge = (status: Booking['status']) => {
       return null;
   }
 };
-

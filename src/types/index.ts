@@ -11,6 +11,12 @@ export interface WarehouseModule {
   description?: string;
 }
 
+export interface BayUsage {
+  id: string;
+  name: string; // e.g., "Pallet vuoti", "Acqua", "Crossdocking", "Cliente Rossi"
+  description?: string;
+}
+
 export interface Bay {
   id: string;
   depotId: string;
@@ -18,6 +24,7 @@ export interface Bay {
   name: string; // e.g., "Baia A1", "Baia A2"
   status: 'DISPONIBILE' | 'OCCUPATA' | 'MANUTENZIONE';
   currentBookingId?: string; // Links to the booking currently occupying the bay
+  bayUsageId?: string; // Links to BayUsage (Uso Baia)
 }
 
 export interface Carrier {
@@ -95,6 +102,12 @@ export interface Booking {
   timeInBay?: string;  // ISO string when loading/unloading started
   timeOutBay?: string; // ISO string when activity finished
   timeOutGate?: string; // ISO string when truck departed
+  
+  // Patente e Ordine Cliente
+  driverLicense?: string;
+  driverLicenseRelease?: string;
+  orderNumber?: string;
+  clientUsageId?: string; // Links to BayUsage (Uso Baia / Cliente)
 }
 
 export interface ActivityLog {

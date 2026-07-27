@@ -39,6 +39,8 @@ function AppContent() {
         return <DashboardAdmin key="admin-activities" defaultTab="activities" />;
       case 'admin-reports':
         return <DashboardAdmin key="admin-reports" defaultTab="reports" />;
+      case 'admin-bayusages':
+        return <DashboardAdmin key="admin-bayusages" defaultTab="bayusages" />;
       case 'carrier-portal':
         return <PortaleVettori />;
       default:
