@@ -17,7 +17,7 @@ function AppContent() {
       setActiveTab('admin-dashboard');
     } else if (currentRole === 'VETTORE') {
       setActiveTab('carrier-portal');
-    } else if (currentRole === 'GUARDIA') {
+    } else if (currentRole === 'GUARDIA' || currentRole === 'PREPOSTO') {
       setActiveTab('yard-monitor');
     }
   }, [currentRole]);

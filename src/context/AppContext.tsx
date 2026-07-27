@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User } from '../types';
+import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert } from '../types';
 
 interface AppContextType {
   depots: Depot[];
@@ -10,7 +10,8 @@ interface AppContextType {
   activityLogs: ActivityLog[];
   activityTypes: ActivityType[];
   reportSchedules: ReportSchedule[];
-  currentRole: 'ADMIN' | 'GUARDIA' | 'VETTORE' | null;
+  checklistAlerts: ChecklistFailureAlert[];
+  currentRole: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null;
   currentUser: User | null;
   currentCarrierId: string;
   selectedDepotId: string;
@@ -44,10 +45,28 @@ interface AppContextType {
     updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number }
   ) => void;
   relocateBookingBay: (bookingId: string, newBayId: string, reason: string) => void;
+  addBookingNote: (bookingId: string, text: string) => void;
+  saveQualityChecklist: (
+    bookingId: string,
+    checklistData: {
+      pianaleSporco: boolean;
+      presenzaInfestantiMezzo: boolean;
+      puliziaPallet: boolean;
+      integritaPallet: boolean;
+      presenzaInfestantiProdotto: boolean;
+      presenzaBio: boolean;
+      noteLibere?: string;
+      sigilloPresente: boolean;
+      numeroSigillo?: string;
+      corrispondenzaDdt: boolean;
+      noteSigillo?: string;
+    }
+  ) => void;
+  resolveChecklistAlert: (alertId: string, action: 'PROCEDI' | 'RESPINTO', reason?: string) => void;
   addActivityType: (name: string, code: string) => void;
   addReportSchedule: (name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => void;
   toggleReportSchedule: (id: string) => void;
-  setCurrentRole: (role: 'ADMIN' | 'GUARDIA' | 'VETTORE' | null) => void;
+  setCurrentRole: (role: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null) => void;
   setCurrentUser: (user: User | null) => void;
   setCurrentCarrierId: (carrierId: string) => void;
   setSelectedDepotId: (depotId: string) => void;
@@ -56,7 +75,7 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'yard_management_system_state_v3';
+const LOCAL_STORAGE_KEY = 'yard_management_system_state_v4';
 
 const getTodayDateString = () => {
   return new Date().toISOString().split('T')[0];
@@ -127,7 +146,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverPhone: '+39 347 1234567',
       palletPlaces: 24,
       ticketNumber: 'C-392',
-      notes: 'Materiale promozionale secco',
+      notes: 'Carico urgente merci secche',
+      notesHistory: [
+        { id: 'n-init-1', timestamp: new Date(new Date().setHours(new Date().getHours() - 10)).toISOString(), author: 'Vettore Logistica', text: 'Carico urgente merci secche' }
+      ]
     },
     {
       id: 'book-milano-2',
@@ -142,6 +164,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       palletPlaces: 12,
       ticketNumber: 'S-712',
       notes: 'Carico a temperatura controllata fresco',
+      notesHistory: [
+        { id: 'n-init-2', timestamp: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(), author: 'Autista', text: 'Carico a temperatura controllata fresco' }
+      ],
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 1)).toISOString(),
     },
     {
@@ -157,7 +182,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverPhone: '+39 320 1122334',
       palletPlaces: 33,
       ticketNumber: 'S-209',
-      notes: 'Sponda idraulica richiesta',
+      notes: 'Richiesta sponda idraulica',
+      notesHistory: [
+        { id: 'n-init-3', timestamp: new Date(new Date().setHours(new Date().getHours() - 6)).toISOString(), author: 'Vettore', text: 'Richiesta sponda idraulica' }
+      ],
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 3)).toISOString(),
       timeInBay: new Date(new Date().setHours(new Date().getHours() - 2)).toISOString(),
     },
@@ -175,6 +203,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       palletPlaces: 8,
       ticketNumber: 'C-881',
       notes: 'Reso imballaggi',
+      notesHistory: [
+        { id: 'n-init-4', timestamp: new Date(new Date().setHours(new Date().getHours() - 8)).toISOString(), author: 'Vettore', text: 'Reso imballaggi' }
+      ],
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(),
       timeInBay: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(),
       timeOutBay: new Date(new Date().setHours(new Date().getHours() - 3)).toISOString(),
@@ -198,14 +229,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(defaultLogs);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>(defaultActivityTypes);
   const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>(defaultReportSchedules);
+  
+  // Allerte per checklist fallite (Guardiola)
+  const [checklistAlerts, setChecklistAlerts] = useState<ChecklistFailureAlert[]>([]);
 
-  // Stati di sessione (Simulazione d'accesso)
-  const [currentRole, setCurrentRole] = useState<'ADMIN' | 'GUARDIA' | 'VETTORE' | null>(null);
+  // Stati di sessione
+  const [currentRole, setCurrentRole] = useState<'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentCarrierId, setCurrentCarrierId] = useState<string>('');
   const [selectedDepotId, setSelectedDepotId] = useState<string>('depot-milano');
 
-  // Caricamento iniziale da LocalStorage
+  // Caricamento iniziale
   useEffect(() => {
     const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (savedState) {
@@ -219,8 +253,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.activityLogs) setActivityLogs(parsed.activityLogs);
         if (parsed.activityTypes) setActivityTypes(parsed.activityTypes);
         if (parsed.reportSchedules) setReportSchedules(parsed.reportSchedules);
+        if (parsed.checklistAlerts) setChecklistAlerts(parsed.checklistAlerts);
         
-        // Mantieni la sessione se presente
         if (parsed.currentRole !== undefined) setCurrentRole(parsed.currentRole);
         if (parsed.currentUser !== undefined) setCurrentUser(parsed.currentUser);
         if (parsed.currentCarrierId !== undefined) setCurrentCarrierId(parsed.currentCarrierId);
@@ -242,13 +276,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activityLogs,
       activityTypes,
       reportSchedules,
+      checklistAlerts,
       currentRole,
       currentUser,
       currentCarrierId,
       selectedDepotId,
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, currentRole, currentUser, currentCarrierId, selectedDepotId]);
+  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, checklistAlerts, currentRole, currentUser, currentCarrierId, selectedDepotId]);
 
   // --- OPERAZIONI DI LOG ---
   const logActivity = (depotId: string, message: string, type: ActivityLog['type'] = 'INFO') => {
@@ -372,10 +407,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `book-${Date.now()}`;
     const carrierId = currentRole === 'VETTORE' ? currentCarrierId : 'carrier-1';
     
-    // Triage ticket number prefix from activity code
     const prefix = activityType.substring(0, 1).toUpperCase() || 'T';
     const randNum = Math.floor(100 + Math.random() * 900);
     const ticketNumber = `${prefix}-${randNum}`;
+
+    const newNote: BookingNote[] = [];
+    if (notes) {
+      newNote.push({
+        id: `note-init-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        author: currentRole === 'VETTORE' ? 'Vettore' : 'Sistema',
+        text: notes,
+      });
+    }
 
     const newBooking: Booking = {
       id,
@@ -388,6 +432,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverName,
       driverPhone,
       notes,
+      notesHistory: newNote,
       palletPlaces: palletPlaces ? Number(palletPlaces) : undefined,
       ticketNumber,
       isEditedInBay: false,
@@ -397,7 +442,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const carrier = carriers.find((c) => c.id === carrierId);
     logActivity(
       depotId,
-      `Prenotazione [Ticket: ${ticketNumber}] per attività di ${activityType} registrata da ${carrier?.name || 'Vettore'} (Veicolo: ${licensePlate.toUpperCase()}, Pallet: ${palletPlaces || 'N/D'})`,
+      `Prenotazione [Ticket: ${ticketNumber}] registrata da ${carrier?.name || 'Vettore'} per il ${date}`,
       'INFO'
     );
   };
@@ -419,13 +464,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           const updated = { ...b, status };
 
-          // Aggiungi dati extra dal check-in se forniti
+          // Aggiungi dati extra dal check-in
           if (extra) {
             if (extra.driverPhone !== undefined) updated.driverPhone = extra.driverPhone;
-            if (extra.notes !== undefined) updated.notes = extra.notes;
+            if (extra.notes !== undefined) {
+              updated.notes = extra.notes;
+              const authorName = currentUser?.name || 'Guardiola';
+              const newNote: BookingNote = {
+                id: `note-checkin-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                author: authorName,
+                text: extra.notes,
+              };
+              updated.notesHistory = updated.notesHistory ? [...updated.notesHistory, newNote] : [newNote];
+            }
           }
 
-          // Timestamp in base alla transizione
           if (status === 'AL_CANCELLO' && !b.timeInGate) {
             updated.timeInGate = new Date().toISOString();
           } else if (status === 'IN_BAIA') {
@@ -453,12 +507,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // Gestione dello stato delle baie
+    // Gestione baie
     if (oldBooking) {
-      const carrierName = carriers.find((c) => c.id === oldBooking?.carrierId)?.name || 'Vettore';
       const ticketText = oldBooking.ticketNumber || oldBooking.id;
 
-      // 1. Libera la baia precedente
       if (oldBooking.bayId) {
         setBays((prevBays) =>
           prevBays.map((b) =>
@@ -469,7 +521,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         );
       }
 
-      // 2. Se in baia, bloccala
       if (status === 'IN_BAIA' && bayId) {
         setBays((prevBays) =>
           prevBays.map((b) =>
@@ -481,20 +532,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const targetBayName = bays.find((b) => b.id === bayId)?.name || 'Baia';
         logActivity(
           targetDepotId,
-          `Mezzo ${oldBooking.licensePlate} [${ticketText}] (${carrierName}) in baia ${targetBayName}. Avviata attività di ${oldBooking.activityType}.`,
+          `Mezzo ${oldBooking.licensePlate} [${ticketText}] in baia ${targetBayName}.`,
           'SUCCESS'
         );
       } else if (status === 'AL_CANCELLO') {
         logActivity(
           targetDepotId,
-          `Check-In al cancello per veicolo ${oldBooking.licensePlate} [${ticketText}] (${carrierName}). Registrato ingresso.`,
+          `Check-In per veicolo ${oldBooking.licensePlate} [${ticketText}].`,
           'INFO'
         );
       } else if (status === 'COMPLETATO') {
         const targetBayName = bays.find((b) => b.id === oldBooking?.bayId)?.name || 'Baia';
         logActivity(
           targetDepotId,
-          `Attività conclusa per veicolo ${oldBooking.licensePlate} [${ticketText}] (${carrierName}) presso ${targetBayName}. Mezzo uscito da Plant.`,
+          `Attività conclusa per veicolo ${oldBooking.licensePlate} [${ticketText}] presso ${targetBayName}.`,
           'SUCCESS'
         );
       } else if (status === 'ANNULLATO') {
@@ -503,7 +554,191 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Aggiorna dettagli attività/note e attiva il flag contorno evidenziato
+  // Aggiungi una nota alla cronologia tabellata
+  const addBookingNote = (bookingId: string, text: string) => {
+    const authorName = currentUser?.name || (currentRole === 'GUARDIA' ? `Guardiola ${selectedDepotId}` : 'Preposto');
+    const newNote: BookingNote = {
+      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      author: authorName,
+      text,
+    };
+
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === bookingId) {
+          const notesHistory = b.notesHistory ? [...b.notesHistory, newNote] : [newNote];
+          return {
+            ...b,
+            notes: text,
+            notesHistory,
+            isEditedInBay: b.status === 'IN_BAIA' ? true : b.isEditedInBay,
+          };
+        }
+        return b;
+      })
+    );
+
+    const booking = bookings.find(b => b.id === bookingId);
+    if (booking) {
+      logActivity(booking.depotId, `Aggiunta nota a veicolo ${booking.licensePlate} da ${authorName}.`, 'INFO');
+    }
+  };
+
+  // Compila e salva la Checklist Qualità
+  const saveQualityChecklist = (
+    bookingId: string,
+    checklistData: {
+      pianaleSporco: boolean;
+      presenzaInfestantiMezzo: boolean;
+      puliziaPallet: boolean;
+      integritaPallet: boolean;
+      presenzaInfestantiProdotto: boolean;
+      presenzaBio: boolean;
+      noteLibere?: string;
+      sigilloPresente: boolean;
+      numeroSigillo?: string;
+      corrispondenzaDdt: boolean;
+      noteSigillo?: string;
+    }
+  ) => {
+    const prepostoName = currentUser?.name || 'Preposto Magazzino';
+    
+    // Fallimento critico: presenza sporco/infestanti o anomalie sigillo
+    const isFailed =
+      checklistData.pianaleSporco ||
+      checklistData.presenzaInfestantiMezzo ||
+      !checklistData.puliziaPallet ||
+      !checklistData.integritaPallet ||
+      checklistData.presenzaInfestantiProdotto ||
+      (checklistData.sigilloPresente && !checklistData.corrispondenzaDdt);
+
+    const checklist: QualityChecklist = {
+      ...checklistData,
+      dataOraCheck: new Date().toISOString(),
+      compilataDa: prepostoName,
+      isFailed,
+    };
+
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === bookingId) {
+          return {
+            ...b,
+            checklist,
+            isEditedInBay: true, // Contorna in evidenza
+          };
+        }
+        return b;
+      })
+    );
+
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (booking) {
+      logActivity(
+        booking.depotId,
+        `Compilata checklist conformità veicolo ${booking.licensePlate} da preposto ${prepostoName}. Esito: ${isFailed ? 'FALLITO' : 'CONFORME'}.`,
+        isFailed ? 'WARNING' : 'SUCCESS'
+      );
+
+      if (isFailed) {
+        const failedList: string[] = [];
+        if (checklistData.pianaleSporco) failedList.push('Pianale sporco');
+        if (checklistData.presenzaInfestantiMezzo) failedList.push('Infestanti mezzo');
+        if (!checklistData.puliziaPallet) failedList.push('Pallet non puliti');
+        if (!checklistData.integritaPallet) failedList.push('Pallet non integri');
+        if (checklistData.presenzaInfestantiProdotto) failedList.push('Infestanti prodotto');
+        if (checklistData.sigilloPresente && !checklistData.corrispondenzaDdt) failedList.push('Sigillo non conforme');
+
+        const newAlert: ChecklistFailureAlert = {
+          id: `alert-${Date.now()}`,
+          bookingId,
+          depotId: booking.depotId,
+          bayId: booking.bayId || '',
+          prepostoName,
+          failedChecks: failedList,
+          timestamp: new Date().toISOString(),
+          status: 'ATTESA_DECISIONE',
+        };
+
+        setChecklistAlerts((prev) => [newAlert, ...prev]);
+      }
+    }
+  };
+
+  // Guardiola risponde all'allerta blocco checklist
+  const resolveChecklistAlert = (alertId: string, action: 'PROCEDI' | 'RESPINTO', reason?: string) => {
+    let alertObj: ChecklistFailureAlert | undefined;
+
+    setChecklistAlerts((prev) =>
+      prev.map((a) => {
+        if (a.id === alertId) {
+          alertObj = a;
+          return { ...a, status: action, resolutionReason: reason };
+        }
+        return a;
+      })
+    );
+
+    if (alertObj) {
+      const { bookingId, bayId, depotId } = alertObj;
+
+      if (action === 'PROCEDI') {
+        setBookings((prev) =>
+          prev.map((b) => {
+            if (b.id === bookingId) {
+              const resNote: BookingNote = {
+                id: `note-res-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                author: currentUser?.name || 'Guardiola',
+                text: `SBLOCCATA ALLERTA CHECKLIST FALLITA: ${reason || 'Autorizzato a procedere.'}`,
+              };
+              return {
+                ...b,
+                isEditedInBay: false, // Rimuovi allerta contorno
+                notesHistory: b.notesHistory ? [...b.notesHistory, resNote] : [resNote],
+              };
+            }
+            return b;
+          })
+        );
+        logActivity(depotId, `Allerta checklist sbloccata da guardiola. Attività procede.`, 'SUCCESS');
+      } else if (action === 'RESPINTO') {
+        setBookings((prev) =>
+          prev.map((b) => {
+            if (b.id === bookingId) {
+              const rejNote: BookingNote = {
+                id: `note-rej-${Date.now()}`,
+                timestamp: new Date().toISOString(),
+                author: currentUser?.name || 'Guardiola',
+                text: `MEZZO RESPINTO PER CHECKLIST FALLITA. Motivazione: ${reason || 'Non specificato'}`,
+              };
+              return {
+                ...b,
+                status: 'ANNULLATO',
+                bayId: undefined,
+                timeOutGate: new Date().toISOString(),
+                notesHistory: b.notesHistory ? [...b.notesHistory, rejNote] : [rejNote],
+              };
+            }
+            return b;
+          })
+        );
+
+        if (bayId) {
+          setBays((prev) =>
+            prev.map((bay) =>
+              bay.id === bayId
+                ? { ...bay, status: 'DISPONIBILE', currentBookingId: undefined }
+                : bay
+            )
+          );
+        }
+        logActivity(depotId, `Mezzo respinto per checklist fallita. Baia liberata. Motivo: ${reason}`, 'WARNING');
+      }
+    }
+  };
+
   const updateBookingDetails = (
     bookingId: string,
     updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number }
@@ -515,9 +750,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...b,
             ...updates,
           };
-          // Se il camion è in baia, imposta l'allerta contorno a true
           if (b.status === 'IN_BAIA') {
             updated.isEditedInBay = true;
+          }
+          if (updates.notes) {
+            const author = currentUser?.name || 'Sistema';
+            const newNote: BookingNote = {
+              id: `note-det-${Date.now()}`,
+              timestamp: new Date().toISOString(),
+              author,
+              text: updates.notes,
+            };
+            updated.notesHistory = updated.notesHistory ? [...updated.notesHistory, newNote] : [newNote];
           }
           return updated;
         }
@@ -527,12 +771,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const booking = bookings.find((b) => b.id === bookingId);
     if (booking) {
-      const ticketText = booking.ticketNumber || booking.id;
-      logActivity(booking.depotId, `Aggiornati dettagli operativi per prenotazione [${ticketText}].`, 'INFO');
+      logActivity(booking.depotId, `Aggiornati dettagli operativi prenotazione.`, 'INFO');
     }
   };
 
-  // Spostamento di baia con motivazione registrata
   const relocateBookingBay = (bookingId: string, newBayId: string, reason: string) => {
     let targetDepotId = selectedDepotId;
     let oldBayId: string | undefined;
@@ -542,26 +784,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (b.id === bookingId) {
           targetDepotId = b.depotId;
           oldBayId = b.bayId;
+          const relocateNote: BookingNote = {
+            id: `note-reloc-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            author: currentUser?.name || 'Operatore',
+            text: `CAMBIO BAIA: spostato da ${bays.find(x => x.id === oldBayId)?.name || 'N/D'} a ${bays.find(x => x.id === newBayId)?.name || 'N/D'}. Motivazione: ${reason}`,
+          };
           return {
             ...b,
             bayId: newBayId,
             bayChangeReason: reason,
-            isEditedInBay: true, // Lo spostamento attiva l'evidenziazione contorno!
-            notes: b.notes ? `${b.notes} | Spostato da baia: ${reason}` : `Spostato da baia: ${reason}`,
+            isEditedInBay: true,
+            notesHistory: b.notesHistory ? [...b.notesHistory, relocateNote] : [relocateNote],
           };
         }
         return b;
       })
     );
 
-    // Aggiorna lo stato delle baie fisiche
     setBays((prevBays) =>
       prevBays.map((b) => {
-        // Libera la vecchia
         if (oldBayId && b.id === oldBayId) {
           return { ...b, status: 'DISPONIBILE' as const, currentBookingId: undefined };
         }
-        // Blocca la nuova
         if (b.id === newBayId) {
           return { ...b, status: 'OCCUPATA' as const, currentBookingId: bookingId };
         }
@@ -571,12 +816,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const bNameOld = bays.find((b) => b.id === oldBayId)?.name || 'Vecchia Baia';
     const bNameNew = bays.find((b) => b.id === newBayId)?.name || 'Nuova Baia';
-    const booking = bookings.find(b => b.id === bookingId);
-    const ticketText = booking?.ticketNumber || bookingId;
-
     logActivity(
       targetDepotId,
-      `Riassegnazione baia per [${ticketText}]: spostato da ${bNameOld} a ${bNameNew}. Motivazione: ${reason}`,
+      `Riassegnazione baia: spostato da ${bNameOld} a ${bNameNew}. Motivazione: ${reason}`,
       'WARNING'
     );
   };
@@ -610,6 +852,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActivityLogs(defaultLogs);
     setActivityTypes(defaultActivityTypes);
     setReportSchedules(defaultReportSchedules);
+    setChecklistAlerts([]);
     setCurrentRole(null);
     setCurrentUser(null);
     setCurrentCarrierId('');
@@ -629,6 +872,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activityLogs,
         activityTypes,
         reportSchedules,
+        checklistAlerts,
         currentRole,
         currentUser,
         currentCarrierId,
@@ -646,6 +890,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateBookingStatus,
         updateBookingDetails,
         relocateBookingBay,
+        addBookingNote,
+        saveQualityChecklist,
+        resolveChecklistAlert,
         addActivityType,
         addReportSchedule,
         toggleReportSchedule,

@@ -16,9 +16,9 @@ export const AccessoLogin: React.FC = () => {
     setSelectedDepotId,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'admin' | 'guardiola' | 'vettore'>('guardiola');
+  const [activeTab, setActiveTab] = useState<'admin' | 'guardiola' | 'vettore' | 'preposto'>('guardiola');
   
-  // Stati Guardiola
+  // Stati Plant
   const [selectedPlantId, setSelectedPlantId] = useState(depots[0]?.id || '');
 
   // Stati Vettore
@@ -53,6 +53,17 @@ export const AccessoLogin: React.FC = () => {
         role: 'GUARDIA_CANCELLO',
         depotId: selectedPlantId,
       });
+    } else if (activeTab === 'preposto') {
+      setCurrentRole('PREPOSTO');
+      setSelectedDepotId(selectedPlantId);
+      const plantName = depots.find(d => d.id === selectedPlantId)?.name || 'Plant';
+      setCurrentUser({
+        id: `usr-preposto-${selectedPlantId}`,
+        name: `Preposto ${plantName}`,
+        email: `preposto.${selectedPlantId}@logisticauno.it`,
+        role: 'PREPOSTO',
+        depotId: selectedPlantId,
+      });
     } else if (activeTab === 'vettore') {
       if (!selectedCarrierId) {
         alert('Seleziona un vettore abilitato per accedere.');
@@ -65,7 +76,7 @@ export const AccessoLogin: React.FC = () => {
         id: `usr-carrier-${selectedCarrierId}`,
         name: carrierName,
         email: carriers.find(c => c.id === selectedCarrierId)?.email || 'carrier@info.it',
-        role: 'OPERATORE_YARD', // Mapped as standard user for yard page operations
+        role: 'OPERATORE_YARD',
       });
     }
   };
@@ -79,7 +90,6 @@ export const AccessoLogin: React.FC = () => {
     registerCarrier(regName, regEmail, regVat, regPlate);
     setRegSuccess(true);
     setRegError('');
-    // reset form
     setRegName('');
     setRegEmail('');
     setRegVat('');
@@ -107,10 +117,10 @@ export const AccessoLogin: React.FC = () => {
         {!showRegForm ? (
           <Card title="Autenticazione Portale" className="shadow-lg border-black/10">
             {/* Tabs per tipologia d'accesso */}
-            <div className="flex space-x-1 border-b border-black/10 pb-px mb-6 font-mono text-[10px]">
+            <div className="flex space-x-1 border-b border-black/10 pb-px mb-6 font-mono text-[9px] overflow-x-auto whitespace-nowrap">
               <button
                 onClick={() => setActiveTab('guardiola')}
-                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center ${
+                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
                   activeTab === 'guardiola'
                     ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
                     : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
@@ -119,8 +129,18 @@ export const AccessoLogin: React.FC = () => {
                 🎥 Guardiola
               </button>
               <button
+                onClick={() => setActiveTab('preposto')}
+                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
+                  activeTab === 'preposto'
+                    ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
+                    : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
+                }`}
+              >
+                📋 Preposto
+              </button>
+              <button
                 onClick={() => setActiveTab('vettore')}
-                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center ${
+                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
                   activeTab === 'vettore'
                     ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
                     : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
@@ -130,7 +150,7 @@ export const AccessoLogin: React.FC = () => {
               </button>
               <button
                 onClick={() => setActiveTab('admin')}
-                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center ${
+                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
                   activeTab === 'admin'
                     ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
                     : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
@@ -157,6 +177,27 @@ export const AccessoLogin: React.FC = () => {
                 />
                 <Button onClick={handleLogin} className="w-full mt-4">
                   Accedi come Guardiola
+                </Button>
+              </div>
+            )}
+
+            {/* CONTENUTO TAB: PREPOSTO */}
+            {activeTab === 'preposto' && (
+              <div className="space-y-4">
+                <p className="text-xs text-gray-500 font-sans leading-relaxed">
+                  Seleziona lo stabilimento (Plant) logistico in cui operi come preposto per compilare le check-list di conformità igienica e ultimare i carichi/scarichi.
+                </p>
+                <Select
+                  label="Stabilimento Plant Attivo"
+                  options={depots.map((d) => ({ value: d.id, label: `${d.name} (${d.city})` }))}
+                  value={plantIdToLabel(selectedPlantId)}
+                  onChange={(e) => {
+                    const opt = depots.find(d => `${d.name} (${d.city})` === e.target.value || d.id === e.target.value);
+                    if (opt) setSelectedPlantId(opt.id);
+                  }}
+                />
+                <Button onClick={handleLogin} className="w-full mt-4">
+                  Accedi come Preposto
                 </Button>
               </div>
             )}

@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
-import type { Booking, Bay } from '../types';
+import type { Booking, Bay, BookingNote } from '../types';
 
 export const MonitorYard: React.FC = () => {
   const {
@@ -17,22 +17,32 @@ export const MonitorYard: React.FC = () => {
     warehouseModules,
     activityLogs,
     activityTypes,
+    checklistAlerts,
+    currentRole,
     updateBookingStatus,
     addBooking,
     updateBookingDetails,
     relocateBookingBay,
+    addBookingNote,
+    saveQualityChecklist,
+    resolveChecklistAlert,
   } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'monitor' | 'schedule'>('monitor');
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
   
-  // Calendario per visualizzare la programmazione di altri giorni
+  // Data selezionata per le attività
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().split('T')[0]);
 
+  // Stato per la navigazione del mese nel calendario
+  const [currentYear, setCurrentYear] = useState(new Date(scheduleDate).getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(new Date(scheduleDate).getMonth()); // 0-11
+
+  // Filtro Depot
   const activeDepot = depots.find((d) => d.id === selectedDepotId);
   const activeBays = bays.filter((b) => b.depotId === selectedDepotId);
   
-  // Prenotazioni filtrate per giorno e plant
+  // Prenotazioni filtrate per Depot
   const activeBookings = bookings.filter((b) => b.depotId === selectedDepotId);
   const dayBookings = activeBookings.filter((b) => b.date === scheduleDate);
 
@@ -42,7 +52,7 @@ export const MonitorYard: React.FC = () => {
     : activeBays;
 
   const incomingBookings = dayBookings.filter((b) => b.status === 'PRENOTATO');
-  const gateBookings = activeBookings.filter((b) => b.status === 'AL_CANCELLO'); // La coda al gate è live per chi è arrivato fisicamente
+  const gateBookings = activeBookings.filter((b) => b.status === 'AL_CANCELLO');
   const activeLogs = activityLogs.filter((l) => l.depotId === selectedDepotId);
 
   // Form check-in manuale rapido
@@ -59,17 +69,78 @@ export const MonitorYard: React.FC = () => {
   const [checkInPhone, setCheckInPhone] = useState('');
   const [checkInNotes, setCheckInNotes] = useState('');
 
+  // Dettaglio Baia
   const [activeBayDetail, setActiveBayDetail] = useState<{ bay: Bay; booking: Booking } | null>(null);
-  const [detailNotes, setDetailNotes] = useState('');
-  const [detailActivity, setDetailActivity] = useState('');
   const [detailPhone, setDetailPhone] = useState('');
   const [detailPallets, setDetailPallets] = useState<number | ''>('');
+  const [detailActivity, setDetailActivity] = useState('');
+  const [newNoteText, setNewNoteText] = useState('');
 
   // Spostamento Baia
   const [relocateBayId, setRelocateBayId] = useState('');
   const [relocateReason, setRelocateReason] = useState('');
 
+  // Checklist Qualità Form
+  const [showChecklistForm, setShowChecklistForm] = useState(false);
+  const [pianaleSporco, setPianaleSporco] = useState(false);
+  const [presenzaInfestantiMezzo, setPresenzaInfestantiMezzo] = useState(false);
+  const [puliziaPallet, setPuliziaPallet] = useState(true); // default pulito
+  const [integritaPallet, setIntegritaPallet] = useState(true); // default integro
+  const [presenzaInfestantiProdotto, setPresenzaInfestantiProdotto] = useState(false);
+  const [presenzaBio, setPresenzaBio] = useState(false);
+  const [noteLibere, setNoteLibere] = useState('');
+  const [sigilloPresente, setSigilloPresente] = useState(false);
+  const [numeroSigillo, setNumeroSigillo] = useState('');
+  const [corrispondenzaDdt, setCorrispondenzaDdt] = useState(true);
+  const [noteSigillo, setNoteSigillo] = useState('');
+
+  // Allerta Blocco Guardiola (Risoluzione Check-list fallita)
+  const [activeAlertForGuardiola, setActiveAlertForGuardiola] = useState<any>(null);
+  const [alertResolveReason, setAlertResolveReason] = useState('');
+
+  // Stampa checklist
+  const [printBooking, setPrintBooking] = useState<Booking | null>(null);
+
   const [tempBayAssignment, setTempBayAssignment] = useState<{ [bookingId: string]: string }>({});
+
+  // Allerte attive per questo Plant e in attesa decisione
+  const pendingAlerts = checklistAlerts.filter(
+    (a) => a.depotId === selectedDepotId && a.status === 'ATTESA_DECISIONE'
+  );
+
+  // Trigger popup per la guardiola
+  React.useEffect(() => {
+    if ((currentRole === 'GUARDIA' || currentRole === 'ADMIN') && pendingAlerts.length > 0) {
+      setActiveAlertForGuardiola(pendingAlerts[0]);
+      setAlertResolveReason('');
+    } else {
+      setActiveAlertForGuardiola(null);
+    }
+  }, [pendingAlerts, currentRole]);
+
+  // Helper giorni del mese per il mini-calendario
+  const getDaysInMonth = (year: number, month: number) => {
+    const firstDay = new Date(year, month, 1);
+    let startDayOfWeek = firstDay.getDay(); // 0 is Sunday
+    startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Align to Monday as 0
+
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const days: (number | null)[] = [];
+    
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push(null);
+    }
+    for (let d = 1; d <= totalDays; d++) {
+      days.push(d);
+    }
+    return days;
+  };
+
+  const calendarDays = getDaysInMonth(currentYear, currentMonth);
+  const monthsNames = [
+    'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+    'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+  ];
 
   const handleRegisterManualArrival = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +158,6 @@ export const MonitorYard: React.FC = () => {
       manualPallets ? Number(manualPallets) : undefined
     );
     
-    // Resetta
     setManualPlate('');
     setManualDriver('');
     setManualPhone('');
@@ -95,7 +165,6 @@ export const MonitorYard: React.FC = () => {
     setManualNotes('');
   };
 
-  // Apertura modal check-in per prenotato
   const handleOpenCheckInModal = (booking: Booking) => {
     setCheckInBooking(booking);
     setCheckInPhone(booking.driverPhone || '');
@@ -126,26 +195,64 @@ export const MonitorYard: React.FC = () => {
     });
   };
 
-  const handleCompleteActivity = (bookingId: string) => {
+  const handleCompleteActivityFromDetail = (bookingId: string) => {
     updateBookingStatus(bookingId, 'COMPLETATO');
     setActiveBayDetail(null);
   };
 
-  // Apertura modal dettaglio baia
   const handleOpenBayDetail = (bay: Bay, booking: Booking) => {
     setActiveBayDetail({ bay, booking });
-    setDetailNotes(booking.notes || '');
-    setDetailActivity(booking.activityType);
     setDetailPhone(booking.driverPhone || '');
     setDetailPallets(booking.palletPlaces || '');
+    setDetailActivity(booking.activityType);
+    setNewNoteText('');
     setRelocateBayId('');
     setRelocateReason('');
+    setShowChecklistForm(false);
+
+    // Carica dati checklist se già presente
+    if (booking.checklist) {
+      setPianaleSporco(booking.checklist.pianaleSporco);
+      setPresenzaInfestantiMezzo(booking.checklist.presenzaInfestantiMezzo);
+      setPuliziaPallet(booking.checklist.puliziaPallet);
+      setIntegritaPallet(booking.checklist.integritaPallet);
+      setPresenzaInfestantiProdotto(booking.checklist.presenzaInfestantiProdotto);
+      setPresenzaBio(booking.checklist.presenzaBio);
+      setNoteLibere(booking.checklist.noteLibere || '');
+      setSigilloPresente(booking.checklist.sigilloPresente);
+      setNumeroSigillo(booking.checklist.numeroSigillo || '');
+      setCorrispondenzaDdt(booking.checklist.corrispondenzaDdt);
+      setNoteSigillo(booking.checklist.noteSigillo || '');
+    } else {
+      // Default
+      setPianaleSporco(false);
+      setPresenzaInfestantiMezzo(false);
+      setPuliziaPallet(true);
+      setIntegritaPallet(true);
+      setPresenzaInfestantiProdotto(false);
+      setPresenzaBio(false);
+      setNoteLibere('');
+      setSigilloPresente(false);
+      setNumeroSigillo('');
+      setCorrispondenzaDdt(true);
+      setNoteSigillo('');
+    }
+  };
+
+  const handleAddNoteDetail = () => {
+    if (!activeBayDetail || !newNoteText.trim()) return;
+    addBookingNote(activeBayDetail.booking.id, newNoteText);
+    setNewNoteText('');
+    // Refresh modal booking state
+    const refreshed = bookings.find(b => b.id === activeBayDetail.booking.id);
+    if (refreshed) {
+      setActiveBayDetail({ bay: activeBayDetail.bay, booking: refreshed });
+    }
   };
 
   const handleSaveBayDetailChanges = () => {
     if (!activeBayDetail) return;
     updateBookingDetails(activeBayDetail.booking.id, {
-      notes: detailNotes || undefined,
       activityType: detailActivity,
       driverPhone: detailPhone || undefined,
       palletPlaces: detailPallets ? Number(detailPallets) : undefined,
@@ -153,512 +260,833 @@ export const MonitorYard: React.FC = () => {
     setActiveBayDetail(null);
   };
 
-  const handleConfirmRelocate = () => {
-    if (!activeBayDetail || !relocateBayId || !relocateReason) {
-      alert('Seleziona una nuova baia e inserisci la motivazione.');
-      return;
+  const handleSaveChecklist = () => {
+    if (!activeBayDetail) return;
+    saveQualityChecklist(activeBayDetail.booking.id, {
+      pianaleSporco,
+      presenzaInfestantiMezzo,
+      puliziaPallet,
+      integritaPallet,
+      presenzaInfestantiProdotto,
+      presenzaBio,
+      noteLibere: noteLibere || undefined,
+      sigilloPresente,
+      numeroSigillo: numeroSigillo || undefined,
+      corrispondenzaDdt,
+      noteSigillo: noteSigillo || undefined,
+    });
+    setShowChecklistForm(false);
+    // Refresh active booking
+    const refreshed = bookings.find(b => b.id === activeBayDetail.booking.id);
+    if (refreshed) {
+      setActiveBayDetail({ bay: activeBayDetail.bay, booking: refreshed });
     }
+  };
+
+  const handleConfirmRelocate = () => {
+    if (!activeBayDetail || !relocateBayId || !relocateReason) return;
     relocateBookingBay(activeBayDetail.booking.id, relocateBayId, relocateReason);
     setActiveBayDetail(null);
   };
 
-  const formatTime = (isoString?: string) => {
-    if (!isoString) return '--:--';
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  const handleResolveAlert = (action: 'PROCEDI' | 'RESPINTO') => {
+    if (!activeAlertForGuardiola) return;
+    if (action === 'RESPINTO' && !alertResolveReason) {
+      alert('Inserire una giustificazione per respingere il mezzo.');
+      return;
+    }
+    resolveChecklistAlert(activeAlertForGuardiola.id, action, alertResolveReason);
+    setActiveAlertForGuardiola(null);
   };
 
-  const getBookingStatusBadge = (status: Booking['status']) => {
-    switch (status) {
-      case 'PRENOTATO': return <Badge variant="info">Pianificato</Badge>;
-      case 'AL_CANCELLO': return <Badge variant="warning">In Guardiola</Badge>;
-      case 'IN_BAIA': return <Badge variant="primary">In Baia</Badge>;
-      case 'COMPLETATO': return <Badge variant="success">Completato</Badge>;
-      case 'ANNULLATO': return <Badge variant="danger">Annullato</Badge>;
-      default: return <Badge variant="info">{status}</Badge>;
-    }
+  const handlePrintChecklist = (booking: Booking) => {
+    setPrintBooking(booking);
+    setTimeout(() => {
+      window.print();
+    }, 300);
+  };
+
+  const formatDateString = (y: number, m: number, d: number) => {
+    const mm = String(m + 1).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    return `${y}-${mm}-${dd}`;
+  };
+
+  // Rendering del Ticket Triage Box (Verticale)
+  const renderTriageTicket = (ticketCode?: string) => {
+    const parts = (ticketCode || 'T-000').split('-');
+    const prefix = parts[0] || 'T';
+    const num = parts[1] || '000';
+    return (
+      <div className="flex flex-col items-center justify-center border-2 border-black/15 bg-white rounded-lg p-1.5 w-11 h-11 font-mono font-bold leading-none select-none shadow-2xs">
+        <span className="text-[10px] text-gray-500">{prefix}-</span>
+        <span className="text-xs text-black mt-0.5">{num}</span>
+      </div>
+    );
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header Pagina */}
-      <div className="flex justify-between items-center border-b border-black/10 pb-4">
-        <div>
-          <h2 className="text-xl font-sans font-bold text-ticket-accent uppercase tracking-wide">
-            // PANNELLO DI CONTROLLO GUARDIOLA
-          </h2>
-          <p className="text-[10px] text-ticket-muted mt-1 uppercase tracking-widest font-mono">
-            Plant Attivo: {activeDepot?.name} ({activeDepot?.city})
-          </p>
-        </div>
-        <div className="flex space-x-2">
-          <Badge variant="success">ONLINE</Badge>
-          <Badge variant="primary">
-            {activeBays.filter((b) => b.status === 'DISPONIBILE').length} / {activeBays.length} Baie Libere
-          </Badge>
-        </div>
-      </div>
-
-      {/* Sotto-Navigazione Guardiola */}
-      <div className="flex justify-between items-center border-b border-black/10 pb-px font-mono text-[10px]">
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setActiveSubTab('monitor')}
-            className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
-              activeSubTab === 'monitor'
-                ? 'border-ticket-accent text-ticket-accent bg-white/50'
-                : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
-            }`}
-          >
-            🎛️ Monitor Live Piazzale
-          </button>
-          <button
-            onClick={() => setActiveSubTab('schedule')}
-            className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
-              activeSubTab === 'schedule'
-                ? 'border-ticket-accent text-ticket-accent bg-white/50'
-                : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
-            }`}
-          >
-            📅 Tabellone Programmazione
-          </button>
-        </div>
-        
-        {/* Calendario Unificato per Filtro Giorno */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-[9px] uppercase tracking-wider text-gray-400">Data Attività:</span>
-          <input
-            type="date"
-            value={scheduleDate}
-            onChange={(e) => setScheduleDate(e.target.value)}
-            className="bg-white border border-black/10 font-mono text-xs px-2 py-1 rounded shadow-xs focus:ring-0 focus:outline-none"
-          />
-        </div>
-      </div>
-
-      {/* --- VISTA: MONITOR LIVE PIAZZALE --- */}
-      {activeSubTab === 'monitor' && (
-        <>
-          {/* Sezione 1: Visualizzazione Grafica Baie */}
-          <Card
-            title="Stato Occupazione Baie Carico/Scarico"
-            accent="orange"
-            headerAction={
-              warehouseModules.filter((m) => m.depotId === selectedDepotId).length > 0 ? (
-                <div className="flex items-center gap-2 font-mono text-[10px] text-black">
-                  <span>Modulo:</span>
-                  <select
-                    value={selectedModuleFilter}
-                    onChange={(e) => setSelectedModuleFilter(e.target.value)}
-                    className="bg-white border border-black/10 text-[9px] font-mono px-2 py-1 rounded focus:outline-none"
-                  >
-                    <option value="">Tutti i moduli</option>
-                    {warehouseModules.filter((m) => m.depotId === selectedDepotId).map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                </div>
-              ) : undefined
-            }
-          >
-            {filteredBays.length === 0 ? (
-              <p className="text-center py-6 text-xs text-gray-500 font-mono">Nessuna baia corrisponde ai filtri impostati.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {filteredBays.map((bay) => {
-                  const activeBooking = activeBookings.find(
-                    (b) => b.status === 'IN_BAIA' && b.bayId === bay.id
-                  );
-                  const carrierName = activeBooking
-                    ? carriers.find((c) => c.id === activeBooking.carrierId)?.name
-                    : '';
-                  const moduleName = warehouseModules.find(m => m.id === bay.moduleId)?.name || 'Generico';
-
-                  // Stili condizionali se modificato in baia
-                  const isModified = activeBooking?.isEditedInBay;
-
-                  return (
-                    <div
-                      key={bay.id}
-                      onClick={() => activeBooking && handleOpenBayDetail(bay, activeBooking)}
-                      className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[170px] cursor-pointer ${
-                        isModified
-                          ? 'border-amber-500 border-[3px] border-dashed bg-amber-50/40 ring-4 ring-amber-500/10 shadow-md scale-[1.02]'
-                          : bay.status === 'DISPONIBILE'
-                          ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400'
-                          : bay.status === 'OCCUPATA'
-                          ? 'border-[#11BCEC]/30 bg-[#11BCEC]/5 hover:border-[#11BCEC] shadow-2xs'
-                          : 'border-red-200 bg-red-50/30 hover:border-red-400'
-                      }`}
-                    >
-                      {/* Header Baia */}
-                      <div className="flex justify-between items-center border-b border-black/5 pb-2">
-                        <div>
-                          <span className="font-mono font-bold text-sm text-black block">{bay.name}</span>
-                          <span className="text-[8px] font-mono text-gray-400 uppercase">Sez: {moduleName}</span>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <Badge
-                            variant={
-                              bay.status === 'DISPONIBILE'
-                                ? 'success'
-                                : bay.status === 'OCCUPATA'
-                                ? 'primary'
-                                : 'danger'
-                            }
-                          >
-                            {bay.status === 'DISPONIBILE'
-                              ? 'Libera'
-                              : bay.status === 'OCCUPATA'
-                              ? 'In Uso'
-                              : 'Manutenzione'}
-                          </Badge>
-                          {isModified && (
-                            <span className="text-[8px] font-bold text-amber-600 bg-amber-100 border border-amber-300 px-1 rounded animate-pulse">
-                              ⚠️ MODIFICATO
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Body Baia */}
-                      <div className="py-3 flex-grow">
-                        {bay.status === 'OCCUPATA' && activeBooking ? (
-                          <div className="font-mono text-xs space-y-1">
-                            <div className="flex justify-between">
-                              <span className="text-ticket-muted text-[10px]">Ticket:</span>
-                              <span className="font-bold text-black">{activeBooking.ticketNumber || 'N/D'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-ticket-muted text-[10px]">Targa:</span>
-                              <span className="font-bold text-ticket-accent">{activeBooking.licensePlate}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-ticket-muted text-[10px]">Vettore:</span>
-                              <span className="truncate max-w-[120px] text-right font-bold">{carrierName}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-ticket-muted text-[10px]">Attività:</span>
-                              <span className="font-bold">{activeBooking.activityType}</span>
-                            </div>
-                          </div>
-                        ) : bay.status === 'MANUTENZIONE' ? (
-                          <div className="text-center py-4 text-xs font-mono text-red-500 font-bold">
-                            // BAIA IN MANUTENZIONE
-                          </div>
-                        ) : (
-                          <div className="text-center py-4 text-xs font-mono text-emerald-600 font-bold">
-                            // PRONTA AL CARICO
-                          </div>
-                        )}
-                      </div>
-
-                      {bay.status === 'OCCUPATA' ? (
-                        <div className="text-[9px] text-center text-ticket-muted font-sans border-t border-black/5 pt-1.5 mt-1">
-                          Clicca per gestire ➔
-                        </div>
-                      ) : (
-                        <div className="h-4" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-
-          {/* Griglie Code e Accettazione manuale */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="space-y-6 lg:col-span-2">
-              {/* Coda al Cancello */}
-              <Card title="Coda Check-In al Cancello (In Attesa di Baia)" accent="yellow">
-                <Table
-                  data={gateBookings}
-                  emptyMessage="Nessun camion in attesa al cancello."
-                  columns={[
-                    {
-                      header: 'Check-In',
-                      accessor: (b) => <span className="text-amber-600 font-bold">{formatTime(b.timeInGate)}</span>,
-                    },
-                    {
-                      header: 'Ticket / Vettore',
-                      accessor: (b) => {
-                        const carrierName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
-                        return (
-                          <div className="text-xs">
-                            <span className="font-mono font-bold bg-gray-100 border border-black/10 px-1 rounded mr-2">{b.ticketNumber || 'N/D'}</span>
-                            <span className="font-bold text-gray-700">{carrierName}</span>
-                          </div>
-                        );
-                      }
-                    },
-                    {
-                      header: 'Veicolo / Autista',
-                      accessor: (b) => (
-                        <div className="text-xs">
-                          <div><span className="font-bold font-mono text-black">{b.licensePlate}</span> ({b.driverName})</div>
-                          {b.driverPhone && <div className="text-[10px] font-mono text-gray-400">Tel: {b.driverPhone}</div>}
-                          {b.notes && <div className="text-[10px] text-amber-600 italic">Note: {b.notes}</div>}
-                        </div>
-                      ),
-                    },
-                    {
-                      header: 'Assegna Baia',
-                      accessor: (b) => {
-                        const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
-                        return (
-                          <div className="flex space-x-2">
-                            <select
-                              value={tempBayAssignment[b.id] || ''}
-                              onChange={(e) =>
-                                setTempBayAssignment((prev) => ({ ...prev, [b.id]: e.target.value }))
-                              }
-                              className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer"
-                            >
-                              <option value="">Seleziona baia...</option>
-                              {availableBays.map((bay) => {
-                                const modName = warehouseModules.find(m => m.id === bay.moduleId)?.name || 'Gen';
-                                return (
-                                  <option key={bay.id} value={bay.id}>
-                                    {bay.name} ({modName})
-                                  </option>
-                                );
-                              })}
-                            </select>
-                            <Button
-                              size="sm"
-                              variant="warning"
-                              onClick={() => handleAssignBay(b.id)}
-                              disabled={!tempBayAssignment[b.id]}
-                            >
-                              Fai Entrare
-                            </Button>
-                          </div>
-                        );
-                      },
-                    },
-                  ]}
-                />
-              </Card>
-
-              {/* Prenotazioni Attese filtrate per giorno */}
-              <Card title={`Prenotazioni Slot Attese per il ${scheduleDate}`}>
-                <Table
-                  data={incomingBookings}
-                  emptyMessage="Nessun camion prenotato atteso per questa data."
-                  columns={[
-                    {
-                      header: 'Ticket',
-                      accessor: (b) => <span className="font-mono font-bold text-xs bg-gray-50 border border-black/5 px-2 py-0.5 rounded">{b.ticketNumber || 'N/D'}</span>
-                    },
-                    {
-                      header: 'Vettore',
-                      accessor: (b) => {
-                        const name = carriers.find((c) => c.id === b.carrierId)?.name || 'Vettore';
-                        return <span className="font-bold">{name}</span>;
-                      },
-                    },
-                    {
-                      header: 'Targa / Autista',
-                      accessor: (b) => (
-                        <div className="text-xs">
-                          <div><span className="font-mono font-bold text-black">{b.licensePlate}</span> ({b.driverName})</div>
-                          {b.palletPlaces && <div className="text-[10px] text-[#11BCEC] font-sans">Capacità: {b.palletPlaces} PL</div>}
-                        </div>
-                      ),
-                    },
-                    {
-                      header: 'Attività',
-                      accessor: (b) => <Badge variant="info">{b.activityType}</Badge>,
-                    },
-                    {
-                      header: 'Registra Arrivo',
-                      accessor: (b) => (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => handleOpenCheckInModal(b)}
-                        >
-                          Check-In Cancello
-                        </Button>
-                      ),
-                    },
-                  ]}
-                />
-              </Card>
+    <div className="space-y-6 relative">
+      
+      {/* AREA DI STAMPA COPERTA (Attiva solo in fase di stampa) */}
+      {printBooking && printBooking.checklist && (
+        <div id="printable-area" className="hidden print:block p-8 bg-white text-black font-sans text-xs space-y-6">
+          <div className="flex justify-between items-center border-b border-black pb-4">
+            <div>
+              <h1 className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</h1>
+              <p className="text-[10px] font-mono">YARD QUALITY ASSURANCE REPORT</p>
             </div>
-
-            {/* Inserimento rapido senza prenotazione */}
-            <div className="space-y-6">
-              <Card title="Registra Mezzo Senza Prenotazione" accent="orange">
-                <form onSubmit={handleRegisterManualArrival} className="space-y-4">
-                  <Select
-                    label="Vettore Selezionato"
-                    options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
-                    value={carriers.find(c => c.id === manualCarrierId)?.name || manualCarrierId}
-                    onChange={(e) => {
-                      const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
-                      if (found) setManualCarrierId(found.id);
-                    }}
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      label="Targa *"
-                      placeholder="AA123BB"
-                      value={manualPlate}
-                      onChange={(e) => setManualPlate(e.target.value)}
-                      required
-                    />
-                    <Input
-                      label="Posti Pallet (Ind.)"
-                      type="number"
-                      placeholder="33"
-                      value={manualPallets}
-                      onChange={(e) => setManualPallets(e.target.value === '' ? '' : Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      label="Nominativo Autista *"
-                      placeholder="Luca Verdi"
-                      value={manualDriver}
-                      onChange={(e) => setManualDriver(e.target.value)}
-                      required
-                    />
-                    <Input
-                      label="Telefono"
-                      placeholder="3331234567"
-                      value={manualPhone}
-                      onChange={(e) => setManualPhone(e.target.value)}
-                    />
-                  </div>
-                  <Select
-                    label="Attività Richiesta"
-                    options={activityTypes.map(act => ({ value: act.code, label: act.name }))}
-                    value={activityTypes.find(a => a.code === manualActivityCode)?.name || manualActivityCode}
-                    onChange={(e) => {
-                      const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
-                      if (found) setManualActivityCode(found.code);
-                    }}
-                  />
-                  <Input
-                    label="Note Operative Check-In"
-                    placeholder="Sponda idraulica, sigillo ecc."
-                    value={manualNotes}
-                    onChange={(e) => setManualNotes(e.target.value)}
-                  />
-                  <Button type="submit" className="w-full">
-                    Registra Check-In
-                  </Button>
-                </form>
-              </Card>
-
-              <Card title="Log Attività Cantiere (Live)">
-                <div className="space-y-2 max-h-[220px] overflow-y-auto font-mono text-[11px] pr-2">
-                  {activeLogs.length === 0 ? (
-                    <div className="text-ticket-muted text-center py-4">// NESSUN LOG REGISTRATO</div>
-                  ) : (
-                    activeLogs.map((log) => (
-                      <div key={log.id} className="border-b border-black/5 pb-2">
-                        <div className="flex justify-between text-[10px] text-ticket-muted">
-                          <span>{new Date(log.timestamp).toLocaleTimeString('it-IT')}</span>
-                          <span className={
-                            log.type === 'SUCCESS' ? 'text-emerald-600' :
-                            log.type === 'WARNING' ? 'text-rose-500' : 'text-[#11BCEC]'
-                          }>
-                            [{log.type}]
-                          </span>
-                        </div>
-                        <div className="text-black mt-0.5">{log.message}</div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </Card>
+            <div className="border border-black p-2 font-mono text-center font-bold">
+              TICKET TRIAGE: {printBooking.ticketNumber || printBooking.id}
             </div>
           </div>
-        </>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div><strong>Targa Trattore:</strong> {printBooking.licensePlate}</div>
+            <div><strong>Autista:</strong> {printBooking.driverName}</div>
+            <div><strong>Vettore:</strong> {carriers.find(c => c.id === printBooking.carrierId)?.name || 'N/D'}</div>
+            <div><strong>Data Attività:</strong> {printBooking.date}</div>
+            <div><strong>Baia di Attracco:</strong> {bays.find(b => b.id === printBooking.bayId)?.name || 'N/D'}</div>
+            <div><strong>Attività:</strong> {printBooking.activityType}</div>
+          </div>
+
+          <div className="border border-black rounded p-3 space-y-4">
+            <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">1. Idoneità Igienico-Sanitaria Mezzo</h2>
+            <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+              <div>Pianale Sporco: [ {printBooking.checklist.pianaleSporco ? 'SI' : 'NO'} ]</div>
+              <div>Presenza Infestanti: [ {printBooking.checklist.presenzaInfestantiMezzo ? 'SI' : 'NO'} ]</div>
+            </div>
+
+            <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">2. Idoneità Igienica Prodotto & Pallet</h2>
+            <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+              <div>Pulizia Pallet: [ {printBooking.checklist.puliziaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
+              <div>Integrità Pallet: [ {printBooking.checklist.integritaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
+              <div>Presenza Infestanti Prodotto: [ {printBooking.checklist.presenzaInfestantiProdotto ? 'SI' : 'NO'} ]</div>
+              <div>Prodotti biologici (Bio): [ {printBooking.checklist.presenzaBio ? 'SI' : 'NO'} ]</div>
+            </div>
+            {printBooking.checklist.noteLibere && (
+              <div className="text-[10px] font-sans"><strong>Note Preposto:</strong> {printBooking.checklist.noteLibere}</div>
+            )}
+
+            <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">3. Controllo Sigillo di Sicurezza</h2>
+            <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+              <div>Sigillo Presente: [ {printBooking.checklist.sigilloPresente ? 'SI' : 'NO'} ]</div>
+              <div>Numero Sigillo: {printBooking.checklist.numeroSigillo || 'N/D'}</div>
+              <div>Corrispondenza DDT: [ {printBooking.checklist.corrispondenzaDdt ? 'SI' : 'NO'} ]</div>
+            </div>
+            {printBooking.checklist.noteSigillo && (
+              <div className="text-[10px] font-sans"><strong>Note Sigillo:</strong> {printBooking.checklist.noteSigillo}</div>
+            )}
+          </div>
+
+          <div className="pt-8 grid grid-cols-2 gap-8 text-center font-mono">
+            <div>
+              <div className="border-b border-black h-12" />
+              <p className="mt-1 text-[10px]">Firma Conducente Mezzo</p>
+            </div>
+            <div>
+              <div className="border-b border-black h-12 flex items-end justify-center pb-1 text-xs">
+                {printBooking.checklist.compilataDa}
+              </div>
+              <p className="mt-1 text-[10px]">Firma Preposto Verificatore ({new Date(printBooking.checklist.dataOraCheck).toLocaleDateString()})</p>
+            </div>
+          </div>
+          
+          <div className="text-center pt-8 font-mono text-[8px] text-gray-500">
+            Logistica Uno SpA - Yard Control Systems - Documento Generato Automaticamente
+          </div>
+        </div>
       )}
 
-      {/* --- VISTA: TABELLONE PROGRAMMAZIONE --- */}
-      {activeSubTab === 'schedule' && (
-        <Card title={`Programmazione Attività del Cantiere - Giorno: ${scheduleDate}`}>
-          <div className="space-y-4">
-            <p className="text-xs text-gray-500 font-sans">
-              Elenco completo di tutti i transiti e slot prenotati in questa data presso lo stabilimento logistico. Le attività completate rimangono visibili per lo storico odierno.
+      {/* MONITOR REGOLARE */}
+      <div className="print:hidden space-y-6">
+        
+        {/* Intestazione */}
+        <div className="flex justify-between items-center border-b border-black/10 pb-4">
+          <div>
+            <h2 className="text-xl font-sans font-bold text-ticket-accent uppercase tracking-wide">
+              // MONITOR DI CONTROLLO {currentRole === 'PREPOSTO' ? 'PREPOSTO DI MAGAZZINO' : 'GUARDIOLA'}
+            </h2>
+            <p className="text-[10px] text-ticket-muted mt-1 uppercase tracking-widest font-mono">
+              Stabilimento: {activeDepot?.name} ({activeDepot?.city})
             </p>
-            <Table
-              data={dayBookings}
-              emptyMessage="Nessun transito pianificato o registrato per questa data."
-              rowClassName={(b: Booking) => b.status === 'COMPLETATO' ? 'opacity-50 line-through bg-gray-50/80 text-gray-400' : ''}
-              columns={[
-                {
-                  header: 'Ticket',
-                  accessor: (b) => <span className="font-mono font-bold text-xs bg-gray-100 border px-2 py-0.5 rounded">{b.ticketNumber || 'N/D'}</span>
-                },
-                {
-                  header: 'Targa Mezzo',
-                  accessor: (b) => <span className="font-mono font-bold text-xs">{b.licensePlate}</span>
-                },
-                {
-                  header: 'Autista',
-                  accessor: (b) => (
-                    <div className="text-xs">
-                      <div>{b.driverName}</div>
-                      {b.driverPhone && <div className="text-[10px] font-mono text-gray-400">Tel: {b.driverPhone}</div>}
-                    </div>
-                  )
-                },
-                {
-                  header: 'Vettore',
-                  accessor: (b) => {
-                    const name = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
-                    return <span className="font-bold text-xs">{name}</span>;
-                  }
-                },
-                {
-                  header: 'Pallet (PL)',
-                  accessor: (b) => <span className="font-mono text-xs">{b.palletPlaces || '-'}</span>
-                },
-                {
-                  header: 'Tipo Attività',
-                  accessor: (b) => <Badge variant="info">{b.activityType}</Badge>
-                },
-                {
-                  header: 'N. Baia Assegnata',
-                  accessor: (b) => {
-                    if (b.bayId) {
-                      const bName = bays.find(bay => bay.id === b.bayId)?.name || 'Baia';
-                      return <span className="font-mono font-bold text-ticket-accent text-xs bg-white border px-2 py-0.5 rounded shadow-2xs">{bName}</span>;
-                    }
-                    return <span className="text-xs text-gray-400 italic">Non in Baia</span>;
-                  }
-                },
-                {
-                  header: 'Check-In',
-                  accessor: (b) => <span className="text-xs font-mono">{formatTime(b.timeInGate)}</span>
-                },
-                {
-                  header: 'Ingresso Baia',
-                  accessor: (b) => <span className="text-xs font-mono">{formatTime(b.timeInBay)}</span>
-                },
-                {
-                  header: 'Partenza',
-                  accessor: (b) => <span className="text-xs font-mono">{formatTime(b.timeOutGate)}</span>
-                },
-                {
-                  header: 'Stato',
-                  accessor: (b) => getBookingStatusBadge(b.status)
-                }
-              ]}
+          </div>
+          <div className="flex space-x-2">
+            <Badge variant="success">ATTIVO</Badge>
+            <Badge variant="primary">
+              {activeBays.filter((b) => b.status === 'DISPONIBILE').length} / {activeBays.length} Baie Libere
+            </Badge>
+          </div>
+        </div>
+
+        {/* Sotto-Navigazione */}
+        <div className="flex justify-between items-center border-b border-black/10 pb-px font-mono text-[10px]">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setActiveSubTab('monitor')}
+              className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
+                activeSubTab === 'monitor'
+                  ? 'border-ticket-accent text-ticket-accent bg-white/50'
+                  : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
+              }`}
+            >
+              🎛️ Monitor Live Piazzale
+            </button>
+            <button
+              onClick={() => setActiveSubTab('schedule')}
+              className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
+                activeSubTab === 'schedule'
+                  ? 'border-ticket-accent text-ticket-accent bg-white/50'
+                  : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
+              }`}
+            >
+              📅 Tabellone Programmazione
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-[9px] uppercase tracking-wider text-gray-400">Data Selezionata:</span>
+            <input
+              type="date"
+              value={scheduleDate}
+              onChange={(e) => {
+                setScheduleDate(e.target.value);
+                setCurrentYear(new Date(e.target.value).getFullYear());
+                setCurrentMonth(new Date(e.target.value).getMonth());
+              }}
+              className="bg-white border border-black/10 font-mono text-xs px-2 py-1 rounded shadow-xs focus:ring-0 focus:outline-none"
             />
           </div>
-        </Card>
+        </div>
+
+        {/* --- VISTA: MONITOR LIVE PIAZZALE --- */}
+        {activeSubTab === 'monitor' && (
+          <>
+            {/* Sezione 1: Visualizzazione Grafica Baie */}
+            <Card
+              title="Stato Occupazione Baie Carico/Scarico"
+              accent="orange"
+              headerAction={
+                warehouseModules.filter((m) => m.depotId === selectedDepotId).length > 0 ? (
+                  <div className="flex items-center gap-2 font-mono text-[10px] text-black">
+                    <span>Filtro Sezione:</span>
+                    <select
+                      value={selectedModuleFilter}
+                      onChange={(e) => setSelectedModuleFilter(e.target.value)}
+                      className="bg-white border border-black/10 text-[9px] font-mono px-2 py-1 rounded focus:outline-none"
+                    >
+                      <option value="">Tutti i moduli</option>
+                      {warehouseModules.filter((m) => m.depotId === selectedDepotId).map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : undefined
+              }
+            >
+              {filteredBays.length === 0 ? (
+                <p className="text-center py-6 text-xs text-gray-500 font-mono">Nessuna baia corrispondente.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {filteredBays.map((bay) => {
+                    const activeBooking = activeBookings.find(
+                      (b) => b.status === 'IN_BAIA' && b.bayId === bay.id
+                    );
+                    const carrierName = activeBooking
+                      ? carriers.find((c) => c.id === activeBooking.carrierId)?.name
+                      : '';
+                    const moduleName = warehouseModules.find(m => m.id === bay.moduleId)?.name || 'Generico';
+
+                    // Allerta se modificata
+                    const isModified = activeBooking?.isEditedInBay;
+                    // Allerta se checklist fallita
+                    const isChecklistFailed = activeBooking?.checklist?.isFailed;
+
+                    return (
+                      <div
+                        key={bay.id}
+                        onClick={() => activeBooking && handleOpenBayDetail(bay, activeBooking)}
+                        className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[170px] cursor-pointer ${
+                          isChecklistFailed
+                            ? 'border-rose-500 border-[3px] bg-rose-50/30 hover:border-rose-600 ring-4 ring-rose-500/10 shadow-md animate-pulse-glow'
+                            : isModified
+                            ? 'border-amber-500 border-[3px] border-dashed bg-amber-50/40 hover:border-amber-600 ring-4 ring-amber-500/10 shadow-md'
+                            : bay.status === 'DISPONIBILE'
+                            ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400'
+                            : bay.status === 'OCCUPATA'
+                            ? 'border-[#11BCEC]/30 bg-[#11BCEC]/5 hover:border-[#11BCEC] shadow-2xs'
+                            : 'border-red-200 bg-red-50/30 hover:border-red-400'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center border-b border-black/5 pb-2">
+                          <div>
+                            <span className="font-mono font-bold text-sm text-black block">{bay.name}</span>
+                            <span className="text-[8px] font-mono text-gray-400 uppercase">Sez: {moduleName}</span>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge
+                              variant={
+                                isChecklistFailed ? 'danger' :
+                                bay.status === 'DISPONIBILE' ? 'success' :
+                                bay.status === 'OCCUPATA' ? 'primary' : 'danger'
+                              }
+                            >
+                              {isChecklistFailed ? 'Bloccato Qualità' :
+                               bay.status === 'DISPONIBILE' ? 'Libera' :
+                               bay.status === 'OCCUPATA' ? 'In Uso' : 'Manutenzione'}
+                            </Badge>
+                            {isModified && !isChecklistFailed && (
+                              <span className="text-[8px] font-bold text-amber-600 bg-amber-100 border border-amber-300 px-1 rounded">
+                                ⚠️ MODIFICATO
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="py-3 flex-grow">
+                          {bay.status === 'OCCUPATA' && activeBooking ? (
+                            <div className="font-mono text-xs space-y-1">
+                              <div className="flex justify-between">
+                                <span className="text-ticket-muted text-[10px]">Targa:</span>
+                                <span className="font-bold text-black">{activeBooking.licensePlate}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-ticket-muted text-[10px]">Vettore:</span>
+                                <span className="truncate max-w-[125px] text-right font-bold text-gray-700">{carrierName}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-ticket-muted text-[10px]">Attività:</span>
+                                <span className="font-bold">{activeBooking.activityType}</span>
+                              </div>
+                              {activeBooking.checklist && (
+                                <div className="flex justify-between">
+                                  <span className="text-ticket-muted text-[10px]">Checklist:</span>
+                                  <span className={`font-bold ${isChecklistFailed ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    {isChecklistFailed ? 'NON CONFORME' : 'CONFORME'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ) : bay.status === 'MANUTENZIONE' ? (
+                            <div className="text-center py-4 text-xs font-mono text-red-500 font-bold">
+                              // BAIA IN MANUTENZIONE
+                            </div>
+                          ) : (
+                            <div className="text-center py-4 text-xs font-mono text-emerald-600 font-bold">
+                              // PRONTA AL CARICO
+                            </div>
+                          )}
+                        </div>
+
+                        {bay.status === 'OCCUPATA' ? (
+                          <div className="text-[9px] text-center text-ticket-muted font-sans border-t border-black/5 pt-1.5 mt-1">
+                            {currentRole === 'PREPOSTO' ? 'Clicca per Checklist e Note ➔' : 'Clicca per gestire ➔'}
+                          </div>
+                        ) : (
+                          <div className="h-4" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+
+            {/* Code al cancello e form manuale */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              {/* Check-In Queue */}
+              <div className="lg:col-span-2 space-y-6">
+                <Card title="Coda Check-In al Cancello (Attesa Assegnazione Baia)">
+                  <Table
+                    data={gateBookings}
+                    emptyMessage="Nessun camion registrato al cancello."
+                    columns={[
+                      {
+                        header: 'Triage Ticket',
+                        accessor: (b) => renderTriageTicket(b.ticketNumber)
+                      },
+                      {
+                        header: 'Vettore / Veicolo',
+                        accessor: (b) => {
+                          const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                          return (
+                            <div className="text-xs">
+                              <div className="font-bold text-black">{cName}</div>
+                              <div className="font-mono text-ticket-accent mt-0.5">{b.licensePlate} ({b.driverName})</div>
+                            </div>
+                          );
+                        }
+                      },
+                      {
+                        header: 'Dettagli',
+                        accessor: (b) => (
+                          <div className="text-xs max-w-[200px]">
+                            {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
+                            {b.driverPhone && <div className="text-[10px] font-mono text-gray-400 mt-1">Tel: {b.driverPhone}</div>}
+                            {b.notes && <div className="text-[10px] italic text-amber-600 truncate">{b.notes}</div>}
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Assegna Baia',
+                        accessor: (b) => {
+                          const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
+                          const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+
+                          return (
+                            <div className="flex space-x-2">
+                              <select
+                                value={tempBayAssignment[b.id] || ''}
+                                onChange={(e) =>
+                                  setTempBayAssignment((prev) => ({ ...prev, [b.id]: e.target.value }))
+                                }
+                                disabled={!isGuard}
+                                className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer disabled:opacity-50"
+                              >
+                                <option value="">Seleziona baia...</option>
+                                {availableBays.map((bay) => (
+                                  <option key={bay.id} value={bay.id}>
+                                    {bay.name}
+                                  </option>
+                                ))}
+                              </select>
+                              <Button
+                                size="sm"
+                                variant="warning"
+                                onClick={() => handleAssignBay(b.id)}
+                                disabled={!tempBayAssignment[b.id] || !isGuard}
+                              >
+                                Fai Entrare
+                              </Button>
+                            </div>
+                          );
+                        },
+                      },
+                    ]}
+                  />
+                </Card>
+
+                {/* Prenotazioni Attese per Oggi */}
+                <Card title="Prenotazioni Slot Attese per Oggi (Attesa Arrivo)">
+                  <Table
+                    data={incomingBookings}
+                    emptyMessage="Nessun camion prenotato per oggi."
+                    columns={[
+                      {
+                        header: 'Ticket',
+                        accessor: (b) => renderTriageTicket(b.ticketNumber)
+                      },
+                      {
+                        header: 'Dettagli Richiesta',
+                        accessor: (b) => {
+                          const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                          return (
+                            <div className="text-xs">
+                              <div className="font-bold text-black">{cName}</div>
+                              <div className="font-mono text-gray-500">{b.licensePlate} ({b.driverName})</div>
+                            </div>
+                          );
+                        }
+                      },
+                      {
+                        header: 'Attività',
+                        accessor: (b) => <Badge variant="info">{b.activityType}</Badge>,
+                      },
+                      {
+                        header: 'Check-In',
+                        accessor: (b) => {
+                          const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+                          return (
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              disabled={!isGuard}
+                              onClick={() => handleOpenCheckInModal(b)}
+                            >
+                              Check-In Cancello
+                            </Button>
+                          );
+                        },
+                      },
+                    ]}
+                  />
+                </Card>
+              </div>
+
+              {/* Colonna Destra: Registrazione Rapida e Log */}
+              <div className="space-y-6">
+                <Card title="Registrazione Rapida (Senza Prenotazione)" accent="orange">
+                  {currentRole === 'PREPOSTO' ? (
+                    <p className="text-xs text-gray-400 italic text-center py-4">
+                      Funzione riservata alla sola Guardiola.
+                    </p>
+                  ) : (
+                    <form onSubmit={handleRegisterManualArrival} className="space-y-4">
+                      <Select
+                        label="Vettore Selezionato"
+                        options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
+                        value={carriers.find(c => c.id === manualCarrierId)?.name || manualCarrierId}
+                        onChange={(e) => {
+                          const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
+                          if (found) setManualCarrierId(found.id);
+                        }}
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          label="Targa *"
+                          placeholder="AA123BB"
+                          value={manualPlate}
+                          onChange={(e) => setManualPlate(e.target.value)}
+                          required
+                        />
+                        <Input
+                          label="Posti Pallet"
+                          type="number"
+                          placeholder="33"
+                          value={manualPallets}
+                          onChange={(e) => setManualPallets(e.target.value === '' ? '' : Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          label="Autista *"
+                          placeholder="Luca Verdi"
+                          value={manualDriver}
+                          onChange={(e) => setManualDriver(e.target.value)}
+                          required
+                        />
+                        <Input
+                          label="Telefono"
+                          placeholder="3331234567"
+                          value={manualPhone}
+                          onChange={(e) => setManualPhone(e.target.value)}
+                        />
+                      </div>
+                      <Select
+                        label="Attività Richiesta"
+                        options={activityTypes.map(act => ({ value: act.code, label: act.name }))}
+                        value={activityTypes.find(a => a.code === manualActivityCode)?.name || manualActivityCode}
+                        onChange={(e) => {
+                          const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
+                          if (found) setManualActivityCode(found.code);
+                        }}
+                      />
+                      <Input
+                        label="Note di Ingresso"
+                        placeholder="Sigilli, anomalie, Bio..."
+                        value={manualNotes}
+                        onChange={(e) => setManualNotes(e.target.value)}
+                      />
+                      <Button type="submit" className="w-full">
+                        Esegui Check-In
+                      </Button>
+                    </form>
+                  )}
+                </Card>
+
+                <Card title="Registro Log Operazioni">
+                  <div className="space-y-2 max-h-[220px] overflow-y-auto font-mono text-[11px] pr-2">
+                    {activeLogs.length === 0 ? (
+                      <div className="text-ticket-muted text-center py-4">// NESSUN LOG REGISTRATO</div>
+                    ) : (
+                      activeLogs.map((log) => (
+                        <div key={log.id} className="border-b border-black/5 pb-2">
+                          <div className="flex justify-between text-[10px] text-ticket-muted">
+                            <span>{new Date(log.timestamp).toLocaleTimeString('it-IT')}</span>
+                            <span className={
+                              log.type === 'SUCCESS' ? 'text-emerald-600' :
+                              log.type === 'WARNING' ? 'text-rose-500' : 'text-[#11BCEC]'
+                            }>
+                              [{log.type}]
+                            </span>
+                          </div>
+                          <div className="text-black mt-0.5">{log.message}</div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Card>
+              </div>
+
+            </div>
+          </>
+        )}
+
+        {/* --- VISTA: TABELLONE PROGRAMMAZIONE CON MINI-CALENDARIO HIGHLIGHT --- */}
+        {activeSubTab === 'schedule' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* MINI-CALENDARIO MENSILE HIGHLIGHT (Sinistra) */}
+            <div className="lg:col-span-1">
+              <Card title="Calendario Attività Mensile" accent="orange">
+                <div className="space-y-4">
+                  
+                  {/* Header Mese */}
+                  <div className="flex justify-between items-center border-b border-black/5 pb-2">
+                    <button
+                      onClick={() => {
+                        if (currentMonth === 0) {
+                          setCurrentMonth(11);
+                          setCurrentYear(prev => prev - 1);
+                        } else {
+                          setCurrentMonth(prev => prev - 1);
+                        }
+                      }}
+                      className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
+                    >
+                      ◀
+                    </button>
+                    <span className="font-bold text-xs uppercase font-mono tracking-wider">
+                      {monthsNames[currentMonth]} {currentYear}
+                    </span>
+                    <button
+                      onClick={() => {
+                        if (currentMonth === 11) {
+                          setCurrentMonth(0);
+                          setCurrentYear(prev => prev + 1);
+                        } else {
+                          setCurrentMonth(prev => prev + 1);
+                        }
+                      }}
+                      className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
+                    >
+                      ▶
+                    </button>
+                  </div>
+
+                  {/* Grid Settimana */}
+                  <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px] text-gray-400 font-bold border-b border-black/5 pb-1">
+                    <span>LUN</span><span>MAR</span><span>MER</span><span>GIO</span><span>VEN</span><span>SAB</span><span>DOM</span>
+                  </div>
+
+                  {/* Giorni */}
+                  <div className="grid grid-cols-7 gap-1 font-mono text-xs">
+                    {calendarDays.map((day, index) => {
+                      if (day === null) {
+                        return <div key={`empty-${index}`} className="h-8" />;
+                      }
+
+                      const dateStr = formatDateString(currentYear, currentMonth, day);
+                      const isSelected = dateStr === scheduleDate;
+                      
+                      // Filtra le prenotazioni per questo specifico giorno
+                      const dayBookingsList = activeBookings.filter(b => b.date === dateStr);
+                      const hasBookings = dayBookingsList.length > 0;
+                      
+                      // Verifica se sono tutte completate o annullate
+                      const allDone = hasBookings && dayBookingsList.every(b => b.status === 'COMPLETATO' || b.status === 'ANNULLATO');
+
+                      let dayBgClass = 'bg-white border border-black/5 hover:border-black/20 text-gray-700';
+                      if (hasBookings) {
+                        if (allDone) {
+                          dayBgClass = 'bg-emerald-100 border border-emerald-300 text-emerald-800 hover:bg-emerald-200';
+                        } else {
+                          dayBgClass = 'bg-[#11BCEC]/20 border border-[#11BCEC]/40 text-[#004B97] hover:bg-[#11BCEC]/30';
+                        }
+                      }
+
+                      if (isSelected) {
+                        dayBgClass += ' ring-2 ring-ticket-accent font-black scale-105 shadow-xs';
+                      }
+
+                      return (
+                        <button
+                          key={`day-${day}`}
+                          onClick={() => setScheduleDate(dateStr)}
+                          className={`h-8 rounded-lg flex flex-col items-center justify-center transition-all cursor-pointer ${dayBgClass}`}
+                        >
+                          <span className="text-[11px] font-bold">{day}</span>
+                          {hasBookings && (
+                            <span className="text-[7px] leading-none mt-0.5 opacity-80">
+                              {dayBookingsList.length} v.
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Legenda */}
+                  <div className="pt-4 border-t border-black/5 flex justify-between text-[8px] font-mono text-gray-400">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2.5 h-2.5 rounded bg-[#11BCEC]/20 border border-[#11BCEC]/40" />
+                      <span>Attività Attive</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2.5 h-2.5 rounded bg-emerald-100 border border-emerald-300" />
+                      <span>Completato</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-2.5 h-2.5 rounded bg-white border border-black/5" />
+                      <span>Nessuna</span>
+                    </div>
+                  </div>
+
+                </div>
+              </Card>
+            </div>
+
+            {/* TABELLONE GIORNALIERO (Destra) */}
+            <div className="lg:col-span-2">
+              <Card title={`Programmazione Attività del Cantiere - Giorno: ${scheduleDate}`}>
+                <div className="space-y-4">
+                  <p className="text-xs text-gray-500 font-sans">
+                    Elenco completo di tutti i transiti e slot prenotati in questa data presso lo stabilimento logistico. Le attività completate rimangono visibili per lo storico odierno.
+                  </p>
+                  <Table
+                    data={dayBookings}
+                    emptyMessage="Nessun transito pianificato o registrato per questa data."
+                    rowClassName={(b: Booking) => b.status === 'COMPLETATO' ? 'opacity-50 line-through bg-gray-50/80 text-gray-400' : ''}
+                    columns={[
+                      {
+                        header: 'Ticket',
+                        accessor: (b) => renderTriageTicket(b.ticketNumber)
+                      },
+                      {
+                        header: 'Targa Mezzo',
+                        accessor: (b) => <span className="font-mono font-bold text-xs">{b.licensePlate}</span>
+                      },
+                      {
+                        header: 'Autista',
+                        accessor: (b) => (
+                          <div className="text-xs">
+                            <div>{b.driverName}</div>
+                            {b.driverPhone && <div className="text-[10px] font-mono text-gray-400">Tel: {b.driverPhone}</div>}
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Vettore',
+                        accessor: (b) => {
+                          const name = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                          return <span className="font-bold text-xs">{name}</span>;
+                        }
+                      },
+                      {
+                        header: 'Pallet (PL)',
+                        accessor: (b) => <span className="font-mono text-xs">{b.palletPlaces || '-'}</span>
+                      },
+                      {
+                        header: 'Attività',
+                        accessor: (b) => <Badge variant="info">{b.activityType}</Badge>
+                      },
+                      {
+                        header: 'Baia Assegnata',
+                        accessor: (b) => {
+                          if (b.bayId) {
+                            const bName = bays.find(bay => bay.id === b.bayId)?.name || 'Baia';
+                            return <span className="font-mono font-bold text-ticket-accent text-xs bg-white border px-2 py-0.5 rounded shadow-2xs">{bName}</span>;
+                          }
+                          return <span className="text-xs text-gray-400 italic">Non in Baia</span>;
+                        }
+                      },
+                      {
+                        header: 'Orari',
+                        accessor: (b) => (
+                          <div className="text-[9px] font-mono text-gray-500 space-y-0.5">
+                            <div>In: {formatTime(b.timeInGate)}</div>
+                            <div>Dock: {formatTime(b.timeInBay)}</div>
+                            <div>Out: {formatTime(b.timeOutGate)}</div>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Stato',
+                        accessor: (b) => (
+                          <div className="flex flex-col gap-1 items-start">
+                            {getBookingStatusBadge(b.status)}
+                            {b.checklist && (
+                              <button
+                                onClick={() => handlePrintChecklist(b)}
+                                className="text-[8px] font-bold uppercase tracking-wider text-[#11BCEC] hover:underline"
+                              >
+                                🖨️ Stampa checklist
+                              </button>
+                            )}
+                          </div>
+                        )
+                      }
+                    ]}
+                  />
+                </div>
+              </Card>
+            </div>
+
+          </div>
+        )}
+
+      </div>
+
+      {/* --- POPUP DI ALLERTA BLOCCO GUARDIOLA --- */}
+      {activeAlertForGuardiola && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in print:hidden">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border-4 border-rose-500 overflow-hidden">
+            <div className="bg-rose-500 text-white p-4">
+              <h3 className="font-extrabold text-sm uppercase tracking-wide flex items-center gap-2">
+                🚨 BLOCCO QUALITÀ: CHECKLIST FALLITA
+              </h3>
+              <p className="text-[10px] text-white/80 font-mono mt-1">
+                Generata allerta da Preposto: {activeAlertForGuardiola.prepostoName}
+              </p>
+            </div>
+            
+            <div className="p-5 space-y-4 font-sans text-xs">
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800">
+                <p className="font-bold">Veicolo in Baia rilevato non conforme!</p>
+                <div className="mt-2 text-[11px] font-mono space-y-1">
+                  <div>Targa: {bookings.find(b => b.id === activeAlertForGuardiola.bookingId)?.licensePlate}</div>
+                  <div>Baia: {bays.find(b => b.id === activeAlertForGuardiola.bayId)?.name}</div>
+                </div>
+              </div>
+
+              <div>
+                <span className="block font-bold text-gray-500 uppercase text-[9px] tracking-wider mb-1">Anomalie Rilevate:</span>
+                <ul className="list-disc pl-4 space-y-1 text-black font-mono text-[10px]">
+                  {activeAlertForGuardiola.failedChecks.map((check: string, i: number) => (
+                    <li key={i}>{check}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t border-black/5">
+                <label className="block text-[9px] font-mono text-gray-500 uppercase tracking-widest">
+                  Giustificazione / Note Risoluzione *
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Se si respinge il mezzo, inserire il motivo. Se si sblocca, giustificare la deroga..."
+                  value={alertResolveReason}
+                  onChange={(e) => setAlertResolveReason(e.target.value)}
+                  className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:outline-none focus:ring-0 resize-none font-sans"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50">
+              <Button
+                variant="danger"
+                className="flex-1 text-xs"
+                onClick={() => handleResolveAlert('RESPINTO')}
+              >
+                Respingi Mezzo
+              </Button>
+              <Button
+                variant="success"
+                className="flex-1 text-xs"
+                onClick={() => handleResolveAlert('PROCEDI')}
+              >
+                Autorizza Transito
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* --- MODAL 1: REGISTRAZIONE CHECK-IN (TELEFONO E NOTE) --- */}
+      {/* --- MODAL 1: CHECK-IN NOTE E TELEFONO (GUARDIOLA) --- */}
       {checkInBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-black/10 overflow-hidden">
             <div className="bg-gradient-to-r from-[#003a75] to-[#004B97] text-white p-4">
               <h3 className="font-bold text-sm uppercase tracking-wide">
@@ -669,23 +1097,20 @@ export const MonitorYard: React.FC = () => {
               </p>
             </div>
             <div className="p-4 space-y-4 font-sans text-xs">
-              <p className="text-gray-500">
-                Inserisci o verifica i dettagli del veicolo prima dell'ingresso nello Yard.
-              </p>
               <div className="space-y-3">
                 <Input
-                  label="Telefono Autista per reperibilità"
+                  label="Telefono Autista"
                   placeholder="Es. +39 347 1122334"
                   value={checkInPhone}
                   onChange={(e) => setCheckInPhone(e.target.value)}
                 />
                 <div>
                   <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Note di Ingresso / Anomalie
+                    Nota di Check-In
                   </label>
                   <textarea
                     rows={3}
-                    placeholder="Es. Sigilli intatti, temperatura registrata, ritardo..."
+                    placeholder="Note relative all'arrivo..."
                     value={checkInNotes}
                     onChange={(e) => setCheckInNotes(e.target.value)}
                     className="w-full bg-[#F5F0EB]/40 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none"
@@ -705,17 +1130,18 @@ export const MonitorYard: React.FC = () => {
                 className="flex-1 text-xs"
                 onClick={handleConfirmCheckIn}
               >
-                Conferma Check-In
+                Conferma Ingresso
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODAL 2: DETTAGLIO BAIA ATTIVA (MODIFICA INFO, SPOSTAMENTO BAIA CON MOTIVAZIONE) --- */}
+      {/* --- MODAL 2: GESTIONE DETTAGLIO BAIA ATTIVA --- */}
       {activeBayDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full border border-black/10 overflow-hidden my-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in print:hidden">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full border border-black/10 overflow-hidden my-8">
+            
             {/* Header */}
             <div className="bg-gradient-to-r from-[#004B97] to-[#0062b8] text-white p-4 flex justify-between items-start">
               <div>
@@ -723,19 +1149,20 @@ export const MonitorYard: React.FC = () => {
                   Gestione Attiva Baia: {activeBayDetail.bay.name}
                 </h3>
                 <span className="text-[9px] font-mono text-white/70 block mt-0.5">
-                  Modulo attrazione: {warehouseModules.find(m => m.id === activeBayDetail.bay.moduleId)?.name || 'Generico'}
+                  Modulo: {warehouseModules.find(m => m.id === activeBayDetail.bay.moduleId)?.name || 'Generico'}
                 </span>
               </div>
               <Badge variant="warning">{activeBayDetail.booking.ticketNumber || 'Triage'}</Badge>
             </div>
 
-            {/* Content */}
+            {/* Body */}
             <div className="p-5 space-y-5 font-sans text-xs">
-              {/* Dati statici */}
+              
+              {/* Griglia Dati Veicolo */}
               <div className="grid grid-cols-2 gap-4 border-b border-black/5 pb-4 bg-gray-50/50 p-3 rounded-lg font-mono">
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase">Vettore</span>
-                  <span className="font-bold text-black text-xs truncate block">
+                  <span className="font-bold text-black text-xs block truncate">
                     {carriers.find(c => c.id === activeBayDetail.booking.carrierId)?.name || 'N/D'}
                   </span>
                 </div>
@@ -752,122 +1179,318 @@ export const MonitorYard: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block text-[9px] uppercase">Attracco Baia</span>
+                  <span className="text-gray-400 block text-[9px] uppercase">Orario Attracco</span>
                   <span className="font-bold text-amber-600 text-xs block">
                     {formatTime(activeBayDetail.booking.timeInBay)}
                   </span>
                 </div>
               </div>
 
-              {/* Modifica informazioni in baia */}
-              <div className="space-y-3">
-                <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
-                  1. Modifica Info in Baia (Evidenzia Contorno)
-                </h4>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label="Telefono Autista"
-                    value={detailPhone}
-                    onChange={(e) => setDetailPhone(e.target.value)}
-                  />
-                  <Input
-                    label="Posti Pallet"
-                    type="number"
-                    value={detailPallets === '' ? '' : detailPallets}
-                    onChange={(e) => setDetailPallets(e.target.value === '' ? '' : Number(e.target.value))}
-                  />
-                </div>
-                <Select
-                  label="Cambia Attività In Baia"
-                  options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
-                  value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
-                  onChange={(e) => {
-                    const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
-                    if (found) setDetailActivity(found.code);
-                  }}
-                />
-                <div>
-                  <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                    Note Operative (In Baia)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={detailNotes}
-                    onChange={(e) => setDetailNotes(e.target.value)}
-                    className="w-full bg-[#F5F0EB]/40 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
-                    placeholder="Inserisci note o anomalie che allertano il piazzale..."
-                  />
-                </div>
-                <Button size="sm" onClick={handleSaveBayDetailChanges} className="w-full">
-                  Salva Informazioni
-                </Button>
-              </div>
-
-              {/* Riassegnazione Baia (Spostamento) */}
-              <div className="space-y-3 pt-3 border-t border-black/5">
-                <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-amber-600 border-b border-black/5 pb-1">
-                  2. Riassegna / Sposta ad altra Baia Disponibile
-                </h4>
-                
-                {activeBays.filter((b) => b.status === 'DISPONIBILE').length === 0 ? (
-                  <p className="text-[10px] text-rose-500 italic font-mono">// NESSUNA ALTRA BAIA DISPONIBILE PER LO SPOSTAMENTO</p>
-                ) : (
+              {!showChecklistForm ? (
+                <>
+                  {/* Tabella Cronologica delle Note (Case History) */}
                   <div className="space-y-2">
-                    <Select
-                      label="Seleziona Baia di Destinazione"
-                      options={[{ value: '', label: 'Scegli baia...' }, ...activeBays.filter(b => b.status === 'DISPONIBILE').map(b => {
-                        const mName = warehouseModules.find(m => m.id === b.moduleId)?.name || 'Gen';
-                        return { value: b.id, label: `${b.name} (${mName})` };
-                      })]}
-                      value={bays.find(b => b.id === relocateBayId)?.name || relocateBayId}
-                      onChange={(e) => {
-                        const found = bays.find(b => b.name === e.target.value || b.id === e.target.value);
-                        setRelocateBayId(found ? found.id : e.target.value);
-                      }}
-                    />
-                    <div>
-                      <label className="block text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1.5">
-                        Motivazione dello Spostamento *
-                      </label>
-                      <textarea
-                        rows={2}
-                        value={relocateReason}
-                        onChange={(e) => setRelocateReason(e.target.value)}
-                        className="w-full bg-[#F5F0EB]/40 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
-                        placeholder="Rampa danneggiata, priorità modulo refrigerato, ecc."
-                        required
-                      />
+                    <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
+                      Cronologia Note (Case History)
+                    </h4>
+                    
+                    <div className="border border-black/10 rounded-lg overflow-hidden bg-white">
+                      <div className="max-h-[140px] overflow-y-auto">
+                        <table className="w-full text-left border-collapse text-[10px] font-mono">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-black/10 text-gray-400 text-[8px] uppercase">
+                              <th className="p-2">Orario</th>
+                              <th className="p-2">Operatore</th>
+                              <th className="p-2">Nota</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-black/5">
+                            {!activeBayDetail.booking.notesHistory || activeBayDetail.booking.notesHistory.length === 0 ? (
+                              <tr>
+                                <td colSpan={3} className="p-4 text-center text-gray-400 italic">Nessuna nota storica registrata.</td>
+                              </tr>
+                            ) : (
+                              activeBayDetail.booking.notesHistory.map((note: BookingNote) => (
+                                <tr key={note.id} className="hover:bg-gray-50/50">
+                                  <td className="p-2 text-gray-500">{new Date(note.timestamp).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</td>
+                                  <td className="p-2 text-black font-bold">{note.author}</td>
+                                  <td className="p-2 text-gray-600">{note.text}</td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="warning"
-                      onClick={handleConfirmRelocate}
-                      disabled={!relocateBayId || !relocateReason}
-                      className="w-full"
-                    >
-                      Sposta Camion
+
+                    {/* Form aggiungi nota */}
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Aggiungi una nota operativa..."
+                        value={newNoteText}
+                        onChange={(e) => setNewNoteText(e.target.value)}
+                        className="flex-grow bg-[#F5F0EB]/40 border border-black/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none"
+                      />
+                      <Button size="sm" onClick={handleAddNoteDetail}>Aggiungi Nota</Button>
+                    </div>
+                  </div>
+
+                  {/* Flag di Checklist se presente */}
+                  {activeBayDetail.booking.checklist && (
+                    <div className={`p-3 rounded-lg border flex justify-between items-center ${activeBayDetail.booking.checklist.isFailed ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
+                      <div>
+                        <span className="font-bold block text-[10px] uppercase font-mono">Checklist di Conformità Qualità</span>
+                        <span className="text-[10px] block mt-0.5">Compilata da: {activeBayDetail.booking.checklist.compilataDa} il {new Date(activeBayDetail.booking.checklist.dataOraCheck).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => handlePrintChecklist(activeBayDetail.booking)}>
+                          🖨️ Stampa
+                        </Button>
+                        {currentRole === 'PREPOSTO' && (
+                          <Button size="sm" variant="primary" onClick={() => setShowChecklistForm(true)}>
+                            Modifica Checklist
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!activeBayDetail.booking.checklist && currentRole === 'PREPOSTO' && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex justify-between items-center">
+                      <span className="text-[10px] font-bold uppercase font-mono">Checklist Qualità non compilata!</span>
+                      <Button size="sm" variant="warning" onClick={() => setShowChecklistForm(true)}>
+                        Compila Checklist Qualità ➔
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Modifica Campi Generali (Solo Guardiola/Admin) */}
+                  {(currentRole === 'GUARDIA' || currentRole === 'ADMIN') && (
+                    <div className="space-y-3 pt-3 border-t border-black/5">
+                      <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
+                        Modifica Dettagli Veicolo
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          label="Telefono Autista"
+                          value={detailPhone}
+                          onChange={(e) => setDetailPhone(e.target.value)}
+                        />
+                        <Input
+                          label="Posti Pallet"
+                          type="number"
+                          value={detailPallets === '' ? '' : detailPallets}
+                          onChange={(e) => setDetailPallets(e.target.value === '' ? '' : Number(e.target.value))}
+                        />
+                      </div>
+                      <Select
+                        label="Cambia Attività"
+                        options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
+                        value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
+                        onChange={(e) => {
+                          const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
+                          if (found) setDetailActivity(found.code);
+                        }}
+                      />
+                      <Button size="sm" onClick={handleSaveBayDetailChanges} className="w-full">
+                        Salva Dettagli
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Riassegnazione Spostamento Baia (Solo Guardiola/Admin) */}
+                  {(currentRole === 'GUARDIA' || currentRole === 'ADMIN') && (
+                    <div className="space-y-3 pt-3 border-t border-black/5">
+                      <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-amber-600 border-b border-black/5 pb-1">
+                        Spostamento ad altra Baia Disponibile
+                      </h4>
+                      
+                      {activeBays.filter((b) => b.status === 'DISPONIBILE').length === 0 ? (
+                        <p className="text-[10px] text-rose-500 italic font-mono">// NESSUNA ALTRA BAIA DISPONIBILE PER LO SPOSTAMENTO</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <Select
+                            label="Seleziona Baia di Destinazione"
+                            options={[{ value: '', label: 'Scegli baia...' }, ...activeBays.filter(b => b.status === 'DISPONIBILE').map(b => ({ value: b.id, label: b.name }))]}
+                            value={bays.find(b => b.id === relocateBayId)?.name || relocateBayId}
+                            onChange={(e) => {
+                              const found = bays.find(b => b.name === e.target.value || b.id === e.target.value);
+                              setRelocateBayId(found ? found.id : e.target.value);
+                            }}
+                          />
+                          <Input
+                            label="Motivazione dello Spostamento *"
+                            placeholder="Rampa non idonea, priorità..."
+                            value={relocateReason}
+                            onChange={(e) => setRelocateReason(e.target.value)}
+                          />
+                          <Button
+                            size="sm"
+                            variant="warning"
+                            onClick={handleConfirmRelocate}
+                            disabled={!relocateBayId || !relocateReason}
+                            className="w-full"
+                          >
+                            Rilocazione Mezzo
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* --- FORM COMPILAZIONE CHECKLIST QUALITÀ (PREPOSTO) --- */
+                <div className="space-y-4 animate-fade-in">
+                  <h4 className="font-bold text-[11px] uppercase font-mono tracking-wider text-amber-600 border-b border-black/10 pb-1">
+                    Compilazione Checklist Qualità & Conformità Mezzo
+                  </h4>
+
+                  {/* Idoneità Mezzo */}
+                  <div className="space-y-2">
+                    <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">1. Idoneità Igienica del Mezzo</span>
+                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs">Pianale Sporco?</span>
+                        <input
+                          type="checkbox"
+                          checked={pianaleSporco}
+                          onChange={(e) => setPianaleSporco(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs">Presenza Infestanti?</span>
+                        <input
+                          type="checkbox"
+                          checked={presenzaInfestantiMezzo}
+                          onChange={(e) => setPresenzaInfestantiMezzo(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Idoneità Prodotto */}
+                  <div className="space-y-2">
+                    <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">2. Idoneità Igienica del Prodotto & Pallet</span>
+                    <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg font-mono">
+                      <div className="flex items-center justify-between">
+                        <span>Pallet Puliti?</span>
+                        <input
+                          type="checkbox"
+                          checked={puliziaPallet}
+                          onChange={(e) => setPuliziaPallet(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Pallet Integri?</span>
+                        <input
+                          type="checkbox"
+                          checked={integritaPallet}
+                          onChange={(e) => setIntegritaPallet(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Infestanti Prodotto?</span>
+                        <input
+                          type="checkbox"
+                          checked={presenzaInfestantiProdotto}
+                          onChange={(e) => setPresenzaInfestantiProdotto(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Presenza Prodotti Bio?</span>
+                        <input
+                          type="checkbox"
+                          checked={presenzaBio}
+                          onChange={(e) => setPresenzaBio(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    <Input
+                      label="Note Libere Conformità Merci"
+                      placeholder="Anomalie pallet, rotture..."
+                      value={noteLibere}
+                      onChange={(e) => setNoteLibere(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Idoneità Sigillo */}
+                  <div className="space-y-2 border-t border-black/5 pt-2">
+                    <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">3. Verifica Sigillo di Sicurezza</span>
+                    <div className="bg-gray-50 p-3 rounded-lg space-y-3 font-mono">
+                      <div className="flex items-center justify-between">
+                        <span>Sigillo Presente?</span>
+                        <input
+                          type="checkbox"
+                          checked={sigilloPresente}
+                          onChange={(e) => setSigilloPresente(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                      {sigilloPresente && (
+                        <div className="grid grid-cols-2 gap-2 animate-fade-in">
+                          <Input
+                            label="Numero Sigillo"
+                            placeholder="Es. SIG-100293"
+                            value={numeroSigillo}
+                            onChange={(e) => setNumeroSigillo(e.target.value)}
+                          />
+                          <div className="flex items-center justify-between mt-6">
+                            <span className="text-[10px]">Corrisponde a DDT?</span>
+                            <input
+                              type="checkbox"
+                              checked={corrispondenzaDdt}
+                              onChange={(e) => setCorrispondenzaDdt(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <Input
+                      label="Note Sigillo"
+                      placeholder="es. Sigillo spezzato..."
+                      value={noteSigillo}
+                      onChange={(e) => setNoteSigillo(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="secondary" className="flex-1" onClick={() => setShowChecklistForm(false)}>
+                      Annulla
+                    </Button>
+                    <Button variant="warning" className="flex-1" onClick={handleSaveChecklist}>
+                      Salva e Sottoscrivi
                     </Button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
             <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50">
               <Button
                 variant="secondary"
-                className="flex-1 text-xs"
+                className="flex-grow text-xs"
                 onClick={() => setActiveBayDetail(null)}
               >
                 Chiudi
               </Button>
-              <Button
-                variant="success"
-                className="flex-1 text-xs"
-                onClick={() => handleCompleteActivity(activeBayDetail.booking.id)}
-              >
-                Completa & Rilascia Baia
-              </Button>
+              {currentRole === 'PREPOSTO' && !showChecklistForm && (
+                <Button
+                  variant="success"
+                  className="flex-grow text-xs"
+                  onClick={() => handleCompleteActivityFromDetail(activeBayDetail.booking.id)}
+                >
+                  Completa Attività & Libera
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -875,3 +1498,26 @@ export const MonitorYard: React.FC = () => {
     </div>
   );
 };
+
+const formatTime = (isoString?: string) => {
+  if (!isoString) return '--:--';
+  return new Date(isoString).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+};
+
+const getBookingStatusBadge = (status: Booking['status']) => {
+  switch (status) {
+    case 'PRENOTATO':
+      return <Badge variant="info">Prenotato</Badge>;
+    case 'AL_CANCELLO':
+      return <Badge variant="warning">In Guardiola</Badge>;
+    case 'IN_BAIA':
+      return <Badge variant="primary">In Baia</Badge>;
+    case 'COMPLETATO':
+      return <Badge variant="success">Completato</Badge>;
+    case 'ANNULLATO':
+      return <Badge variant="danger">Respinto / Ann.</Badge>;
+    default:
+      return null;
+  }
+};
+

@@ -30,6 +30,49 @@ export interface Carrier {
   vatNumber?: string; // Partita IVA
 }
 
+export interface BookingNote {
+  id: string;
+  timestamp: string; // ISO string
+  author: string; // e.g. "Guardiola Milano" or "Preposto"
+  text: string;
+}
+
+export interface QualityChecklist {
+  // Verifiche Idoneità Mezzo
+  pianaleSporco: boolean;
+  presenzaInfestantiMezzo: boolean;
+  
+  // Verifiche Idoneità Prodotto
+  puliziaPallet: boolean;
+  integritaPallet: boolean;
+  presenzaInfestantiProdotto: boolean;
+  presenzaBio: boolean;
+  noteLibere?: string;
+  dataOraCheck: string;
+  compilataDa: string; // Preposto Name
+
+  // Controllo Sigillo
+  sigilloPresente: boolean;
+  numeroSigillo?: string;
+  corrispondenzaDdt: boolean;
+  noteSigillo?: string;
+
+  // Esito
+  isFailed: boolean; // True if critically failed
+}
+
+export interface ChecklistFailureAlert {
+  id: string;
+  bookingId: string;
+  depotId: string;
+  bayId: string;
+  prepostoName: string;
+  failedChecks: string[];
+  timestamp: string; // ISO string
+  status: 'ATTESA_DECISIONE' | 'PROCEDI' | 'RESPINTO';
+  resolutionReason?: string;
+}
+
 export interface Booking {
   id: string;
   carrierId: string;
@@ -41,7 +84,9 @@ export interface Booking {
   licensePlate: string;
   driverName: string;
   driverPhone?: string;
-  notes?: string;
+  notes?: string; // Standard notes
+  notesHistory?: BookingNote[]; // Tabular notes history
+  checklist?: QualityChecklist; // Quality conformation check
   palletPlaces?: number;
   ticketNumber?: string;
   isEditedInBay?: boolean;
@@ -79,6 +124,6 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'GUARDIA_CANCELLO' | 'OPERATORE_YARD';
-  depotId?: string; // Optional: assigned to a specific Plant (Hub) for guardiola
+  role: 'ADMIN' | 'GUARDIA_CANCELLO' | 'OPERATORE_YARD' | 'PREPOSTO';
+  depotId?: string; // Optional: assigned to a specific Plant (Hub) for guardiola or preposto
 }

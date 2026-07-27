@@ -50,7 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           </div>
         </div>
 
-        {/* INFO CONTESTO ATTIVO (PLANT / VETTORE LOGGATO) */}
+        {/* INFO CONTESTO ATTIVO */}
         <div className="px-5 py-4 border-b border-white/10 bg-white/5 font-sans">
           <div className="text-[9px] font-mono text-white/40 uppercase tracking-widest mb-1.5">
             [ sessione attiva ]
@@ -58,14 +58,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           <div className="text-xs space-y-1">
             <div className="flex justify-between">
               <span className="text-white/60">Ruolo:</span>
-              <span className="font-bold text-[#11BCEC] uppercase">
-                {currentRole === 'ADMIN' ? 'Amministratore' : currentRole === 'GUARDIA' ? 'Guardiola' : 'Vettore'}
+              <span className="font-bold text-[#11BCEC] uppercase font-mono">
+                {currentRole === 'ADMIN' && 'Amministratore'}
+                {currentRole === 'GUARDIA' && 'Guardiola'}
+                {currentRole === 'PREPOSTO' && 'Preposto Mag.'}
+                {currentRole === 'VETTORE' && 'Vettore'}
               </span>
             </div>
-            {currentRole === 'GUARDIA' && (
+            {(currentRole === 'GUARDIA' || currentRole === 'PREPOSTO') && (
               <div className="flex justify-between">
                 <span className="text-white/60">Plant:</span>
-                <span className="font-bold truncate max-w-[150px] text-right">{currentDepotName}</span>
+                <span className="font-bold truncate max-w-[150px] text-right font-mono">{currentDepotName}</span>
               </div>
             )}
             {currentRole === 'VETTORE' && (
@@ -194,8 +197,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             </>
           )}
 
-          {/* MENU: GUARDIA / GUARDIOLA */}
-          {currentRole === 'GUARDIA' && (
+          {/* MENU: GUARDIA O PREPOSTO */}
+          {(currentRole === 'GUARDIA' || currentRole === 'PREPOSTO') && (
             <>
               <button
                 onClick={() => setActiveTab('yard-monitor')}
@@ -205,7 +208,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <span>🎛️ Monitor Live Piazzale</span>
+                <span>{currentRole === 'PREPOSTO' ? '🎛️ Gestione Baie & Checklist' : '🎛️ Monitor Live Piazzale'}</span>
                 {activeTab === 'yard-monitor' && (
                   <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#11BCEC] shrink-0" />
                 )}
