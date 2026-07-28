@@ -32,7 +32,8 @@ export interface Carrier {
   name: string;
   email: string;
   status: 'ATTESA_APPROVAZIONE' | 'APPROVATO' | 'RIFIUTATO';
-  licensePlate?: string; // Default license plate
+  licensePlate?: string; // Default license plate (Tractor)
+  licensePlateTrailer?: string; // Default trailer license plate
   phone?: string;
   vatNumber?: string; // Partita IVA
 }
@@ -80,6 +81,21 @@ export interface ChecklistFailureAlert {
   resolutionReason?: string;
 }
 
+export interface AnomalyLog {
+  id: string;
+  timestamp: string; // ISO string
+  depotId: string;
+  bookingId?: string;
+  ticketNumber?: string;
+  licensePlate?: string;
+  type: 'PATENTE_SCADUTA' | 'TARGA_DUPLICATA' | 'SFORAMENTO_TEMPO' | 'CHECKLIST_FALLITA';
+  message: string;
+  resolved: boolean;
+  resolutionNotes?: string;
+  resolvedBy?: string;
+  resolvedAt?: string;
+}
+
 export interface Booking {
   id: string;
   carrierId: string;
@@ -88,7 +104,8 @@ export interface Booking {
   activityType: string; // e.g. "CARICO", "SCARICO", "RESO" (dynamically managed)
   status: 'PRENOTATO' | 'AL_CANCELLO' | 'IN_BAIA' | 'COMPLETATO' | 'ANNULLATO';
   bayId?: string; // Assigned during gate check-in
-  licensePlate: string;
+  licensePlate: string; // Tractor
+  licensePlateTrailer?: string; // Trailer
   driverName: string;
   driverPhone?: string;
   notes?: string; // Standard notes
@@ -106,7 +123,9 @@ export interface Booking {
   // Patente e Ordine Cliente
   driverLicense?: string;
   driverLicenseRelease?: string;
-  orderNumber?: string;
+  driverLicenseExpiry?: string;
+  orderNumber?: string; // Required reference
+  orderNumber2?: string; // Optional reference
   clientUsageId?: string; // Links to BayUsage (Uso Baia / Cliente)
 }
 
@@ -122,6 +141,8 @@ export interface ActivityType {
   id: string;
   name: string; // e.g., "Carico", "Scarico", "Reso Cliente"
   code: string; // e.g., "CARICO", "SCARICO", "RESO"
+  baseDurationMinutes: number; // Base processing time (setup/docs)
+  minutesPerPallet: number;    // Processing time per pallet place
 }
 
 export interface ReportSchedule {

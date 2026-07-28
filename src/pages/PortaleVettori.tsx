@@ -28,6 +28,7 @@ export const PortaleVettori: React.FC = () => {
   const [targetDate, setTargetDate] = useState('');
   const [selectedActivityCode, setSelectedActivityCode] = useState(activityTypes[0]?.code || 'SCARICO');
   const [licensePlate, setLicensePlate] = useState('');
+  const [licensePlateTrailer, setLicensePlateTrailer] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [notes, setNotes] = useState('');
@@ -36,7 +37,9 @@ export const PortaleVettori: React.FC = () => {
   // Patente e Ordine Cliente
   const [driverLicense, setDriverLicense] = useState('');
   const [driverLicenseRelease, setDriverLicenseRelease] = useState('');
+  const [driverLicenseExpiry, setDriverLicenseExpiry] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
+  const [orderNumber2, setOrderNumber2] = useState('');
   const [clientUsageId, setClientUsageId] = useState('');
 
   // Form Profilo
@@ -44,6 +47,7 @@ export const PortaleVettori: React.FC = () => {
   const [profEmail, setProfEmail] = useState(loggedInCarrier?.email || '');
   const [profPhone, setProfPhone] = useState(loggedInCarrier?.phone || '');
   const [profPlate, setProfPlate] = useState(loggedInCarrier?.licensePlate || '');
+  const [profPlateTrailer, setProfPlateTrailer] = useState(loggedInCarrier?.licensePlateTrailer || '');
   const [profSuccess, setProfSuccess] = useState(false);
 
   if (!loggedInCarrier) {
@@ -59,12 +63,22 @@ export const PortaleVettori: React.FC = () => {
   const isApproved = loggedInCarrier.status === 'APPROVATO';
   const myBookings = bookings.filter((b) => b.carrierId === loggedInCarrier.id);
 
+  // Controlli in tempo reale
+  const normalizedPlate = licensePlate.replace(/\s+/g, '').toUpperCase();
+  const normalizedTrailer = licensePlateTrailer.replace(/\s+/g, '').toUpperCase();
+
+  const isPlateDuplicate = normalizedPlate !== '' && carriers.some(
+    (c) => c.id !== loggedInCarrier.id && c.licensePlate?.replace(/\s+/g, '').toUpperCase() === normalizedPlate
+  );
+
+  const isLicenseExpired = driverLicenseExpiry !== '' && new Date(driverLicenseExpiry) < new Date();
+
   const handleSubmitBooking = (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     setSuccessMsg('');
 
-    if (!targetDepotId || !targetDate || !licensePlate || !driverName) {
+    if (!targetDepotId || !targetDate || !licensePlate || !driverName || !orderNumber) {
       setFormError('Tutti i campi contrassegnati con (*) sono obbligatori.');
       return;
     }
@@ -73,26 +87,32 @@ export const PortaleVettori: React.FC = () => {
       targetDepotId,
       targetDate,
       selectedActivityCode,
-      licensePlate,
+      normalizedPlate,
       driverName,
       driverPhone || undefined,
       notes || undefined,
       palletPlaces ? Number(palletPlaces) : undefined,
       driverLicense || undefined,
       driverLicenseRelease || undefined,
-      orderNumber || undefined,
-      clientUsageId || undefined
+      orderNumber,
+      clientUsageId || undefined,
+      normalizedTrailer || undefined,
+      driverLicenseExpiry || undefined,
+      orderNumber2 || undefined
     );
 
     setSuccessMsg('Richiesta slot registrata con successo.');
     setLicensePlate('');
+    setLicensePlateTrailer('');
     setPalletPlaces('');
     setDriverName('');
     setDriverPhone('');
     setNotes('');
     setDriverLicense('');
     setDriverLicenseRelease('');
+    setDriverLicenseExpiry('');
     setOrderNumber('');
+    setOrderNumber2('');
     setClientUsageId('');
   };
 
@@ -100,7 +120,7 @@ export const PortaleVettori: React.FC = () => {
     e.preventDefault();
     setProfSuccess(false);
     if (!profEmail) return;
-    updateCarrierProfile(loggedInCarrier.id, profEmail, profPlate || undefined, profPhone || undefined);
+    updateCarrierProfile(loggedInCarrier.id, profEmail, profPlate || undefined, profPhone || undefined, profPlateTrailer || undefined);
     setProfSuccess(true);
   };
 
@@ -192,11 +212,34 @@ export const PortaleVettori: React.FC = () => {
               />
 
               <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Input
+                    label="Targa Trattore *"
+                    placeholder="Es. AA123BB"
+                    value={licensePlate}
+                    onChange={(e) => setLicensePlate(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                    required
+                  />
+                  {isPlateDuplicate && (
+                    <span className="text-[9px] text-amber-600 block font-bold leading-tight">
+                      ⚠️ Targa già associata ad altro vettore!
+                    </span>
+                  )}
+                </div>
                 <Input
-                  label="Targa Automezzo *"
-                  placeholder="Es. AA123BB"
-                  value={licensePlate}
-                  onChange={(e) => setLicensePlate(e.target.value)}
+                  label="Targa Rimorchio"
+                  placeholder="Es. CC789DD"
+                  value={licensePlateTrailer}
+                  onChange={(e) => setLicensePlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Nominativo Autista *"
+                  placeholder="Es. Mario Rossi"
+                  value={driverName}
+                  onChange={(e) => setDriverName(e.target.value)}
                   required
                 />
                 <Input
@@ -210,12 +253,14 @@ export const PortaleVettori: React.FC = () => {
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <Input
-                  label="Nominativo Autista *"
-                  placeholder="Es. Mario Rossi"
-                  value={driverName}
-                  onChange={(e) => setDriverName(e.target.value)}
-                  required
+                <Select
+                  label="Cliente / Uso Baia"
+                  options={[{ value: '', label: 'Nessun uso specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
+                  value={bayUsages.find(u => u.id === clientUsageId)?.name || clientUsageId}
+                  onChange={(e) => {
+                    const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
+                    setClientUsageId(found ? found.id : e.target.value);
+                  }}
                 />
                 <Input
                   label="Telefono Autista"
@@ -225,36 +270,48 @@ export const PortaleVettori: React.FC = () => {
                 />
               </div>
 
-              <Select
-                label="Cliente Riferimento / Uso Baia"
-                options={[{ value: '', label: 'Nessun cliente/attività specifica' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
-                value={bayUsages.find(u => u.id === clientUsageId)?.name || clientUsageId}
-                onChange={(e) => {
-                  const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
-                  setClientUsageId(found ? found.id : e.target.value);
-                }}
-              />
-
-              <Input
-                label="Numero d'Ordine Cliente"
-                placeholder="Riferimento ordine carico/scarico..."
-                value={orderNumber}
-                onChange={(e) => setOrderNumber(e.target.value)}
-              />
-
               <div className="grid grid-cols-2 gap-2">
                 <Input
+                  label="Rif. Carico 1 (Ord.) *"
+                  placeholder="Es. ORD-10293"
+                  value={orderNumber}
+                  onChange={(e) => setOrderNumber(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Rif. Carico 2"
+                  placeholder="Es. ORD-10294"
+                  value={orderNumber2}
+                  onChange={(e) => setOrderNumber2(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <Input
                   label="Patente Autista"
-                  placeholder="Es. U19283748A"
+                  placeholder="U19283"
                   value={driverLicense}
                   onChange={(e) => setDriverLicense(e.target.value)}
                 />
                 <Input
-                  label="Data Rilascio Patente"
+                  label="Rilascio"
                   type="date"
                   value={driverLicenseRelease}
                   onChange={(e) => setDriverLicenseRelease(e.target.value)}
                 />
+                <div className="space-y-1">
+                  <Input
+                    label="Scadenza"
+                    type="date"
+                    value={driverLicenseExpiry}
+                    onChange={(e) => setDriverLicenseExpiry(e.target.value)}
+                  />
+                  {isLicenseExpired && (
+                    <span className="text-[9px] text-red-600 block font-bold leading-tight animate-pulse-glow">
+                      ⚠️ SCADUTA!
+                    </span>
+                  )}
+                </div>
               </div>
 
               <Input
@@ -306,12 +363,20 @@ export const PortaleVettori: React.FC = () => {
                 onChange={(e) => setProfPhone(e.target.value)}
               />
 
-              <Input
-                label="Targa Automezzo Predefinita"
-                placeholder="Es. AA123BB"
-                value={profPlate}
-                onChange={(e) => setProfPlate(e.target.value)}
-              />
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Trattore Predefinito"
+                  placeholder="Es. AA123BB"
+                  value={profPlate}
+                  onChange={(e) => setProfPlate(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                />
+                <Input
+                  label="Rimorchio Predefinito"
+                  placeholder="Es. CC789DD"
+                  value={profPlateTrailer}
+                  onChange={(e) => setProfPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                />
+              </div>
 
               <Button type="submit" variant="warning" className="w-full">
                 Aggiorna Anagrafica
@@ -330,15 +395,21 @@ export const PortaleVettori: React.FC = () => {
                 {
                   header: 'Ticket',
                   accessor: (b) => {
-                    const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.clientUsageId;
+                    const isAnyIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
+                    const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
                     return (
                       <div className="flex flex-col items-start gap-1 font-mono">
                         <span className="font-bold text-xs bg-gray-100 border border-black/10 px-2 py-0.5 rounded text-gray-800">
                           {b.ticketNumber || 'N/D'}
                         </span>
-                        {isIncomplete && (
+                        {isAnyIncomplete && (
                           <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded" title="Patente o Numero Ordine mancante">
                             ⚠️ INCOMPLETO
+                          </span>
+                        )}
+                        {isExpired && (
+                          <span className="text-[8px] font-bold bg-rose-50 text-rose-600 border border-rose-200 px-1 py-0.5 rounded animate-pulse-glow" title="Patente autista scaduta">
+                            ⚠️ SCADUTA
                           </span>
                         )}
                       </div>
@@ -362,15 +433,16 @@ export const PortaleVettori: React.FC = () => {
                     const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
                     return (
                       <div className="text-xs">
-                        <div className="font-bold font-mono">
-                          {b.licensePlate} 
+                        <div className="font-bold font-mono text-black">
+                          TR: {b.licensePlate} 
+                          {b.licensePlateTrailer && <span className="text-gray-400 font-normal"> (RIM: {b.licensePlateTrailer})</span>}
                           {b.palletPlaces && <span className="text-[10px] text-[#11BCEC] font-sans ml-1">({b.palletPlaces} PL)</span>}
                         </div>
                         <div className="text-ticket-muted mt-0.5">
                           {b.driverName} {b.driverPhone && <span className="text-[10px] font-mono">({b.driverPhone})</span>}
                         </div>
                         <div className="text-[9px] text-gray-400 font-mono mt-0.5">
-                          Uso: {usageName} | Ordine: {b.orderNumber || 'N/D'}
+                          Uso: {usageName} | Ord. 1: {b.orderNumber || 'N/D'} {b.orderNumber2 && `| Ord. 2: ${b.orderNumber2}`}
                         </div>
                         {b.notes && <div className="text-[10px] italic text-gray-400 truncate max-w-[150px] mt-0.5">{b.notes}</div>}
                       </div>

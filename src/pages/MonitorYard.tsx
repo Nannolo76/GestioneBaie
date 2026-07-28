@@ -20,6 +20,7 @@ export const MonitorYard: React.FC = () => {
     checklistAlerts,
     currentRole,
     bayUsages,
+    anomalies,
     updateBookingStatus,
     addBooking,
     updateBookingDetails,
@@ -27,9 +28,11 @@ export const MonitorYard: React.FC = () => {
     addBookingNote,
     saveQualityChecklist,
     resolveChecklistAlert,
+    addAnomaly,
+    resolveAnomaly,
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'monitor' | 'schedule'>('monitor');
+  const [activeSubTab, setActiveSubTab] = useState<'monitor' | 'schedule' | 'anomalies'>('monitor');
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
   
   // Data selezionata per le attività
@@ -37,7 +40,7 @@ export const MonitorYard: React.FC = () => {
 
   // Stato per la navigazione del mese nel calendario
   const [currentYear, setCurrentYear] = useState(new Date(scheduleDate).getFullYear());
-  const [currentMonth, setCurrentMonth] = useState(new Date(scheduleDate).getMonth()); // 0-11
+  const [currentMonth, setCurrentMonth] = useState(new Date(scheduleDate).getMonth());
 
   // Filtro Depot
   const activeDepot = depots.find((d) => d.id === selectedDepotId);
@@ -58,6 +61,7 @@ export const MonitorYard: React.FC = () => {
 
   // Form check-in manuale rapido
   const [manualPlate, setManualPlate] = useState('');
+  const [manualPlateTrailer, setManualPlateTrailer] = useState('');
   const [manualDriver, setManualDriver] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [manualPallets, setManualPallets] = useState<number | ''>('');
@@ -67,7 +71,9 @@ export const MonitorYard: React.FC = () => {
   
   const [manualDriverLicense, setManualDriverLicense] = useState('');
   const [manualDriverLicenseRelease, setManualDriverLicenseRelease] = useState('');
+  const [manualDriverLicenseExpiry, setManualDriverLicenseExpiry] = useState('');
   const [manualOrderNumber, setManualOrderNumber] = useState('');
+  const [manualOrderNumber2, setManualOrderNumber2] = useState('');
   const [manualClientUsageId, setManualClientUsageId] = useState('');
 
   // Stato Modali
@@ -76,8 +82,11 @@ export const MonitorYard: React.FC = () => {
   const [checkInNotes, setCheckInNotes] = useState('');
   const [checkInLicense, setCheckInLicense] = useState('');
   const [checkInLicenseRelease, setCheckInLicenseRelease] = useState('');
+  const [checkInLicenseExpiry, setCheckInLicenseExpiry] = useState('');
   const [checkInOrderNumber, setCheckInOrderNumber] = useState('');
+  const [checkInOrderNumber2, setCheckInOrderNumber2] = useState('');
   const [checkInClientUsageId, setCheckInClientUsageId] = useState('');
+  const [checkInPlateTrailer, setCheckInPlateTrailer] = useState('');
 
   // Dettaglio Baia
   const [activeBayDetail, setActiveBayDetail] = useState<{ bay: Bay; booking: Booking } | null>(null);
@@ -87,8 +96,11 @@ export const MonitorYard: React.FC = () => {
   const [newNoteText, setNewNoteText] = useState('');
   const [detailLicense, setDetailLicense] = useState('');
   const [detailLicenseRelease, setDetailLicenseRelease] = useState('');
+  const [detailLicenseExpiry, setDetailLicenseExpiry] = useState('');
   const [detailOrderNumber, setDetailOrderNumber] = useState('');
+  const [detailOrderNumber2, setDetailOrderNumber2] = useState('');
   const [detailClientUsageId, setDetailClientUsageId] = useState('');
+  const [detailPlateTrailer, setDetailPlateTrailer] = useState('');
 
   // Spostamento Baia
   const [relocateBayId, setRelocateBayId] = useState('');
@@ -98,8 +110,8 @@ export const MonitorYard: React.FC = () => {
   const [showChecklistForm, setShowChecklistForm] = useState(false);
   const [pianaleSporco, setPianaleSporco] = useState(false);
   const [presenzaInfestantiMezzo, setPresenzaInfestantiMezzo] = useState(false);
-  const [puliziaPallet, setPuliziaPallet] = useState(true); // default pulito
-  const [integritaPallet, setIntegritaPallet] = useState(true); // default integro
+  const [puliziaPallet, setPuliziaPallet] = useState(true);
+  const [integritaPallet, setIntegritaPallet] = useState(true);
   const [presenzaInfestantiProdotto, setPresenzaInfestantiProdotto] = useState(false);
   const [presenzaBio, setPresenzaBio] = useState(false);
   const [noteLibere, setNoteLibere] = useState('');
@@ -108,16 +120,19 @@ export const MonitorYard: React.FC = () => {
   const [corrispondenzaDdt, setCorrispondenzaDdt] = useState(true);
   const [noteSigillo, setNoteSigillo] = useState('');
 
-  // Allerta Blocco Guardiola (Risoluzione Check-list fallita)
+  // Allerta Blocco Guardiola
   const [activeAlertForGuardiola, setActiveAlertForGuardiola] = useState<any>(null);
   const [alertResolveReason, setAlertResolveReason] = useState('');
 
   // Stampa checklist
   const [printBooking, setPrintBooking] = useState<Booking | null>(null);
 
+  // Risoluzione Anomalia
+  const [activeResolveAnomalyId, setActiveResolveAnomalyId] = useState<string | null>(null);
+  const [resolveNotes, setResolveNotes] = useState('');
+
   const [tempBayAssignment, setTempBayAssignment] = useState<{ [bookingId: string]: string }>({});
 
-  // Allerte attive per questo Plant e in attesa decisione
   const pendingAlerts = checklistAlerts.filter(
     (a) => a.depotId === selectedDepotId && a.status === 'ATTESA_DECISIONE'
   );
@@ -131,7 +146,6 @@ export const MonitorYard: React.FC = () => {
       if (!nextAssignments[b.id]) {
         const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
         if (availableBays.length > 0) {
-          // Cerca baia con lo stesso uso consigliato
           const matchingBay = b.clientUsageId
             ? availableBays.find((bay) => bay.bayUsageId === b.clientUsageId)
             : undefined;
@@ -140,7 +154,6 @@ export const MonitorYard: React.FC = () => {
             nextAssignments[b.id] = matchingBay.id;
             hasChanged = true;
           } else {
-            // Pre-seleziona la prima baia libera generica
             nextAssignments[b.id] = availableBays[0].id;
             hasChanged = true;
           }
@@ -163,11 +176,45 @@ export const MonitorYard: React.FC = () => {
     }
   }, [pendingAlerts, currentRole]);
 
+  // EFFETTO PERIODICO PER LOGGARE SFORAMENTI TEMPO IN BAIA
+  React.useEffect(() => {
+    const checkInterval = setInterval(() => {
+      const docked = bookings.filter((b) => b.status === 'IN_BAIA' && b.timeInBay);
+      docked.forEach((b) => {
+        const actType = activityTypes.find((a) => a.code === b.activityType);
+        const base = actType?.baseDurationMinutes ?? 20;
+        const perPlt = actType?.minutesPerPallet ?? 1.5;
+        const plts = b.palletPlaces ?? 0;
+        const limit = base + (plts * perPlt);
+        const elapsed = Math.floor((Date.now() - new Date(b.timeInBay!).getTime()) / 60000);
+
+        if (elapsed > limit) {
+          const alreadyLogged = anomalies.some(
+            (an) => an.bookingId === b.id && an.type === 'SFORAMENTO_TEMPO' && !an.resolved
+          );
+          if (!alreadyLogged) {
+            const bName = bays.find((bay) => bay.id === b.bayId)?.name || 'Baia';
+            addAnomaly(
+              b.depotId,
+              'SFORAMENTO_TEMPO',
+              `Sforamento tempo operativo su baia ${bName}: ${elapsed}m trascorsi su un limite previsto di ${limit}m per ${plts} pallet.`,
+              b.id,
+              b.ticketNumber,
+              b.licensePlate
+            );
+          }
+        }
+      });
+    }, 10000); // Controlla ogni 10 secondi
+
+    return () => clearInterval(checkInterval);
+  }, [bookings, activityTypes, bays, anomalies, addAnomaly]);
+
   // Helper giorni del mese per il mini-calendario
   const getDaysInMonth = (year: number, month: number) => {
     const firstDay = new Date(year, month, 1);
-    let startDayOfWeek = firstDay.getDay(); // 0 is Sunday
-    startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1; // Align to Monday as 0
+    let startDayOfWeek = firstDay.getDay();
+    startDayOfWeek = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
 
     const totalDays = new Date(year, month + 1, 0).getDate();
     const days: (number | null)[] = [];
@@ -189,32 +236,38 @@ export const MonitorYard: React.FC = () => {
 
   const handleRegisterManualArrival = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualPlate || !manualDriver) return;
+    if (!manualPlate || !manualDriver || !manualOrderNumber) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
     addBooking(
       selectedDepotId,
       todayStr,
       manualActivityCode,
-      manualPlate,
+      manualPlate.replace(/\s+/g, '').toUpperCase(),
       manualDriver,
       manualPhone || undefined,
       manualNotes || undefined,
       manualPallets ? Number(manualPallets) : undefined,
       manualDriverLicense || undefined,
       manualDriverLicenseRelease || undefined,
-      manualOrderNumber || undefined,
-      manualClientUsageId || undefined
+      manualOrderNumber,
+      manualClientUsageId || undefined,
+      manualPlateTrailer ? manualPlateTrailer.replace(/\s+/g, '').toUpperCase() : undefined,
+      manualDriverLicenseExpiry || undefined,
+      manualOrderNumber2 || undefined
     );
     
     setManualPlate('');
+    setManualPlateTrailer('');
     setManualDriver('');
     setManualPhone('');
     setManualPallets('');
     setManualNotes('');
     setManualDriverLicense('');
     setManualDriverLicenseRelease('');
+    setManualDriverLicenseExpiry('');
     setManualOrderNumber('');
+    setManualOrderNumber2('');
     setManualClientUsageId('');
   };
 
@@ -224,8 +277,11 @@ export const MonitorYard: React.FC = () => {
     setCheckInNotes(booking.notes || '');
     setCheckInLicense(booking.driverLicense || '');
     setCheckInLicenseRelease(booking.driverLicenseRelease || '');
+    setCheckInLicenseExpiry(booking.driverLicenseExpiry || '');
     setCheckInOrderNumber(booking.orderNumber || '');
+    setCheckInOrderNumber2(booking.orderNumber2 || '');
     setCheckInClientUsageId(booking.clientUsageId || '');
+    setCheckInPlateTrailer(booking.licensePlateTrailer || '');
   };
 
   const handleConfirmCheckIn = () => {
@@ -235,8 +291,11 @@ export const MonitorYard: React.FC = () => {
       notes: checkInNotes || undefined,
       driverLicense: checkInLicense || undefined,
       driverLicenseRelease: checkInLicenseRelease || undefined,
+      driverLicenseExpiry: checkInLicenseExpiry || undefined,
       orderNumber: checkInOrderNumber || undefined,
+      orderNumber2: checkInOrderNumber2 || undefined,
       clientUsageId: checkInClientUsageId || undefined,
+      licensePlateTrailer: checkInPlateTrailer || undefined,
     });
     setCheckInBooking(null);
   };
@@ -268,14 +327,16 @@ export const MonitorYard: React.FC = () => {
     setDetailActivity(booking.activityType);
     setDetailLicense(booking.driverLicense || '');
     setDetailLicenseRelease(booking.driverLicenseRelease || '');
+    setDetailLicenseExpiry(booking.driverLicenseExpiry || '');
     setDetailOrderNumber(booking.orderNumber || '');
+    setDetailOrderNumber2(booking.orderNumber2 || '');
     setDetailClientUsageId(booking.clientUsageId || '');
+    setDetailPlateTrailer(booking.licensePlateTrailer || '');
     setNewNoteText('');
     setRelocateBayId('');
     setRelocateReason('');
     setShowChecklistForm(false);
 
-    // Carica dati checklist se già presente
     if (booking.checklist) {
       setPianaleSporco(booking.checklist.pianaleSporco);
       setPresenzaInfestantiMezzo(booking.checklist.presenzaInfestantiMezzo);
@@ -289,7 +350,6 @@ export const MonitorYard: React.FC = () => {
       setCorrispondenzaDdt(booking.checklist.corrispondenzaDdt);
       setNoteSigillo(booking.checklist.noteSigillo || '');
     } else {
-      // Default
       setPianaleSporco(false);
       setPresenzaInfestantiMezzo(false);
       setPuliziaPallet(true);
@@ -322,8 +382,11 @@ export const MonitorYard: React.FC = () => {
       palletPlaces: detailPallets ? Number(detailPallets) : undefined,
       driverLicense: detailLicense || undefined,
       driverLicenseRelease: detailLicenseRelease || undefined,
+      driverLicenseExpiry: detailLicenseExpiry || undefined,
       orderNumber: detailOrderNumber || undefined,
+      orderNumber2: detailOrderNumber2 || undefined,
       clientUsageId: detailClientUsageId || undefined,
+      licensePlateTrailer: detailPlateTrailer || undefined,
     });
     setActiveBayDetail(null);
   };
@@ -379,18 +442,27 @@ export const MonitorYard: React.FC = () => {
     return `${y}-${mm}-${dd}`;
   };
 
-  // Rendering del Ticket Triage Box (Verticale)
   const renderTriageTicket = (ticketCode?: string) => {
     const parts = (ticketCode || 'T-000').split('-');
-    const prefix = parts[0] || 'T';
-    const num = parts[1] || '000';
+    const finalNum = parts[2] || parts[1] || '000';
+    const finalPrefix = parts[2] ? `${parts[0]}-${parts[1]}` : (parts[0] || 'T');
+
     return (
-      <div className="flex flex-col items-center justify-center border-2 border-black/15 bg-white rounded-lg p-1.5 w-11 h-11 font-mono font-bold leading-none select-none shadow-2xs">
-        <span className="text-[10px] text-gray-500">{prefix}-</span>
-        <span className="text-xs text-black mt-0.5">{num}</span>
+      <div className="flex flex-col items-center justify-center border-2 border-black/15 bg-white rounded-lg p-1.5 w-14 h-11 font-mono font-bold leading-none select-none shadow-2xs">
+        <span className="text-[8px] text-gray-500 truncate max-w-full">{finalPrefix}</span>
+        <span className="text-xs text-black mt-0.5">{finalNum}</span>
       </div>
     );
   };
+
+  // Controlli per la form manuale rapida
+  const isManualPlateDuplicate = manualPlate !== '' && carriers.some(
+    (c) => c.licensePlate?.replace(/\s+/g, '').toUpperCase() === manualPlate.replace(/\s+/g, '').toUpperCase()
+  );
+  const isManualLicenseExpired = manualDriverLicenseExpiry !== '' && new Date(manualDriverLicenseExpiry) < new Date();
+
+  // Controlli per la form check-in modal
+  const isCheckInLicenseExpired = checkInLicenseExpiry !== '' && new Date(checkInLicenseExpiry) < new Date();
 
   return (
     <div className="space-y-6 relative">
@@ -409,14 +481,14 @@ export const MonitorYard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div><strong>Targa Trattore:</strong> {printBooking.licensePlate}</div>
+            <div><strong>Targa Trattore:</strong> {printBooking.licensePlate} {printBooking.licensePlateTrailer && `(Rimorchio: ${printBooking.licensePlateTrailer})`}</div>
             <div><strong>Autista:</strong> {printBooking.driverName}</div>
             <div><strong>Vettore:</strong> {carriers.find(c => c.id === printBooking.carrierId)?.name || 'N/D'}</div>
             <div><strong>Data Attività:</strong> {printBooking.date}</div>
             <div><strong>Baia di Attracco:</strong> {bays.find(b => b.id === printBooking.bayId)?.name || 'N/D'}</div>
             <div><strong>Attività:</strong> {printBooking.activityType}</div>
-            <div><strong>Numero Ordine:</strong> {printBooking.orderNumber || 'Non inserito'}</div>
-            <div><strong>Patente Autista:</strong> {printBooking.driverLicense || 'Non inserito'} {printBooking.driverLicenseRelease && `(Ril. ${printBooking.driverLicenseRelease})`}</div>
+            <div><strong>Ordine 1:</strong> {printBooking.orderNumber} {printBooking.orderNumber2 && `| Ordine 2: ${printBooking.orderNumber2}`}</div>
+            <div><strong>Patente Autista:</strong> {printBooking.driverLicense || 'N/D'} {printBooking.driverLicenseRelease && `(Ril. ${printBooking.driverLicenseRelease})`} {printBooking.driverLicenseExpiry && `(Scad. ${printBooking.driverLicenseExpiry})`}</div>
           </div>
 
           <div className="border border-black rounded p-3 space-y-4">
@@ -511,6 +583,16 @@ export const MonitorYard: React.FC = () => {
             >
               📅 Tabellone Programmazione
             </button>
+            <button
+              onClick={() => setActiveSubTab('anomalies')}
+              className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
+                activeSubTab === 'anomalies'
+                  ? 'border-ticket-accent text-ticket-accent bg-white/50'
+                  : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
+              }`}
+            >
+              🚨 Anomalie Plant ({anomalies.filter(a => a.depotId === selectedDepotId && !a.resolved).length})
+            </button>
           </div>
           
           <div className="flex items-center gap-2 mb-1">
@@ -567,25 +649,44 @@ export const MonitorYard: React.FC = () => {
                     const moduleName = warehouseModules.find(m => m.id === bay.moduleId)?.name || 'Generico';
                     const activeUsage = bayUsages.find(u => u.id === bay.bayUsageId);
 
-                    // Allerta se modificata
+                    // Calcolo dello sforamento
+                    let isTimeoutSforato = false;
+                    let elapsedMinutes = 0;
+                    let timeLimit = 0;
+
+                    if (activeBooking && activeBooking.timeInBay) {
+                      const actType = activityTypes.find((a) => a.code === activeBooking.activityType);
+                      const base = actType?.baseDurationMinutes ?? 20;
+                      const perPlt = actType?.minutesPerPallet ?? 1.5;
+                      const plts = activeBooking.palletPlaces ?? 0;
+                      timeLimit = base + (plts * perPlt);
+                      elapsedMinutes = Math.floor((Date.now() - new Date(activeBooking.timeInBay).getTime()) / 60000);
+                      if (elapsedMinutes > timeLimit) {
+                        isTimeoutSforato = true;
+                      }
+                    }
+
                     const isModified = activeBooking?.isEditedInBay;
                     const isChecklistFailed = activeBooking?.checklist?.isFailed;
+
+                    let bayBorderColor = 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400';
+                    if (isChecklistFailed) {
+                      bayBorderColor = 'border-rose-500 border-[3px] bg-rose-50/30 hover:border-rose-600 ring-4 ring-rose-500/10 shadow-md animate-pulse-glow';
+                    } else if (isTimeoutSforato) {
+                      bayBorderColor = 'border-red-600 border-[3px] bg-red-50/30 hover:border-red-700 shadow-md animate-pulse-glow';
+                    } else if (isModified) {
+                      bayBorderColor = 'border-amber-500 border-[3px] border-dashed bg-amber-50/40 hover:border-amber-600 ring-4 ring-amber-500/10 shadow-md';
+                    } else if (bay.status === 'OCCUPATA') {
+                      bayBorderColor = 'border-[#11BCEC]/30 bg-[#11BCEC]/5 hover:border-[#11BCEC] shadow-2xs';
+                    } else if (bay.status === 'MANUTENZIONE') {
+                      bayBorderColor = 'border-red-200 bg-red-50/30 hover:border-red-400';
+                    }
 
                     return (
                       <div
                         key={bay.id}
                         onClick={() => activeBooking && handleOpenBayDetail(bay, activeBooking)}
-                        className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[180px] cursor-pointer ${
-                          isChecklistFailed
-                            ? 'border-rose-500 border-[3px] bg-rose-50/30 hover:border-rose-600 ring-4 ring-rose-500/10 shadow-md animate-pulse-glow'
-                            : isModified
-                            ? 'border-amber-500 border-[3px] border-dashed bg-amber-50/40 hover:border-amber-600 ring-4 ring-amber-500/10 shadow-md'
-                            : bay.status === 'DISPONIBILE'
-                            ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400'
-                            : bay.status === 'OCCUPATA'
-                            ? 'border-[#11BCEC]/30 bg-[#11BCEC]/5 hover:border-[#11BCEC] shadow-2xs'
-                            : 'border-red-200 bg-red-50/30 hover:border-red-400'
-                        }`}
+                        className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[190px] cursor-pointer ${bayBorderColor}`}
                       >
                         <div className="flex justify-between items-center border-b border-black/5 pb-2">
                           <div>
@@ -596,15 +697,17 @@ export const MonitorYard: React.FC = () => {
                             <Badge
                               variant={
                                 isChecklistFailed ? 'danger' :
+                                isTimeoutSforato ? 'danger' :
                                 bay.status === 'DISPONIBILE' ? 'success' :
                                 bay.status === 'OCCUPATA' ? 'primary' : 'danger'
                               }
                             >
                               {isChecklistFailed ? 'Bloccato Qualità' :
+                               isTimeoutSforato ? 'TEMPO SCADUTO' :
                                bay.status === 'DISPONIBILE' ? 'Libera' :
                                bay.status === 'OCCUPATA' ? 'In Uso' : 'Manutenzione'}
                             </Badge>
-                            {isModified && !isChecklistFailed && (
+                            {isModified && !isChecklistFailed && !isTimeoutSforato && (
                               <span className="text-[8px] font-bold text-amber-600 bg-amber-100 border border-amber-300 px-1 rounded">
                                 ⚠️ MODIFICATO
                               </span>
@@ -612,25 +715,36 @@ export const MonitorYard: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="py-2.5 flex-grow">
+                        <div className="py-2 flex-grow">
                           {bay.status === 'OCCUPATA' && activeBooking ? (
                             <div className="font-mono text-[10px] space-y-0.5">
                               <div className="flex justify-between">
-                                <span className="text-ticket-muted">Targa:</span>
+                                <span className="text-ticket-muted">Trattore:</span>
                                 <span className="font-bold text-black">{activeBooking.licensePlate}</span>
                               </div>
+                              {activeBooking.licensePlateTrailer && (
+                                <div className="flex justify-between">
+                                  <span className="text-ticket-muted">Rimorchio:</span>
+                                  <span className="font-bold text-black">{activeBooking.licensePlateTrailer}</span>
+                                </div>
+                              )}
                               <div className="flex justify-between">
                                 <span className="text-ticket-muted">Vettore:</span>
                                 <span className="truncate max-w-[100px] text-right font-bold text-gray-700">{carrierName}</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-ticket-muted">Attività:</span>
-                                <span className="font-bold">{activeBooking.activityType}</span>
+                                <span className="font-bold">{activeBooking.activityType} ({activeBooking.palletPlaces ?? 0} PL)</span>
                               </div>
                               {activeBooking.orderNumber && (
                                 <div className="flex justify-between">
-                                  <span className="text-ticket-muted">Ordine:</span>
-                                  <span className="font-bold text-gray-600 truncate max-w-[100px]">{activeBooking.orderNumber}</span>
+                                  <span className="text-ticket-muted">Ord. 1:</span>
+                                  <span className="font-bold text-gray-600 truncate max-w-[90px]">{activeBooking.orderNumber}</span>
+                                </div>
+                              )}
+                              {isTimeoutSforato && (
+                                <div className="text-[8px] font-bold text-red-600 bg-red-100 border border-red-300 rounded p-1 text-center mt-1 animate-pulse-glow">
+                                  🚨 SFORATO DI {elapsedMinutes - timeLimit} MIN (Prev: {timeLimit}m, Sosta: {elapsedMinutes}m)
                                 </div>
                               )}
                             </div>
@@ -673,13 +787,19 @@ export const MonitorYard: React.FC = () => {
                       {
                         header: 'Triage Ticket',
                         accessor: (b) => {
-                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.clientUsageId;
+                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
+                          const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
                           return (
-                            <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex flex-col items-center gap-1">
                               {renderTriageTicket(b.ticketNumber)}
                               {isIncomplete && (
-                                <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
+                                <span className="text-[7px] font-bold bg-amber-50 text-amber-600 border border-amber-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
                                   ⚠️ Incompleto
+                                </span>
+                              )}
+                              {isExpired && (
+                                <span className="text-[7px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
+                                  ⚠️ SCADUTA
                                 </span>
                               )}
                             </div>
@@ -694,7 +814,9 @@ export const MonitorYard: React.FC = () => {
                           return (
                             <div className="text-xs font-sans">
                               <div className="font-bold text-black">{cName}</div>
-                              <div className="font-mono text-ticket-accent mt-0.5">{b.licensePlate} ({b.driverName})</div>
+                              <div className="font-mono text-ticket-accent mt-0.5">
+                                TR: {b.licensePlate} {b.licensePlateTrailer && `/ RIM: ${b.licensePlateTrailer}`} ({b.driverName})
+                              </div>
                               <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso Richiesto: {usageName}</div>
                             </div>
                           );
@@ -705,7 +827,7 @@ export const MonitorYard: React.FC = () => {
                         accessor: (b) => (
                           <div className="text-xs max-w-[200px]">
                             {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
-                            {b.orderNumber && <div className="text-[9px] font-mono text-gray-600 mt-1">Ordine: {b.orderNumber}</div>}
+                            {b.orderNumber && <div className="text-[9px] font-mono text-gray-600 mt-1">Ord. 1: {b.orderNumber} {b.orderNumber2 && `| Ord. 2: ${b.orderNumber2}`}</div>}
                             {b.driverPhone && <div className="text-[10px] font-mono text-gray-400 mt-0.5">Tel: {b.driverPhone}</div>}
                             {b.notes && <div className="text-[10px] italic text-amber-600 truncate mt-0.5">{b.notes}</div>}
                           </div>
@@ -717,7 +839,6 @@ export const MonitorYard: React.FC = () => {
                           const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
                           const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
 
-                          // Ordina le baie libere proponendo prima quelle dello stesso uso consigliato
                           const sortedBays = [...availableBays].sort((bayA, bayB) => {
                             const matchA = b.clientUsageId && bayA.bayUsageId === b.clientUsageId ? 1 : 0;
                             const matchB = b.clientUsageId && bayB.bayUsageId === b.clientUsageId ? 1 : 0;
@@ -770,13 +891,19 @@ export const MonitorYard: React.FC = () => {
                       {
                         header: 'Ticket',
                         accessor: (b) => {
-                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.clientUsageId;
+                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
+                          const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
                           return (
-                            <div className="flex flex-col items-center gap-1.5">
+                            <div className="flex flex-col items-center gap-1">
                               {renderTriageTicket(b.ticketNumber)}
                               {isIncomplete && (
-                                <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
+                                <span className="text-[7px] font-bold bg-amber-50 text-amber-600 border border-amber-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
                                   ⚠️ Incompleto
+                                </span>
+                              )}
+                              {isExpired && (
+                                <span className="text-[7px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
+                                  ⚠️ SCADUTA
                                 </span>
                               )}
                             </div>
@@ -791,7 +918,9 @@ export const MonitorYard: React.FC = () => {
                           return (
                             <div className="text-xs">
                               <div className="font-bold text-black">{cName}</div>
-                              <div className="font-mono text-gray-500 mt-0.5">{b.licensePlate} ({b.driverName})</div>
+                              <div className="font-mono text-gray-500 mt-0.5">
+                                TR: {b.licensePlate} {b.licensePlateTrailer && `/ RIM: ${b.licensePlateTrailer}`} ({b.driverName})
+                              </div>
                               <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso/Cliente: {usageName}</div>
                             </div>
                           );
@@ -802,7 +931,7 @@ export const MonitorYard: React.FC = () => {
                         accessor: (b) => (
                           <div className="text-xs font-mono">
                             <Badge variant="info">{b.activityType}</Badge>
-                            {b.orderNumber && <div className="text-[9px] mt-1 text-gray-600">Ord: {b.orderNumber}</div>}
+                            {b.orderNumber && <div className="text-[9px] mt-1 text-gray-600">Ord 1: {b.orderNumber} {b.orderNumber2 && `| Ord 2: ${b.orderNumber2}`}</div>}
                           </div>
                         ),
                       },
@@ -846,19 +975,25 @@ export const MonitorYard: React.FC = () => {
                         }}
                       />
                       <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Input
+                            label="Targa Trattore *"
+                            placeholder="AA123BB"
+                            value={manualPlate}
+                            onChange={(e) => setManualPlate(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                            required
+                          />
+                          {isManualPlateDuplicate && (
+                            <span className="text-[9px] text-amber-600 font-bold block leading-tight">
+                              ⚠️ Targa associata ad altro vettore!
+                            </span>
+                          )}
+                        </div>
                         <Input
-                          label="Targa *"
-                          placeholder="AA123BB"
-                          value={manualPlate}
-                          onChange={(e) => setManualPlate(e.target.value)}
-                          required
-                        />
-                        <Input
-                          label="Posti Pallet"
-                          type="number"
-                          placeholder="33"
-                          value={manualPallets}
-                          onChange={(e) => setManualPallets(e.target.value === '' ? '' : Number(e.target.value))}
+                          label="Targa Rimorchio"
+                          placeholder="CC789DD"
+                          value={manualPlateTrailer}
+                          onChange={(e) => setManualPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -870,40 +1005,71 @@ export const MonitorYard: React.FC = () => {
                           required
                         />
                         <Input
+                          label="Posti Pallet"
+                          type="number"
+                          placeholder="33"
+                          value={manualPallets}
+                          onChange={(e) => setManualPallets(e.target.value === '' ? '' : Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select
+                          label="Cliente / Uso Baia"
+                          options={[{ value: '', label: 'Nessuno specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
+                          value={bayUsages.find(u => u.id === manualClientUsageId)?.name || manualClientUsageId}
+                          onChange={(e) => {
+                            const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
+                            setManualClientUsageId(found ? found.id : e.target.value);
+                          }}
+                        />
+                        <Input
                           label="Telefono"
                           placeholder="3331234567"
                           value={manualPhone}
                           onChange={(e) => setManualPhone(e.target.value)}
                         />
                       </div>
-                      <Select
-                        label="Riferimento Cliente / Uso Baia"
-                        options={[{ value: '', label: 'Nessuno specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
-                        value={bayUsages.find(u => u.id === manualClientUsageId)?.name || manualClientUsageId}
-                        onChange={(e) => {
-                          const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
-                          setManualClientUsageId(found ? found.id : e.target.value);
-                        }}
-                      />
-                      <Input
-                        label="Numero Ordine Cliente"
-                        placeholder="Riferimento d'ordine..."
-                        value={manualOrderNumber}
-                        onChange={(e) => setManualOrderNumber(e.target.value)}
-                      />
                       <div className="grid grid-cols-2 gap-2">
                         <Input
-                          label="Patente Autista"
-                          placeholder="Es. U19283748"
+                          label="Rif. Carico 1 *"
+                          placeholder="Es. ORD-12345"
+                          value={manualOrderNumber}
+                          onChange={(e) => setManualOrderNumber(e.target.value)}
+                          required
+                        />
+                        <Input
+                          label="Rif. Carico 2"
+                          placeholder="Es. ORD-54321"
+                          value={manualOrderNumber2}
+                          onChange={(e) => setManualOrderNumber2(e.target.value)}
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-1">
+                        <Input
+                          label="Patente N."
+                          placeholder="U1928"
                           value={manualDriverLicense}
                           onChange={(e) => setManualDriverLicense(e.target.value)}
                         />
                         <Input
-                          label="Data Rilascio"
+                          label="Rilascio"
                           type="date"
                           value={manualDriverLicenseRelease}
                           onChange={(e) => setManualDriverLicenseRelease(e.target.value)}
                         />
+                        <div className="space-y-1">
+                          <Input
+                            label="Scadenza"
+                            type="date"
+                            value={manualDriverLicenseExpiry}
+                            onChange={(e) => setManualDriverLicenseExpiry(e.target.value)}
+                          />
+                          {isManualLicenseExpired && (
+                            <span className="text-[8px] text-red-600 font-bold block leading-tight animate-pulse-glow">
+                              ⚠️ SCADUTA!
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <Select
                         label="Attività Richiesta"
@@ -958,13 +1124,9 @@ export const MonitorYard: React.FC = () => {
         {/* --- VISTA: TABELLONE PROGRAMMAZIONE --- */}
         {activeSubTab === 'schedule' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            
-            {/* MINI-CALENDARIO MENSILE HIGHLIGHT (Sinistra) */}
             <div className="lg:col-span-1">
               <Card title="Calendario Attività Mensile" accent="orange">
                 <div className="space-y-4">
-                  
-                  {/* Header Mese */}
                   <div className="flex justify-between items-center border-b border-black/5 pb-2">
                     <button
                       onClick={() => {
@@ -997,12 +1159,10 @@ export const MonitorYard: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Grid Settimana */}
                   <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px] text-gray-400 font-bold border-b border-black/5 pb-1">
                     <span>LUN</span><span>MAR</span><span>MER</span><span>GIO</span><span>VEN</span><span>SAB</span><span>DOM</span>
                   </div>
 
-                  {/* Giorni */}
                   <div className="grid grid-cols-7 gap-1 font-mono text-xs">
                     {calendarDays.map((day, index) => {
                       if (day === null) {
@@ -1046,7 +1206,6 @@ export const MonitorYard: React.FC = () => {
                     })}
                   </div>
 
-                  {/* Legenda */}
                   <div className="pt-4 border-t border-black/5 flex justify-between text-[8px] font-mono text-gray-400">
                     <div className="flex items-center gap-1">
                       <div className="w-2.5 h-2.5 rounded bg-[#11BCEC]/20 border border-[#11BCEC]/40" />
@@ -1066,12 +1225,12 @@ export const MonitorYard: React.FC = () => {
               </Card>
             </div>
 
-            {/* TABELLONE GIORNALIERO (Destra) */}
+            {/* TABELLONE GIORNALIERO */}
             <div className="lg:col-span-2">
               <Card title={`Programmazione Attività del Cantiere - Giorno: ${scheduleDate}`}>
                 <div className="space-y-4">
                   <p className="text-xs text-gray-500 font-sans">
-                    Elenco di tutti i transiti programmati. Le righe che presentano dati anagrafici non completati (es. patente o ordine) mostrano un badge di attenzione.
+                    Elenco di tutti i transiti programmati. Le righe che presentano dati anagrafici non completati (es. patente o ordine) o patenti scadute mostrano un badge di attenzione.
                   </p>
                   <Table
                     data={dayBookings}
@@ -1081,7 +1240,8 @@ export const MonitorYard: React.FC = () => {
                       {
                         header: 'Ticket',
                         accessor: (b) => {
-                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.clientUsageId;
+                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
+                          const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
                           return (
                             <div className="flex flex-col items-center gap-1">
                               {renderTriageTicket(b.ticketNumber)}
@@ -1090,35 +1250,46 @@ export const MonitorYard: React.FC = () => {
                                   ⚠️ Incompleto
                                 </span>
                               )}
+                              {isExpired && (
+                                <span className="text-[7px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none tracking-wider animate-pulse-glow">
+                                  ⚠️ SCADUTA
+                                </span>
+                              )}
                             </div>
                           );
                         }
                       },
                       {
                         header: 'Targa Mezzo',
-                        accessor: (b) => <span className="font-mono font-bold text-xs">{b.licensePlate}</span>
+                        accessor: (b) => (
+                          <div className="font-mono text-xs text-black">
+                            <div className="font-bold">TR: {b.licensePlate}</div>
+                            {b.licensePlateTrailer && <div className="text-[10px] text-gray-400">RIM: {b.licensePlateTrailer}</div>}
+                          </div>
+                        )
                       },
                       {
                         header: 'Autista',
                         accessor: (b) => {
                           const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
                           return (
-                            <div className="text-xs">
+                            <div className="text-xs font-sans">
                               <div className="font-bold">{b.driverName}</div>
                               {b.driverPhone && <div className="text-[10px] font-mono text-gray-400">Tel: {b.driverPhone}</div>}
-                              <div className="text-[9px] font-mono text-gray-400 mt-0.5">Uso/Cliente: {usageName}</div>
+                              <div className="text-[9px] font-mono text-gray-400 mt-0.5">Uso: {usageName}</div>
                             </div>
                           );
                         }
                       },
                       {
-                        header: 'Vettore / Ordine',
+                        header: 'Vettore / Ordini',
                         accessor: (b) => {
                           const name = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
                           return (
-                            <div className="text-xs">
-                              <span className="font-bold block">{name}</span>
-                              <span className="font-mono text-[9px] text-gray-500">Ord: {b.orderNumber || 'N/D'}</span>
+                            <div className="text-xs font-sans">
+                              <span className="font-bold block text-gray-700">{name}</span>
+                              <span className="font-mono text-[9px] text-gray-500">Ord 1: {b.orderNumber}</span>
+                              {b.orderNumber2 && <span className="font-mono text-[9px] text-gray-500 block">Ord 2: {b.orderNumber2}</span>}
                             </div>
                           );
                         }
@@ -1172,8 +1343,77 @@ export const MonitorYard: React.FC = () => {
                 </div>
               </Card>
             </div>
-
           </div>
+        )}
+
+        {/* --- VISTA: ANOMALIE PLANT --- */}
+        {activeSubTab === 'anomalies' && (
+          <Card title={`Gestione Anomalie e Problematiche - Plant: ${activeDepot?.name}`}>
+            <p className="text-xs text-ticket-muted mb-4 font-mono uppercase">
+              // LOG ATTIVI DI ACCESSO AL CANTIERE CHE RICHIEDONO VERIFICHE O DEROGHE
+            </p>
+            <Table
+              data={anomalies.filter(a => a.depotId === selectedDepotId)}
+              emptyMessage="Nessun allarme o anomalia registrata per questo stabilimento."
+              rowClassName={(a) => a.resolved ? 'opacity-65 bg-gray-50/50' : 'bg-rose-50/20 border-l-4 border-rose-500'}
+              columns={[
+                {
+                  header: 'Data / Ora',
+                  accessor: (a) => <span className="font-mono text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</span>
+                },
+                {
+                  header: 'Ticket / Targa',
+                  accessor: (a) => (
+                    <div className="font-mono text-xs">
+                      {a.licensePlate && <div>Targa: <span className="font-bold">{a.licensePlate}</span></div>}
+                      {a.ticketNumber && <div className="text-[10px] text-gray-400">Ticket: {a.ticketNumber}</div>}
+                    </div>
+                  )
+                },
+                {
+                  header: 'Tipologia',
+                  accessor: (a) => {
+                    let color: 'danger' | 'warning' | 'info' | 'primary' = 'danger';
+                    if (a.type === 'TARGA_DUPLICATA') color = 'warning';
+                    if (a.type === 'SFORAMENTO_TEMPO') color = 'primary';
+                    return <Badge variant={color}>{a.type.replace('_', ' ')}</Badge>;
+                  }
+                },
+                {
+                  header: 'Descrizione Problema',
+                  accessor: (a) => <p className="text-xs max-w-[300px] font-medium">{a.message}</p>
+                },
+                {
+                  header: 'Stato / Risoluzione',
+                  accessor: (a) => {
+                    if (a.resolved) {
+                      return (
+                        <div className="text-[10px] font-sans text-emerald-800 bg-emerald-50 border border-emerald-200 p-2 rounded-lg">
+                          <span className="font-bold">Risolta da:</span> {a.resolvedBy}
+                          <div className="italic mt-0.5">Note: "{a.resolutionNotes}"</div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="danger">ATTIVA</Badge>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setActiveResolveAnomalyId(a.id);
+                            setResolveNotes('');
+                          }}
+                        >
+                          Giustifica e Risolvi
+                        </Button>
+                      </div>
+                    );
+                  }
+                }
+              ]}
+            />
+          </Card>
         )}
 
       </div>
@@ -1244,6 +1484,35 @@ export const MonitorYard: React.FC = () => {
         </div>
       )}
 
+      {/* --- MODAL DI RISOLUZIONE ANOMALIA YARD (GUARDIOLA) --- */}
+      {activeResolveAnomalyId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-black/10 overflow-hidden">
+            <div className="bg-rose-500 text-white p-4">
+              <h3 className="font-bold text-sm uppercase">Deroga & Risoluzione Anomalia</h3>
+            </div>
+            <div className="p-4 space-y-3 font-sans text-xs">
+              <p className="text-gray-600">Inserire le note o la giustificazione per marcare questa anomalia come risolta:</p>
+              <textarea
+                rows={3}
+                placeholder="Es. Verificato cartaceo patente valida / Deroga approvata da direzione..."
+                value={resolveNotes}
+                onChange={(e) => setResolveNotes(e.target.value)}
+                className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
+              />
+            </div>
+            <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50">
+              <Button variant="secondary" className="flex-1 text-xs" onClick={() => setActiveResolveAnomalyId(null)}>Annulla</Button>
+              <Button variant="success" className="flex-1 text-xs" onClick={() => {
+                resolveAnomaly(activeResolveAnomalyId, resolveNotes);
+                setActiveResolveAnomalyId(null);
+                setResolveNotes('');
+              }} disabled={!resolveNotes.trim()}>Conferma Risoluzione</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* --- MODAL 1: CHECK-IN NOTE E PATENTE (GUARDIOLA) --- */}
       {checkInBooking && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
@@ -1259,13 +1528,13 @@ export const MonitorYard: React.FC = () => {
             <div className="p-4 space-y-3 font-sans text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <Input
-                  label="Telefono Autista"
-                  placeholder="Es. +39 347 1122334"
-                  value={checkInPhone}
-                  onChange={(e) => setCheckInPhone(e.target.value)}
+                  label="Targa Rimorchio"
+                  placeholder="Es. CC789DD"
+                  value={checkInPlateTrailer}
+                  onChange={(e) => setCheckInPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
                 />
                 <Select
-                  label="Riferimento Uso Baia / Cliente"
+                  label="Uso Baia / Cliente"
                   options={[{ value: '', label: 'Nessun uso specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
                   value={bayUsages.find(u => u.id === checkInClientUsageId)?.name || checkInClientUsageId}
                   onChange={(e) => {
@@ -1275,26 +1544,57 @@ export const MonitorYard: React.FC = () => {
                 />
               </div>
 
-              <Input
-                label="Numero Ordine Cliente (Rif. DDT)"
-                placeholder="Riferimento d'ordine..."
-                value={checkInOrderNumber}
-                onChange={(e) => setCheckInOrderNumber(e.target.value)}
-              />
-
               <div className="grid grid-cols-2 gap-2">
                 <Input
-                  label="Patente Autista"
+                  label="Rif. Carico 1 *"
+                  placeholder="Riferimento d'ordine 1..."
+                  value={checkInOrderNumber}
+                  onChange={(e) => setCheckInOrderNumber(e.target.value)}
+                />
+                <Input
+                  label="Rif. Carico 2"
+                  placeholder="Riferimento d'ordine 2..."
+                  value={checkInOrderNumber2}
+                  onChange={(e) => setCheckInOrderNumber2(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-1">
+                <Input
+                  label="Patente Autore"
                   placeholder="Numero patente..."
                   value={checkInLicense}
                   onChange={(e) => setCheckInLicense(e.target.value)}
                 />
                 <Input
-                  label="Data Rilascio Patente"
+                  label="Rilascio"
                   type="date"
                   value={checkInLicenseRelease}
                   onChange={(e) => setCheckInLicenseRelease(e.target.value)}
                 />
+                <div className="space-y-1">
+                  <Input
+                    label="Scadenza"
+                    type="date"
+                    value={checkInLicenseExpiry}
+                    onChange={(e) => setCheckInLicenseExpiry(e.target.value)}
+                  />
+                  {isCheckInLicenseExpired && (
+                    <span className="text-[8px] text-red-600 font-bold block leading-tight animate-pulse-glow">
+                      ⚠️ SCADUTA!
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  label="Telefono Autista"
+                  placeholder="Es. +39 347 1122334"
+                  value={checkInPhone}
+                  onChange={(e) => setCheckInPhone(e.target.value)}
+                />
+                <div className="h-4" />
               </div>
 
               <div>
@@ -1334,7 +1634,6 @@ export const MonitorYard: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in print:hidden">
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full border border-black/10 overflow-hidden my-8">
             
-            {/* Header */}
             <div className="bg-gradient-to-r from-[#004B97] to-[#0062b8] text-white p-4 flex justify-between items-start">
               <div>
                 <h3 className="font-bold text-sm uppercase tracking-wide">
@@ -1347,10 +1646,8 @@ export const MonitorYard: React.FC = () => {
               <Badge variant="warning">{activeBayDetail.booking.ticketNumber || 'Triage'}</Badge>
             </div>
 
-            {/* Body */}
             <div className="p-5 space-y-5 font-sans text-xs">
               
-              {/* Griglia Dati Veicolo */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 border-b border-black/5 pb-4 bg-gray-50/50 p-3 rounded-lg font-mono">
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase">Vettore</span>
@@ -1359,9 +1656,15 @@ export const MonitorYard: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block text-[9px] uppercase">Veicolo (Targa)</span>
+                  <span className="text-gray-400 block text-[9px] uppercase">Trattore (Targa)</span>
                   <span className="font-bold text-ticket-accent text-xs block font-mono">
                     {activeBayDetail.booking.licensePlate}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[9px] uppercase">Rimorchio</span>
+                  <span className="font-bold text-black text-xs block font-mono">
+                    {activeBayDetail.booking.licensePlateTrailer || 'Non associato'}
                   </span>
                 </div>
                 <div>
@@ -1371,19 +1674,13 @@ export const MonitorYard: React.FC = () => {
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block text-[9px] uppercase">Ordine N.</span>
-                  <span className="font-bold text-gray-700 text-xs block">
-                    {activeBayDetail.booking.orderNumber || 'Non inserito'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[9px] uppercase">Patente N.</span>
+                  <span className="text-gray-400 block text-[9px] uppercase">Ordini N.</span>
                   <span className="font-bold text-gray-700 text-xs block truncate">
-                    {activeBayDetail.booking.driverLicense || 'Non inserito'}
+                    {activeBayDetail.booking.orderNumber} {activeBayDetail.booking.orderNumber2 && ` / ${activeBayDetail.booking.orderNumber2}`}
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-400 block text-[9px] uppercase">Orario Attracco</span>
+                  <span className="text-gray-400 block text-[9px] uppercase">Attracco</span>
                   <span className="font-bold text-amber-600 text-xs block">
                     {formatTime(activeBayDetail.booking.timeInBay)}
                   </span>
@@ -1392,7 +1689,6 @@ export const MonitorYard: React.FC = () => {
 
               {!showChecklistForm ? (
                 <>
-                  {/* Tabella Cronologica delle Note (Case History) */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
                       Cronologia Note (Case History)
@@ -1427,7 +1723,6 @@ export const MonitorYard: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Form aggiungi nota */}
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1440,7 +1735,6 @@ export const MonitorYard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Flag di Checklist se presente */}
                   {activeBayDetail.booking.checklist && (
                     <div className={`p-3 rounded-lg border flex justify-between items-center ${activeBayDetail.booking.checklist.isFailed ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
                       <div>
@@ -1469,12 +1763,16 @@ export const MonitorYard: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Modifica Campi Generali (Solo Guardiola/Admin/Preposto) */}
                   <div className="space-y-3 pt-3 border-t border-black/5">
                     <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
                       Aggiornamento Anagrafica Veicolo
                     </h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                      <Input
+                        label="Targa Rimorchio"
+                        value={detailPlateTrailer}
+                        onChange={(e) => setDetailPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                      />
                       <Input
                         label="Telefono Autista"
                         value={detailPhone}
@@ -1487,7 +1785,7 @@ export const MonitorYard: React.FC = () => {
                         onChange={(e) => setDetailPallets(e.target.value === '' ? '' : Number(e.target.value))}
                       />
                       <Select
-                        label="Uso Baia / Riferimento"
+                        label="Uso Baia / Cliente"
                         options={[{ value: '', label: 'Generico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
                         value={bayUsages.find(u => u.id === detailClientUsageId)?.name || detailClientUsageId}
                         onChange={(e) => {
@@ -1496,11 +1794,16 @@ export const MonitorYard: React.FC = () => {
                         }}
                       />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                       <Input
-                        label="Numero d'Ordine"
+                        label="Rif. Carico 1 *"
                         value={detailOrderNumber}
                         onChange={(e) => setDetailOrderNumber(e.target.value)}
+                      />
+                      <Input
+                        label="Rif. Carico 2"
+                        value={detailOrderNumber2}
+                        onChange={(e) => setDetailOrderNumber2(e.target.value)}
                       />
                       <Input
                         label="Numero Patente"
@@ -1508,27 +1811,34 @@ export const MonitorYard: React.FC = () => {
                         onChange={(e) => setDetailLicense(e.target.value)}
                       />
                       <Input
+                        label="Scadenza Patente"
+                        type="date"
+                        value={detailLicenseExpiry}
+                        onChange={(e) => setDetailLicenseExpiry(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
                         label="Data Rilascio Patente"
                         type="date"
                         value={detailLicenseRelease}
                         onChange={(e) => setDetailLicenseRelease(e.target.value)}
                       />
+                      <Select
+                        label="Cambia Tipo Attività"
+                        options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
+                        value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
+                        onChange={(e) => {
+                          const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
+                          if (found) setDetailActivity(found.code);
+                        }}
+                      />
                     </div>
-                    <Select
-                      label="Cambia Tipo Attività"
-                      options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
-                      value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
-                      onChange={(e) => {
-                        const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
-                        if (found) setDetailActivity(found.code);
-                      }}
-                    />
                     <Button size="sm" onClick={handleSaveBayDetailChanges} className="w-full">
                       Salva Dettagli Anagrafici
                     </Button>
                   </div>
 
-                  {/* Riassegnazione Spostamento Baia (Solo Guardiola/Admin) */}
                   {(currentRole === 'GUARDIA' || currentRole === 'ADMIN') && (
                     <div className="space-y-3 pt-3 border-t border-black/5">
                       <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-amber-600 border-b border-black/5 pb-1">
@@ -1569,13 +1879,12 @@ export const MonitorYard: React.FC = () => {
                   )}
                 </>
               ) : (
-                /* --- FORM COMPILAZIONE CHECKLIST QUALITÀ (PREPOSTO) --- */
+                /* --- FORM COMPILAZIONE CHECKLIST QUALITÀ --- */
                 <div className="space-y-4 animate-fade-in">
                   <h4 className="font-bold text-[11px] uppercase font-mono tracking-wider text-amber-600 border-b border-black/10 pb-1">
                     Compilazione Checklist Qualità & Conformità Mezzo
                   </h4>
 
-                  {/* Idoneità Mezzo */}
                   <div className="space-y-2">
                     <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">1. Idoneità Igienica del Mezzo</span>
                     <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg">
@@ -1600,7 +1909,6 @@ export const MonitorYard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Idoneità Prodotto */}
                   <div className="space-y-2">
                     <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">2. Idoneità Igienica del Prodotto & Pallet</span>
                     <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg font-mono">
@@ -1649,7 +1957,6 @@ export const MonitorYard: React.FC = () => {
                     />
                   </div>
 
-                  {/* Idoneità Sigillo */}
                   <div className="space-y-2 border-t border-black/5 pt-2">
                     <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">3. Verifica Sigillo di Sicurezza</span>
                     <div className="bg-gray-50 p-3 rounded-lg space-y-3 font-mono">
@@ -1702,7 +2009,6 @@ export const MonitorYard: React.FC = () => {
               )}
             </div>
 
-            {/* Footer */}
             <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50">
               <Button
                 variant="secondary"

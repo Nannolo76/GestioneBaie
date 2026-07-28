@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage } from '../types';
+import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog } from '../types';
 
 interface AppContextType {
   depots: Depot[];
@@ -12,6 +12,7 @@ interface AppContextType {
   reportSchedules: ReportSchedule[];
   checklistAlerts: ChecklistFailureAlert[];
   bayUsages: BayUsage[];
+  anomalies: AnomalyLog[];
   currentRole: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null;
   currentUser: User | null;
   currentCarrierId: string;
@@ -23,11 +24,11 @@ interface AppContextType {
   updateBayUsage: (bayId: string, bayUsageId?: string) => void;
   addBayUsage: (name: string, description?: string) => void;
   deleteBayUsage: (id: string) => void;
-  addCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
+  addCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string, licensePlateTrailer?: string) => void;
   registerCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
   approveCarrier: (carrierId: string) => void;
   rejectCarrier: (carrierId: string) => void;
-  updateCarrierProfile: (id: string, email: string, licensePlate?: string, phone?: string) => void;
+  updateCarrierProfile: (id: string, email: string, licensePlate?: string, phone?: string, licensePlateTrailer?: string) => void;
   addBooking: (
     depotId: string,
     date: string,
@@ -40,17 +41,20 @@ interface AppContextType {
     driverLicense?: string,
     driverLicenseRelease?: string,
     orderNumber?: string,
-    clientUsageId?: string
+    clientUsageId?: string,
+    licensePlateTrailer?: string,
+    driverLicenseExpiry?: string,
+    orderNumber2?: string
   ) => void;
   updateBookingStatus: (
     bookingId: string,
     status: Booking['status'],
     bayId?: string,
-    extra?: { driverPhone?: string; notes?: string; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
+    extra?: { driverPhone?: string; notes?: string; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string; licensePlateTrailer?: string; driverLicenseExpiry?: string; orderNumber2?: string }
   ) => void;
   updateBookingDetails: (
     bookingId: string,
-    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
+    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string; licensePlateTrailer?: string; driverLicenseExpiry?: string; orderNumber2?: string }
   ) => void;
   relocateBookingBay: (bookingId: string, newBayId: string, reason: string) => void;
   addBookingNote: (bookingId: string, text: string) => void;
@@ -71,9 +75,11 @@ interface AppContextType {
     }
   ) => void;
   resolveChecklistAlert: (alertId: string, action: 'PROCEDI' | 'RESPINTO', reason?: string) => void;
-  addActivityType: (name: string, code: string) => void;
+  addActivityType: (name: string, code: string, baseDurationMinutes: number, minutesPerPallet: number) => void;
   addReportSchedule: (name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => void;
   toggleReportSchedule: (id: string) => void;
+  addAnomaly: (depotId: string, type: AnomalyLog['type'], message: string, bookingId?: string, ticketNumber?: string, licensePlate?: string) => void;
+  resolveAnomaly: (anomalyId: string, notes: string) => void;
   setCurrentRole: (role: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null) => void;
   setCurrentUser: (user: User | null) => void;
   setCurrentCarrierId: (carrierId: string) => void;
@@ -83,14 +89,14 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'yard_management_system_state_v5';
+const LOCAL_STORAGE_KEY = 'yard_management_system_state_v6';
 
 const getTodayDateString = () => {
   return new Date().toISOString().split('T')[0];
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // --- DATI DI DEFAULT (MOCK DATABASE) ---
+  // --- DATI DI DEFAULT ---
   const defaultDepots: Depot[] = [
     { id: 'depot-milano', name: 'Milano Logistics Plant', city: 'Milano (MI)' },
     { id: 'depot-roma', name: 'Roma Logistics Plant', city: 'Roma (RM)' },
@@ -136,9 +142,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ];
 
   const defaultActivityTypes: ActivityType[] = [
-    { id: 'act-1', name: 'Scarico Standard', code: 'SCARICO' },
-    { id: 'act-2', name: 'Carico Standard', code: 'CARICO' },
-    { id: 'act-3', name: 'Reso Fornitore', code: 'RESO' },
+    { id: 'act-1', name: 'Scarico Standard', code: 'SCARICO', baseDurationMinutes: 15, minutesPerPallet: 1.0 },
+    { id: 'act-2', name: 'Carico Standard', code: 'CARICO', baseDurationMinutes: 20, minutesPerPallet: 1.5 },
+    { id: 'act-3', name: 'Reso Fornitore', code: 'RESO', baseDurationMinutes: 10, minutesPerPallet: 1.0 },
   ];
 
   const defaultReportSchedules: ReportSchedule[] = [
@@ -157,14 +163,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       activityType: 'CARICO',
       status: 'PRENOTATO',
       licensePlate: 'AA123BB',
+      licensePlateTrailer: 'AA777XX',
       driverName: 'Marco Rossi',
       driverPhone: '+39 347 1234567',
       palletPlaces: 24,
-      ticketNumber: 'C-392',
+      ticketNumber: 'MIL-C-392',
       notes: 'Carico urgente merci secche',
       orderNumber: 'ORD-2026-9923',
+      orderNumber2: 'ORD-2026-9924',
       driverLicense: 'U19283748A',
       driverLicenseRelease: '2024-05-12',
+      driverLicenseExpiry: '2028-05-12', // Not expired
       clientUsageId: 'bu-4',
       notesHistory: [
         { id: 'n-init-1', timestamp: new Date(new Date().setHours(new Date().getHours() - 10)).toISOString(), author: 'Vettore Logistica', text: 'Carico urgente merci secche' }
@@ -181,11 +190,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverName: 'Giuseppe Bianchi',
       driverPhone: '+39 333 9876543',
       palletPlaces: 12,
-      ticketNumber: 'S-712',
-      notes: 'Carico a temperatura controllata fresco',
+      ticketNumber: 'MIL-S-712',
+      notes: 'Carico fresco',
+      orderNumber: 'ORD-2026-8811',
+      driverLicense: 'Y99882233B',
+      driverLicenseRelease: '2015-02-10',
+      driverLicenseExpiry: '2025-02-10', // Expired!
       clientUsageId: 'bu-2',
       notesHistory: [
-        { id: 'n-init-2', timestamp: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(), author: 'Autista', text: 'Carico a temperatura controllata fresco' }
+        { id: 'n-init-2', timestamp: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(), author: 'Autista', text: 'Carico fresco' }
       ],
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 1)).toISOString(),
     },
@@ -201,43 +214,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       driverName: 'Luca Verdi',
       driverPhone: '+39 320 1122334',
       palletPlaces: 33,
-      ticketNumber: 'S-209',
-      notes: 'Richiesta sponda idraulica',
+      ticketNumber: 'ROM-S-209',
+      orderNumber: 'ORD-2026-4433',
+      notes: 'Richiesta sponda',
       notesHistory: [
-        { id: 'n-init-3', timestamp: new Date(new Date().setHours(new Date().getHours() - 6)).toISOString(), author: 'Vettore', text: 'Richiesta sponda idraulica' }
+        { id: 'n-init-3', timestamp: new Date(new Date().setHours(new Date().getHours() - 6)).toISOString(), author: 'Vettore', text: 'Richiesta sponda' }
       ],
       timeInGate: new Date(new Date().setHours(new Date().getHours() - 3)).toISOString(),
-      timeInBay: new Date(new Date().setHours(new Date().getHours() - 2)).toISOString(),
-    },
-    {
-      id: 'book-bari-completed',
-      carrierId: 'carrier-2',
-      depotId: 'depot-bari',
-      date: today,
-      activityType: 'CARICO',
-      status: 'COMPLETATO',
-      bayId: 'bay-b-01',
-      licensePlate: 'GG012HH',
-      driverName: 'Giovanni Neri',
-      driverPhone: '+39 345 5566778',
-      palletPlaces: 8,
-      ticketNumber: 'C-881',
-      notes: 'Reso imballaggi',
-      notesHistory: [
-        { id: 'n-init-4', timestamp: new Date(new Date().setHours(new Date().getHours() - 8)).toISOString(), author: 'Vettore', text: 'Reso imballaggi' }
-      ],
-      timeInGate: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(),
-      timeInBay: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(),
-      timeOutBay: new Date(new Date().setHours(new Date().getHours() - 3)).toISOString(),
-      timeOutGate: new Date(new Date().setHours(new Date().getHours() - 2.8)).toISOString(),
+      timeInBay: new Date(new Date().setHours(new Date().getHours() - 2)).toISOString(), // 2 hours docked! With 33 plt limit is 15 + 33*1 = 48 mins. Sforato!
     },
   ];
 
   const defaultLogs: ActivityLog[] = [
-    { id: 'log-1', timestamp: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(), depotId: 'depot-bari', message: 'Sistema avviato. Stato caricato correttamente.', type: 'INFO' },
-    { id: 'log-2', timestamp: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(), depotId: 'depot-bari', message: 'Vettore Freccia Rossa Trasporti registrato al cancello con Ticket C-881.', type: 'INFO' },
-    { id: 'log-3', timestamp: new Date(new Date().setHours(new Date().getHours() - 4)).toISOString(), depotId: 'depot-bari', message: 'Assegnata Baia B-01 a vettore Freccia Rossa Trasporti.', type: 'SUCCESS' },
-    { id: 'log-4', timestamp: new Date(new Date().setHours(new Date().getHours() - 2.8)).toISOString(), depotId: 'depot-bari', message: 'Attività completata per veicolo GG012HH. Registrata uscita da Yard.', type: 'SUCCESS' },
+    { id: 'log-1', timestamp: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(), depotId: 'depot-milano', message: 'Sistema caricato con successo.', type: 'INFO' }
   ];
 
   // --- STATO INIZIALIZZATO ---
@@ -251,6 +240,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>(defaultReportSchedules);
   const [checklistAlerts, setChecklistAlerts] = useState<ChecklistFailureAlert[]>([]);
   const [bayUsages, setBayUsages] = useState<BayUsage[]>(defaultBayUsages);
+  
+  // Anomalie
+  const [anomalies, setAnomalies] = useState<AnomalyLog[]>([]);
 
   // Stati di sessione
   const [currentRole, setCurrentRole] = useState<'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null>(null);
@@ -274,6 +266,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (parsed.reportSchedules) setReportSchedules(parsed.reportSchedules);
         if (parsed.checklistAlerts) setChecklistAlerts(parsed.checklistAlerts);
         if (parsed.bayUsages) setBayUsages(parsed.bayUsages);
+        if (parsed.anomalies) setAnomalies(parsed.anomalies);
         
         if (parsed.currentRole !== undefined) setCurrentRole(parsed.currentRole);
         if (parsed.currentUser !== undefined) setCurrentUser(parsed.currentUser);
@@ -298,13 +291,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reportSchedules,
       checklistAlerts,
       bayUsages,
+      anomalies,
       currentRole,
       currentUser,
       currentCarrierId,
       selectedDepotId,
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, checklistAlerts, bayUsages, currentRole, currentUser, currentCarrierId, selectedDepotId]);
+  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, checklistAlerts, bayUsages, anomalies, currentRole, currentUser, currentCarrierId, selectedDepotId]);
 
   // --- OPERAZIONI DI LOG ---
   const logActivity = (depotId: string, message: string, type: ActivityLog['type'] = 'INFO') => {
@@ -316,6 +310,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type,
     };
     setActivityLogs((prev) => [newLog, ...prev]);
+  };
+
+  // --- GESTIONE ANOMALIE ---
+  const addAnomaly = (
+    depotId: string,
+    type: AnomalyLog['type'],
+    message: string,
+    bookingId?: string,
+    ticketNumber?: string,
+    licensePlate?: string
+  ) => {
+    // Evitiamo duplicazione per lo stesso booking dello stesso tipo se già attiva
+    const isAlreadyPresent = anomalies.some(
+      (an) => an.bookingId === bookingId && an.type === type && !an.resolved
+    );
+    if (isAlreadyPresent && type !== 'SFORAMENTO_TEMPO') return; // Sforamento tempo ricalcola/aggiorna
+
+    const newAnomaly: AnomalyLog = {
+      id: `an-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      timestamp: new Date().toISOString(),
+      depotId,
+      bookingId,
+      ticketNumber,
+      licensePlate,
+      type,
+      message,
+      resolved: false,
+    };
+
+    setAnomalies((prev) => [newAnomaly, ...prev]);
+    logActivity(depotId, `🚨 ANOMALIA REGISTRATA: [${type}] ${message}`, 'WARNING');
+  };
+
+  const resolveAnomaly = (anomalyId: string, notes: string) => {
+    const resolverName = currentUser?.name || (currentRole === 'GUARDIA' ? 'Guardiola' : 'Amministratore');
+    setAnomalies((prev) =>
+      prev.map((a) => {
+        if (a.id === anomalyId) {
+          return {
+            ...a,
+            resolved: true,
+            resolutionNotes: notes,
+            resolvedBy: resolverName,
+            resolvedAt: new Date().toISOString(),
+          };
+        }
+        return a;
+      })
+    );
+    
+    const anomaly = anomalies.find((a) => a.id === anomalyId);
+    if (anomaly) {
+      logActivity(anomaly.depotId, `Risolta anomalia ${anomaly.type} per targa ${anomaly.licensePlate || 'N/D'} da ${resolverName}. Note: ${notes}`, 'SUCCESS');
+    }
   };
 
   // --- AZIONI CONFIGURAZIONE / ADMIN ---
@@ -388,15 +436,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- AZIONI VETTORI ---
-  const addCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string) => {
+  const addCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string, licensePlateTrailer?: string) => {
     const id = `carrier-${Date.now()}`;
+    const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
+    const cleanTrailer = licensePlateTrailer ? licensePlateTrailer.replace(/\s+/g, '').toUpperCase() : undefined;
+    
     const newCarrier: Carrier = {
       id,
       name,
       email,
       status: 'APPROVATO',
       vatNumber,
-      licensePlate,
+      licensePlate: cleanPlate,
+      licensePlateTrailer: cleanTrailer,
     };
     setCarriers((prev) => [...prev, newCarrier]);
     logActivity(selectedDepotId, `Creato anagrafica vettore da Admin: ${name}`, 'SUCCESS');
@@ -404,13 +456,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const registerCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string) => {
     const id = `carrier-${Date.now()}`;
+    const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
+    
     const newCarrier: Carrier = {
       id,
       name,
       email,
       status: 'ATTESA_APPROVAZIONE',
       vatNumber,
-      licensePlate,
+      licensePlate: cleanPlate,
     };
     setCarriers((prev) => [...prev, newCarrier]);
   };
@@ -435,9 +489,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const updateCarrierProfile = (id: string, email: string, licensePlate?: string, phone?: string) => {
+  const updateCarrierProfile = (id: string, email: string, licensePlate?: string, phone?: string, licensePlateTrailer?: string) => {
+    const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
+    const cleanTrailer = licensePlateTrailer ? licensePlateTrailer.replace(/\s+/g, '').toUpperCase() : undefined;
+
     setCarriers((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, email, licensePlate, phone } : c))
+      prev.map((c) => (c.id === id ? { ...c, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer } : c))
     );
     logActivity(selectedDepotId, `Vettore ${id} ha aggiornato il proprio profilo anagrafico.`, 'INFO');
   };
@@ -455,14 +512,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     driverLicense?: string,
     driverLicenseRelease?: string,
     orderNumber?: string,
-    clientUsageId?: string
+    clientUsageId?: string,
+    licensePlateTrailer?: string,
+    driverLicenseExpiry?: string,
+    orderNumber2?: string
   ) => {
     const id = `book-${Date.now()}`;
     const carrierId = currentRole === 'VETTORE' ? currentCarrierId : 'carrier-1';
     
+    // Generazione codice Ticket con prefisso Plant
+    const plantObj = depots.find(d => d.id === depotId);
+    const plantCode = plantObj ? plantObj.name.substring(0, 3).toUpperCase() : 'PLT';
     const prefix = activityType.substring(0, 1).toUpperCase() || 'T';
     const randNum = Math.floor(100 + Math.random() * 900);
-    const ticketNumber = `${prefix}-${randNum}`;
+    const ticketNumber = `${plantCode}-${prefix}-${randNum}`;
+
+    // Pulizia e normalizzazione targhe
+    const cleanPlate = licensePlate.replace(/\s+/g, '').toUpperCase();
+    const cleanTrailer = licensePlateTrailer ? licensePlateTrailer.replace(/\s+/g, '').toUpperCase() : undefined;
 
     const newNote: BookingNote[] = [];
     if (notes) {
@@ -481,7 +548,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       date,
       activityType,
       status: 'PRENOTATO',
-      licensePlate: licensePlate.toUpperCase(),
+      licensePlate: cleanPlate,
+      licensePlateTrailer: cleanTrailer,
       driverName,
       driverPhone,
       notes,
@@ -491,7 +559,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       isEditedInBay: false,
       driverLicense,
       driverLicenseRelease,
+      driverLicenseExpiry,
       orderNumber,
+      orderNumber2,
       clientUsageId,
     };
 
@@ -502,13 +572,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Prenotazione [Ticket: ${ticketNumber}] registrata da ${carrier?.name || 'Vettore'} per il ${date}`,
       'INFO'
     );
+
+    // CONTROLLI ANOMALIE ALL'ATTO DELLA CREAZIONE (PATENTE E TARGA DUPLICATA)
+    // 1. Patente Scaduta
+    if (driverLicenseExpiry && new Date(driverLicenseExpiry) < new Date()) {
+      addAnomaly(
+        depotId,
+        'PATENTE_SCADUTA',
+        `L'autista ${driverName} ha la patente scaduta (Scadenza: ${driverLicenseExpiry})`,
+        id,
+        ticketNumber,
+        cleanPlate
+      );
+    }
+
+    // 2. Targa Duplicata tra Vettori
+    const hasPlateConflict = carriers.some(
+      (c) => c.id !== carrierId && c.licensePlate?.replace(/\s+/g, '').toUpperCase() === cleanPlate
+    );
+    if (hasPlateConflict) {
+      const conflictingCarrierName = carriers.find(c => c.licensePlate?.replace(/\s+/g, '').toUpperCase() === cleanPlate)?.name || 'Altro Vettore';
+      addAnomaly(
+        depotId,
+        'TARGA_DUPLICATA',
+        `La targa trattore ${cleanPlate} è già associata di default ad un altro vettore (${conflictingCarrierName})`,
+        id,
+        ticketNumber,
+        cleanPlate
+      );
+    }
   };
 
   const updateBookingStatus = (
     bookingId: string,
     status: Booking['status'],
     bayId?: string,
-    extra?: { driverPhone?: string; notes?: string; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
+    extra?: { driverPhone?: string; notes?: string; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string; licensePlateTrailer?: string; driverLicenseExpiry?: string; orderNumber2?: string }
   ) => {
     let oldBooking: Booking | undefined;
     let targetDepotId = selectedDepotId;
@@ -526,8 +625,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (extra.driverPhone !== undefined) updated.driverPhone = extra.driverPhone;
             if (extra.driverLicense !== undefined) updated.driverLicense = extra.driverLicense;
             if (extra.driverLicenseRelease !== undefined) updated.driverLicenseRelease = extra.driverLicenseRelease;
+            if (extra.driverLicenseExpiry !== undefined) updated.driverLicenseExpiry = extra.driverLicenseExpiry;
             if (extra.orderNumber !== undefined) updated.orderNumber = extra.orderNumber;
+            if (extra.orderNumber2 !== undefined) updated.orderNumber2 = extra.orderNumber2;
             if (extra.clientUsageId !== undefined) updated.clientUsageId = extra.clientUsageId;
+            if (extra.licensePlateTrailer !== undefined) {
+              updated.licensePlateTrailer = extra.licensePlateTrailer ? extra.licensePlateTrailer.replace(/\s+/g, '').toUpperCase() : undefined;
+            }
             if (extra.notes !== undefined) {
               updated.notes = extra.notes;
               const authorName = currentUser?.name || 'Guardiola';
@@ -568,9 +672,40 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // Gestione baie
+    // Controlli anomalie al check-in
     if (oldBooking) {
       const ticketText = oldBooking.ticketNumber || oldBooking.id;
+      const cleanPlate = oldBooking.licensePlate;
+
+      if (status === 'AL_CANCELLO' && extra) {
+        // Verifica patente scaduta
+        if (extra.driverLicenseExpiry && new Date(extra.driverLicenseExpiry) < new Date()) {
+          addAnomaly(
+            targetDepotId,
+            'PATENTE_SCADUTA',
+            `Autista ${oldBooking.driverName} rilevato al check-in con patente scaduta in data ${extra.driverLicenseExpiry}`,
+            bookingId,
+            ticketText,
+            cleanPlate
+          );
+        }
+
+        // Verifica targa duplicata
+        const hasPlateConflict = carriers.some(
+          (c) => c.id !== oldBooking?.carrierId && c.licensePlate?.replace(/\s+/g, '').toUpperCase() === cleanPlate
+        );
+        if (hasPlateConflict) {
+          const conflictingCarrierName = carriers.find(c => c.licensePlate?.replace(/\s+/g, '').toUpperCase() === cleanPlate)?.name || 'Altro Vettore';
+          addAnomaly(
+            targetDepotId,
+            'TARGA_DUPLICATA',
+            `Mezzo al check-in con targa ${cleanPlate} associata ad altro vettore (${conflictingCarrierName})`,
+            bookingId,
+            ticketText,
+            cleanPlate
+          );
+        }
+      }
 
       if (oldBooking.bayId) {
         setBays((prevBays) =>
@@ -719,6 +854,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         setChecklistAlerts((prev) => [newAlert, ...prev]);
+
+        // Aggiungi anomalia anche nel registro anomalie
+        addAnomaly(
+          booking.depotId,
+          'CHECKLIST_FALLITA',
+          `Checklist qualità fallita per rampa ${bays.find(b=>b.id === booking.bayId)?.name || 'N/D'} da preposto ${prepostoName}`,
+          bookingId,
+          booking.ticketNumber,
+          booking.licensePlate
+        );
       }
     }
   };
@@ -797,7 +942,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateBookingDetails = (
     bookingId: string,
-    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string }
+    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string; licensePlateTrailer?: string; driverLicenseExpiry?: string; orderNumber2?: string }
   ) => {
     setBookings((prev) =>
       prev.map((b) => {
@@ -808,6 +953,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
           if (b.status === 'IN_BAIA') {
             updated.isEditedInBay = true;
+          }
+          if (updates.licensePlateTrailer) {
+            updated.licensePlateTrailer = updates.licensePlateTrailer.replace(/\s+/g, '').toUpperCase();
           }
           if (updates.notes) {
             const author = currentUser?.name || 'Sistema';
@@ -880,9 +1028,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- ATTIVITA' E SCHEDULATORI ---
-  const addActivityType = (name: string, code: string) => {
+  const addActivityType = (name: string, code: string, baseDurationMinutes: number, minutesPerPallet: number) => {
     const id = `act-${Date.now()}`;
-    const newAct: ActivityType = { id, name, code: code.toUpperCase() };
+    const newAct: ActivityType = { id, name, code: code.toUpperCase(), baseDurationMinutes, minutesPerPallet };
     setActivityTypes((prev) => [...prev, newAct]);
   };
 
@@ -910,6 +1058,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setReportSchedules(defaultReportSchedules);
     setChecklistAlerts([]);
     setBayUsages(defaultBayUsages);
+    setAnomalies([]);
     setCurrentRole(null);
     setCurrentUser(null);
     setCurrentCarrierId('');
@@ -931,6 +1080,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         reportSchedules,
         checklistAlerts,
         bayUsages,
+        anomalies,
         currentRole,
         currentUser,
         currentCarrierId,
@@ -957,6 +1107,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addActivityType,
         addReportSchedule,
         toggleReportSchedule,
+        addAnomaly,
+        resolveAnomaly,
         setCurrentRole,
         setCurrentUser,
         setCurrentCarrierId,
