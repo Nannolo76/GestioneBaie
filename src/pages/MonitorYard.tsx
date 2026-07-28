@@ -15,7 +15,6 @@ export const MonitorYard: React.FC = () => {
     bays,
     carriers,
     warehouseModules,
-    activityLogs,
     activityTypes,
     checklistAlerts,
     currentRole,
@@ -32,7 +31,8 @@ export const MonitorYard: React.FC = () => {
     resolveAnomaly,
   } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'monitor' | 'schedule' | 'anomalies'>('monitor');
+  // Stato navigazione sottomenu a sinistra (Opzione A)
+  const [guardiolaView, setGuardiolaView] = useState<'bays' | 'gate' | 'expected' | 'rapid' | 'schedule' | 'anomalies'>('bays');
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
   
   // Data selezionata per le attività
@@ -57,7 +57,6 @@ export const MonitorYard: React.FC = () => {
 
   const incomingBookings = dayBookings.filter((b) => b.status === 'PRENOTATO');
   const gateBookings = activeBookings.filter((b) => b.status === 'AL_CANCELLO');
-  const activeLogs = activityLogs.filter((l) => l.depotId === selectedDepotId);
 
   // Form check-in manuale rapido
   const [manualPlate, setManualPlate] = useState('');
@@ -205,7 +204,7 @@ export const MonitorYard: React.FC = () => {
           }
         }
       });
-    }, 10000); // Controlla ogni 10 secondi
+    }, 10000);
 
     return () => clearInterval(checkInterval);
   }, [bookings, activityTypes, bays, anomalies, addAnomaly]);
@@ -269,6 +268,9 @@ export const MonitorYard: React.FC = () => {
     setManualOrderNumber('');
     setManualOrderNumber2('');
     setManualClientUsageId('');
+    
+    // Ritorna alla vista baie dopo aver registrato l'arrivo rapido
+    setGuardiolaView('gate');
   };
 
   const handleOpenCheckInModal = (booking: Booking) => {
@@ -298,6 +300,7 @@ export const MonitorYard: React.FC = () => {
       licensePlateTrailer: checkInPlateTrailer || undefined,
     });
     setCheckInBooking(null);
+    setGuardiolaView('gate');
   };
 
   const handleAssignBay = (bookingId: string) => {
@@ -313,6 +316,7 @@ export const MonitorYard: React.FC = () => {
       delete copy[bookingId];
       return copy;
     });
+    setGuardiolaView('bays');
   };
 
   const handleCompleteActivityFromDetail = (bookingId: string) => {
@@ -464,8 +468,10 @@ export const MonitorYard: React.FC = () => {
   // Controlli per la form check-in modal
   const isCheckInLicenseExpired = checkInLicenseExpiry !== '' && new Date(checkInLicenseExpiry) < new Date();
 
+  const activeAnomaliesCount = anomalies.filter(a => a.depotId === selectedDepotId && !a.resolved).length;
+
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-6 relative font-sans">
       
       {/* AREA DI STAMPA COPERTA */}
       {printBooking && printBooking.checklist && (
@@ -560,678 +566,688 @@ export const MonitorYard: React.FC = () => {
           </div>
         </div>
 
-        {/* Sotto-Navigazione */}
-        <div className="flex justify-between items-center border-b border-black/10 pb-px font-mono text-[10px]">
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setActiveSubTab('monitor')}
-              className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
-                activeSubTab === 'monitor'
-                  ? 'border-ticket-accent text-ticket-accent bg-white/50'
-                  : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
-              }`}
-            >
-              🎛️ Monitor Live Piazzale
-            </button>
-            <button
-              onClick={() => setActiveSubTab('schedule')}
-              className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
-                activeSubTab === 'schedule'
-                  ? 'border-ticket-accent text-ticket-accent bg-white/50'
-                  : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
-              }`}
-            >
-              📅 Tabellone Programmazione
-            </button>
-            <button
-              onClick={() => setActiveSubTab('anomalies')}
-              className={`px-4 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
-                activeSubTab === 'anomalies'
-                  ? 'border-ticket-accent text-ticket-accent bg-white/50'
-                  : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
-              }`}
-            >
-              🚨 Anomalie Plant ({anomalies.filter(a => a.depotId === selectedDepotId && !a.resolved).length})
-            </button>
-          </div>
+        {/* Layout responsive: Barra di Navigazione a sinistra, Contenuto a destra */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
           
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[9px] uppercase tracking-wider text-gray-400">Data Selezionata:</span>
-            <input
-              type="date"
-              value={scheduleDate}
-              onChange={(e) => {
-                setScheduleDate(e.target.value);
-                setCurrentYear(new Date(e.target.value).getFullYear());
-                setCurrentMonth(new Date(e.target.value).getMonth());
-              }}
-              className="bg-white border border-black/10 font-mono text-xs px-2 py-1 rounded shadow-xs focus:ring-0 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {/* --- VISTA: MONITOR LIVE PIAZZALE --- */}
-        {activeSubTab === 'monitor' && (
-          <>
-            {/* Sezione 1: Visualizzazione Grafica Baie */}
-            <Card
-              title="Stato Occupazione Baie Carico/Scarico"
-              accent="orange"
-              headerAction={
-                warehouseModules.filter((m) => m.depotId === selectedDepotId).length > 0 ? (
-                  <div className="flex items-center gap-2 font-mono text-[10px] text-black">
-                    <span>Filtro Sezione:</span>
-                    <select
-                      value={selectedModuleFilter}
-                      onChange={(e) => setSelectedModuleFilter(e.target.value)}
-                      className="bg-white border border-black/10 text-[9px] font-mono px-2 py-1 rounded focus:outline-none"
-                    >
-                      <option value="">Tutti i moduli</option>
-                      {warehouseModules.filter((m) => m.depotId === selectedDepotId).map(m => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : undefined
-              }
+          {/* Menu Laterale Guardiola */}
+          <div className="lg:col-span-1 space-y-2 bg-gray-50 border border-black/5 p-3.5 rounded-xl font-mono text-xs shadow-2xs">
+            <div className="text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-3 px-2">// MENU GUARDIOLA</div>
+            
+            <button
+              onClick={() => setGuardiolaView('bays')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === 'bays'
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
             >
-              {filteredBays.length === 0 ? (
-                <p className="text-center py-6 text-xs text-gray-500 font-mono">Nessuna baia configurata.</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {filteredBays.map((bay) => {
-                    const activeBooking = activeBookings.find(
-                      (b) => b.status === 'IN_BAIA' && b.bayId === bay.id
-                    );
-                    const carrierName = activeBooking
-                      ? carriers.find((c) => c.id === activeBooking.carrierId)?.name
-                      : '';
-                    const moduleName = warehouseModules.find(m => m.id === bay.moduleId)?.name || 'Generico';
-                    const activeUsage = bayUsages.find(u => u.id === bay.bayUsageId);
+              <span className="flex items-center gap-2">⚡ Baie Attive</span>
+              <Badge variant={guardiolaView === 'bays' ? 'info' : 'primary'}>
+                {activeBays.filter(b => b.status === 'OCCUPATA').length}
+              </Badge>
+            </button>
 
-                    // Calcolo dello sforamento
-                    let isTimeoutSforato = false;
-                    let elapsedMinutes = 0;
-                    let timeLimit = 0;
-
-                    if (activeBooking && activeBooking.timeInBay) {
-                      const actType = activityTypes.find((a) => a.code === activeBooking.activityType);
-                      const base = actType?.baseDurationMinutes ?? 20;
-                      const perPlt = actType?.minutesPerPallet ?? 1.5;
-                      const plts = activeBooking.palletPlaces ?? 0;
-                      timeLimit = base + (plts * perPlt);
-                      elapsedMinutes = Math.floor((Date.now() - new Date(activeBooking.timeInBay).getTime()) / 60000);
-                      if (elapsedMinutes > timeLimit) {
-                        isTimeoutSforato = true;
-                      }
-                    }
-
-                    const isModified = activeBooking?.isEditedInBay;
-                    const isChecklistFailed = activeBooking?.checklist?.isFailed;
-
-                    let bayBorderColor = 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400';
-                    if (isChecklistFailed) {
-                      bayBorderColor = 'border-rose-500 border-[3px] bg-rose-50/30 hover:border-rose-600 ring-4 ring-rose-500/10 shadow-md animate-pulse-glow';
-                    } else if (isTimeoutSforato) {
-                      bayBorderColor = 'border-red-600 border-[3px] bg-red-50/30 hover:border-red-700 shadow-md animate-pulse-glow';
-                    } else if (isModified) {
-                      bayBorderColor = 'border-amber-500 border-[3px] border-dashed bg-amber-50/40 hover:border-amber-600 ring-4 ring-amber-500/10 shadow-md';
-                    } else if (bay.status === 'OCCUPATA') {
-                      bayBorderColor = 'border-[#11BCEC]/30 bg-[#11BCEC]/5 hover:border-[#11BCEC] shadow-2xs';
-                    } else if (bay.status === 'MANUTENZIONE') {
-                      bayBorderColor = 'border-red-200 bg-red-50/30 hover:border-red-400';
-                    }
-
-                    return (
-                      <div
-                        key={bay.id}
-                        onClick={() => activeBooking && handleOpenBayDetail(bay, activeBooking)}
-                        className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[190px] cursor-pointer ${bayBorderColor}`}
-                      >
-                        <div className="flex justify-between items-center border-b border-black/5 pb-2">
-                          <div>
-                            <span className="font-mono font-bold text-sm text-black block">{bay.name}</span>
-                            <span className="text-[8px] font-mono text-gray-400 uppercase">Sez: {moduleName}</span>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            <Badge
-                              variant={
-                                isChecklistFailed ? 'danger' :
-                                isTimeoutSforato ? 'danger' :
-                                bay.status === 'DISPONIBILE' ? 'success' :
-                                bay.status === 'OCCUPATA' ? 'primary' : 'danger'
-                              }
-                            >
-                              {isChecklistFailed ? 'Bloccato Qualità' :
-                               isTimeoutSforato ? 'TEMPO SCADUTO' :
-                               bay.status === 'DISPONIBILE' ? 'Libera' :
-                               bay.status === 'OCCUPATA' ? 'In Uso' : 'Manutenzione'}
-                            </Badge>
-                            {isModified && !isChecklistFailed && !isTimeoutSforato && (
-                              <span className="text-[8px] font-bold text-amber-600 bg-amber-100 border border-amber-300 px-1 rounded">
-                                ⚠️ MODIFICATO
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="py-2 flex-grow">
-                          {bay.status === 'OCCUPATA' && activeBooking ? (
-                            <div className="font-mono text-[10px] space-y-0.5">
-                              <div className="flex justify-between">
-                                <span className="text-ticket-muted">Trattore:</span>
-                                <span className="font-bold text-black">{activeBooking.licensePlate}</span>
-                              </div>
-                              {activeBooking.licensePlateTrailer && (
-                                <div className="flex justify-between">
-                                  <span className="text-ticket-muted">Rimorchio:</span>
-                                  <span className="font-bold text-black">{activeBooking.licensePlateTrailer}</span>
-                                </div>
-                              )}
-                              <div className="flex justify-between">
-                                <span className="text-ticket-muted">Vettore:</span>
-                                <span className="truncate max-w-[100px] text-right font-bold text-gray-700">{carrierName}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-ticket-muted">Attività:</span>
-                                <span className="font-bold">{activeBooking.activityType} ({activeBooking.palletPlaces ?? 0} PL)</span>
-                              </div>
-                              {activeBooking.orderNumber && (
-                                <div className="flex justify-between">
-                                  <span className="text-ticket-muted">Ord. 1:</span>
-                                  <span className="font-bold text-gray-600 truncate max-w-[90px]">{activeBooking.orderNumber}</span>
-                                </div>
-                              )}
-                              {isTimeoutSforato && (
-                                <div className="text-[8px] font-bold text-red-600 bg-red-100 border border-red-300 rounded p-1 text-center mt-1 animate-pulse-glow">
-                                  🚨 SFORATO DI {elapsedMinutes - timeLimit} MIN (Prev: {timeLimit}m, Sosta: {elapsedMinutes}m)
-                                </div>
-                              )}
-                            </div>
-                          ) : bay.status === 'MANUTENZIONE' ? (
-                            <div className="text-center py-4 text-xs font-mono text-red-500 font-bold">
-                              // IN MANUTENZIONE
-                            </div>
-                          ) : (
-                            <div className="text-center py-3 space-y-1">
-                              <div className="text-xs font-mono text-emerald-600 font-bold">// PRONTA</div>
-                              <div className="text-[8px] font-mono text-gray-400 uppercase">Uso: {activeUsage?.name || 'Generico'}</div>
-                            </div>
-                          )}
-                        </div>
-
-                        {bay.status === 'OCCUPATA' ? (
-                          <div className="text-[9px] text-center text-ticket-muted font-sans border-t border-black/5 pt-1.5 mt-1">
-                            {currentRole === 'PREPOSTO' ? 'Dettagli & Checklist ➔' : 'Gestisci Rampa ➔'}
-                          </div>
-                        ) : (
-                          <div className="h-4" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+            <button
+              onClick={() => setGuardiolaView('gate')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === 'gate'
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">🚧 Coda Piazzale</span>
+              {gateBookings.length > 0 && (
+                <Badge variant="warning" className="animate-pulse-glow">
+                  {gateBookings.length}
+                </Badge>
               )}
-            </Card>
+            </button>
 
-            {/* Code al cancello e form manuale */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              
-              {/* Check-In Queue */}
-              <div className="lg:col-span-2 space-y-6">
-                <Card title="Coda Check-In al Cancello (Attesa Assegnazione Baia)">
-                  <Table
-                    data={gateBookings}
-                    emptyMessage="Nessun camion registrato al cancello."
-                    columns={[
-                      {
-                        header: 'Triage Ticket',
-                        accessor: (b) => {
-                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
-                          const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
-                          return (
-                            <div className="flex flex-col items-center gap-1">
-                              {renderTriageTicket(b.ticketNumber)}
-                              {isIncomplete && (
-                                <span className="text-[7px] font-bold bg-amber-50 text-amber-600 border border-amber-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
-                                  ⚠️ Incompleto
-                                </span>
-                              )}
-                              {isExpired && (
-                                <span className="text-[7px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
-                                  ⚠️ SCADUTA
-                                </span>
-                              )}
-                            </div>
-                          );
-                        }
-                      },
-                      {
-                        header: 'Vettore / Veicolo',
-                        accessor: (b) => {
-                          const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
-                          const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
-                          return (
-                            <div className="text-xs font-sans">
-                              <div className="font-bold text-black">{cName}</div>
-                              <div className="font-mono text-ticket-accent mt-0.5">
-                                TR: {b.licensePlate} {b.licensePlateTrailer && `/ RIM: ${b.licensePlateTrailer}`} ({b.driverName})
-                              </div>
-                              <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso Richiesto: {usageName}</div>
-                            </div>
-                          );
-                        }
-                      },
-                      {
-                        header: 'Dettagli',
-                        accessor: (b) => (
-                          <div className="text-xs max-w-[200px]">
-                            {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
-                            {b.orderNumber && <div className="text-[9px] font-mono text-gray-600 mt-1">Ord. 1: {b.orderNumber} {b.orderNumber2 && `| Ord. 2: ${b.orderNumber2}`}</div>}
-                            {b.driverPhone && <div className="text-[10px] font-mono text-gray-400 mt-0.5">Tel: {b.driverPhone}</div>}
-                            {b.notes && <div className="text-[10px] italic text-amber-600 truncate mt-0.5">{b.notes}</div>}
-                          </div>
-                        )
-                      },
-                      {
-                        header: 'Assegna Baia',
-                        accessor: (b) => {
-                          const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
-                          const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+            <button
+              onClick={() => setGuardiolaView('expected')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === 'expected'
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">📅 Attesi Oggi</span>
+              {incomingBookings.length > 0 && (
+                <Badge variant="info">
+                  {incomingBookings.length}
+                </Badge>
+              )}
+            </button>
 
-                          const sortedBays = [...availableBays].sort((bayA, bayB) => {
-                            const matchA = b.clientUsageId && bayA.bayUsageId === b.clientUsageId ? 1 : 0;
-                            const matchB = b.clientUsageId && bayB.bayUsageId === b.clientUsageId ? 1 : 0;
-                            return matchB - matchA;
-                          });
+            <button
+              onClick={() => setGuardiolaView('rapid')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === 'rapid'
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">✍️ Nuovo Check-In</span>
+            </button>
 
-                          return (
-                            <div className="flex space-x-2">
-                              <select
-                                value={tempBayAssignment[b.id] || ''}
-                                onChange={(e) =>
-                                  setTempBayAssignment((prev) => ({ ...prev, [b.id]: e.target.value }))
-                                }
-                                disabled={!isGuard}
-                                className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer disabled:opacity-50"
-                              >
-                                <option value="">Seleziona baia...</option>
-                                {sortedBays.map((bay) => {
-                                  const isRecommended = b.clientUsageId && bay.bayUsageId === b.clientUsageId;
-                                  const usageName = bayUsages.find(u => u.id === bay.bayUsageId)?.name || 'Generica';
-                                  return (
-                                    <option key={bay.id} value={bay.id} className={isRecommended ? 'font-bold text-emerald-600' : ''}>
-                                      {isRecommended ? `⭐ [CONSIGLIATA - ${usageName}] ` : ''}{bay.name}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                              <Button
-                                size="sm"
-                                variant="warning"
-                                onClick={() => handleAssignBay(b.id)}
-                                disabled={!tempBayAssignment[b.id] || !isGuard}
-                              >
-                                Fai Entrare
-                              </Button>
-                            </div>
-                          );
-                        },
-                      },
-                    ]}
-                  />
-                </Card>
+            <button
+              onClick={() => setGuardiolaView('schedule')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === 'schedule'
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">🗓️ Programmazione</span>
+            </button>
 
-                {/* Prenotazioni Attese per Oggi */}
-                <Card title="Prenotazioni Slot Attese per Oggi (Attesa Arrivo)">
-                  <Table
-                    data={incomingBookings}
-                    emptyMessage="Nessun transito prenotato in attesa."
-                    columns={[
-                      {
-                        header: 'Ticket',
-                        accessor: (b) => {
-                          const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
-                          const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
-                          return (
-                            <div className="flex flex-col items-center gap-1">
-                              {renderTriageTicket(b.ticketNumber)}
-                              {isIncomplete && (
-                                <span className="text-[7px] font-bold bg-amber-50 text-amber-600 border border-amber-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
-                                  ⚠️ Incompleto
-                                </span>
-                              )}
-                              {isExpired && (
-                                <span className="text-[7px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
-                                  ⚠️ SCADUTA
-                                </span>
-                              )}
-                            </div>
-                          );
-                        }
-                      },
-                      {
-                        header: 'Dettagli Richiesta',
-                        accessor: (b) => {
-                          const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
-                          const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
-                          return (
-                            <div className="text-xs">
-                              <div className="font-bold text-black">{cName}</div>
-                              <div className="font-mono text-gray-500 mt-0.5">
-                                TR: {b.licensePlate} {b.licensePlateTrailer && `/ RIM: ${b.licensePlateTrailer}`} ({b.driverName})
-                              </div>
-                              <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso/Cliente: {usageName}</div>
-                            </div>
-                          );
-                        }
-                      },
-                      {
-                        header: 'Attività / Sped.',
-                        accessor: (b) => (
-                          <div className="text-xs font-mono">
-                            <Badge variant="info">{b.activityType}</Badge>
-                            {b.orderNumber && <div className="text-[9px] mt-1 text-gray-600">Ord 1: {b.orderNumber} {b.orderNumber2 && `| Ord 2: ${b.orderNumber2}`}</div>}
-                          </div>
-                        ),
-                      },
-                      {
-                        header: 'Check-In',
-                        accessor: (b) => {
-                          const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
-                          return (
-                            <Button
-                              size="sm"
-                              variant="primary"
-                              disabled={!isGuard}
-                              onClick={() => handleOpenCheckInModal(b)}
-                            >
-                              Check-In Cancello
-                            </Button>
-                          );
-                        },
-                      },
-                    ]}
-                  />
-                </Card>
-              </div>
+            <button
+              onClick={() => setGuardiolaView('anomalies')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === 'anomalies'
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">🚨 Anomalie</span>
+              {activeAnomaliesCount > 0 && (
+                <Badge variant="danger" className="animate-pulse-glow">
+                  {activeAnomaliesCount}
+                </Badge>
+              )}
+            </button>
 
-              {/* Colonna Destra: Registrazione Rapida e Log */}
-              <div className="space-y-6">
-                <Card title="Registrazione Rapida (Senza Prenotazione)" accent="orange">
-                  {currentRole === 'PREPOSTO' ? (
-                    <p className="text-xs text-gray-400 italic text-center py-4">
-                      Funzione riservata alla sola Guardiola.
-                    </p>
-                  ) : (
-                    <form onSubmit={handleRegisterManualArrival} className="space-y-3 text-xs font-sans">
-                      <Select
-                        label="Vettore Selezionato"
-                        options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
-                        value={carriers.find(c => c.id === manualCarrierId)?.name || manualCarrierId}
-                        onChange={(e) => {
-                          const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
-                          if (found) setManualCarrierId(found.id);
-                        }}
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Input
-                            label="Targa Trattore *"
-                            placeholder="AA123BB"
-                            value={manualPlate}
-                            onChange={(e) => setManualPlate(e.target.value.replace(/\s+/g, '').toUpperCase())}
-                            required
-                          />
-                          {isManualPlateDuplicate && (
-                            <span className="text-[9px] text-amber-600 font-bold block leading-tight">
-                              ⚠️ Targa associata ad altro vettore!
-                            </span>
-                          )}
-                        </div>
-                        <Input
-                          label="Targa Rimorchio"
-                          placeholder="CC789DD"
-                          value={manualPlateTrailer}
-                          onChange={(e) => setManualPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          label="Autista *"
-                          placeholder="Luca Verdi"
-                          value={manualDriver}
-                          onChange={(e) => setManualDriver(e.target.value)}
-                          required
-                        />
-                        <Input
-                          label="Posti Pallet"
-                          type="number"
-                          placeholder="33"
-                          value={manualPallets}
-                          onChange={(e) => setManualPallets(e.target.value === '' ? '' : Number(e.target.value))}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Select
-                          label="Cliente / Uso Baia"
-                          options={[{ value: '', label: 'Nessuno specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
-                          value={bayUsages.find(u => u.id === manualClientUsageId)?.name || manualClientUsageId}
-                          onChange={(e) => {
-                            const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
-                            setManualClientUsageId(found ? found.id : e.target.value);
-                          }}
-                        />
-                        <Input
-                          label="Telefono"
-                          placeholder="3331234567"
-                          value={manualPhone}
-                          onChange={(e) => setManualPhone(e.target.value)}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          label="Rif. Carico 1 *"
-                          placeholder="Es. ORD-12345"
-                          value={manualOrderNumber}
-                          onChange={(e) => setManualOrderNumber(e.target.value)}
-                          required
-                        />
-                        <Input
-                          label="Rif. Carico 2"
-                          placeholder="Es. ORD-54321"
-                          value={manualOrderNumber2}
-                          onChange={(e) => setManualOrderNumber2(e.target.value)}
-                        />
-                      </div>
-                      <div className="grid grid-cols-3 gap-1">
-                        <Input
-                          label="Patente N."
-                          placeholder="U1928"
-                          value={manualDriverLicense}
-                          onChange={(e) => setManualDriverLicense(e.target.value)}
-                        />
-                        <Input
-                          label="Rilascio"
-                          type="date"
-                          value={manualDriverLicenseRelease}
-                          onChange={(e) => setManualDriverLicenseRelease(e.target.value)}
-                        />
-                        <div className="space-y-1">
-                          <Input
-                            label="Scadenza"
-                            type="date"
-                            value={manualDriverLicenseExpiry}
-                            onChange={(e) => setManualDriverLicenseExpiry(e.target.value)}
-                          />
-                          {isManualLicenseExpired && (
-                            <span className="text-[8px] text-red-600 font-bold block leading-tight animate-pulse-glow">
-                              ⚠️ SCADUTA!
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <Select
-                        label="Attività Richiesta"
-                        options={activityTypes.map(act => ({ value: act.code, label: act.name }))}
-                        value={activityTypes.find(a => a.code === manualActivityCode)?.name || manualActivityCode}
-                        onChange={(e) => {
-                          const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
-                          if (found) setManualActivityCode(found.code);
-                        }}
-                      />
-                      <Input
-                        label="Note di Ingresso"
-                        placeholder="Sigilli, anomalie, Bio..."
-                        value={manualNotes}
-                        onChange={(e) => setManualNotes(e.target.value)}
-                      />
-                      <Button type="submit" className="w-full">
-                        Esegui Check-In
-                      </Button>
-                    </form>
-                  )}
-                </Card>
-
-                <Card title="Registro Log Operazioni">
-                  <div className="space-y-2 max-h-[200px] overflow-y-auto font-mono text-[11px] pr-2">
-                    {activeLogs.length === 0 ? (
-                      <div className="text-ticket-muted text-center py-4">// NESSUN LOG REGISTRATO</div>
-                    ) : (
-                      activeLogs.map((log) => (
-                        <div key={log.id} className="border-b border-black/5 pb-2">
-                          <div className="flex justify-between text-[10px] text-ticket-muted">
-                            <span>{new Date(log.timestamp).toLocaleTimeString('it-IT')}</span>
-                            <span className={
-                              log.type === 'SUCCESS' ? 'text-emerald-600' :
-                              log.type === 'WARNING' ? 'text-rose-500' : 'text-[#11BCEC]'
-                            }>
-                              [{log.type}]
-                            </span>
-                          </div>
-                          <div className="text-black mt-0.5">{log.message}</div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </Card>
-              </div>
-
+            <div className="pt-4 border-t border-black/5 mt-4">
+              <label className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1.5 px-1">Filtra per Data:</label>
+              <input
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => {
+                  setScheduleDate(e.target.value);
+                  setCurrentYear(new Date(e.target.value).getFullYear());
+                  setCurrentMonth(new Date(e.target.value).getMonth());
+                }}
+                className="w-full bg-white border border-black/10 font-mono text-xs px-2 py-1.5 rounded-lg shadow-2xs focus:ring-0 focus:outline-none"
+              />
             </div>
-          </>
-        )}
+          </div>
 
-        {/* --- VISTA: TABELLONE PROGRAMMAZIONE --- */}
-        {activeSubTab === 'schedule' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            <div className="lg:col-span-1">
-              <Card title="Calendario Attività Mensile" accent="orange">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center border-b border-black/5 pb-2">
-                    <button
-                      onClick={() => {
-                        if (currentMonth === 0) {
-                          setCurrentMonth(11);
-                          setCurrentYear(prev => prev - 1);
-                        } else {
-                          setCurrentMonth(prev => prev - 1);
-                        }
-                      }}
-                      className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
-                    >
-                      ◀
-                    </button>
-                    <span className="font-bold text-xs uppercase font-mono tracking-wider">
-                      {monthsNames[currentMonth]} {currentYear}
-                    </span>
-                    <button
-                      onClick={() => {
-                        if (currentMonth === 11) {
-                          setCurrentMonth(0);
-                          setCurrentYear(prev => prev + 1);
-                        } else {
-                          setCurrentMonth(prev => prev + 1);
-                        }
-                      }}
-                      className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
-                    >
-                      ▶
-                    </button>
-                  </div>
+          {/* Area Contenuto (Destra) */}
+          <div className="lg:col-span-4">
+            
+            {/* VISTA: STATO BAIE */}
+            {guardiolaView === 'bays' && (
+              <Card
+                title="Stato Occupazione Baie Carico/Scarico"
+                accent="orange"
+                headerAction={
+                  warehouseModules.filter((m) => m.depotId === selectedDepotId).length > 0 ? (
+                    <div className="flex items-center gap-2 font-mono text-[10px] text-black">
+                      <span>Filtro Sezione:</span>
+                      <select
+                        value={selectedModuleFilter}
+                        onChange={(e) => setSelectedModuleFilter(e.target.value)}
+                        className="bg-white border border-black/10 text-[9px] font-mono px-2 py-1 rounded focus:outline-none"
+                      >
+                        <option value="">Tutti i moduli</option>
+                        {warehouseModules.filter((m) => m.depotId === selectedDepotId).map(m => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : undefined
+                }
+              >
+                {filteredBays.length === 0 ? (
+                  <p className="text-center py-6 text-xs text-gray-500 font-mono">Nessuna baia configurata.</p>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {filteredBays.map((bay) => {
+                      const activeBooking = activeBookings.find(
+                        (b) => b.status === 'IN_BAIA' && b.bayId === bay.id
+                      );
+                      const carrierName = activeBooking
+                        ? carriers.find((c) => c.id === activeBooking.carrierId)?.name
+                        : '';
+                      const moduleName = warehouseModules.find(m => m.id === bay.moduleId)?.name || 'Generico';
+                      const activeUsage = bayUsages.find(u => u.id === bay.bayUsageId);
 
-                  <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px] text-gray-400 font-bold border-b border-black/5 pb-1">
-                    <span>LUN</span><span>MAR</span><span>MER</span><span>GIO</span><span>VEN</span><span>SAB</span><span>DOM</span>
-                  </div>
+                      let isTimeoutSforato = false;
+                      let elapsedMinutes = 0;
+                      let timeLimit = 0;
 
-                  <div className="grid grid-cols-7 gap-1 font-mono text-xs">
-                    {calendarDays.map((day, index) => {
-                      if (day === null) {
-                        return <div key={`empty-${index}`} className="h-8" />;
-                      }
-
-                      const dateStr = formatDateString(currentYear, currentMonth, day);
-                      const isSelected = dateStr === scheduleDate;
-                      
-                      const dayBookingsList = activeBookings.filter(b => b.date === dateStr);
-                      const hasBookings = dayBookingsList.length > 0;
-                      const allDone = hasBookings && dayBookingsList.every(b => b.status === 'COMPLETATO' || b.status === 'ANNULLATO');
-
-                      let dayBgClass = 'bg-white border border-black/5 hover:border-black/20 text-gray-700';
-                      if (hasBookings) {
-                        if (allDone) {
-                          dayBgClass = 'bg-emerald-100 border border-emerald-300 text-emerald-800 hover:bg-emerald-200';
-                        } else {
-                          dayBgClass = 'bg-[#11BCEC]/20 border border-[#11BCEC]/40 text-[#004B97] hover:bg-[#11BCEC]/30';
+                      if (activeBooking && activeBooking.timeInBay) {
+                        const actType = activityTypes.find((a) => a.code === activeBooking.activityType);
+                        const base = actType?.baseDurationMinutes ?? 20;
+                        const perPlt = actType?.minutesPerPallet ?? 1.5;
+                        const plts = activeBooking.palletPlaces ?? 0;
+                        timeLimit = base + (plts * perPlt);
+                        elapsedMinutes = Math.floor((Date.now() - new Date(activeBooking.timeInBay).getTime()) / 60000);
+                        if (elapsedMinutes > timeLimit) {
+                          isTimeoutSforato = true;
                         }
                       }
 
-                      if (isSelected) {
-                        dayBgClass += ' ring-2 ring-ticket-accent font-black scale-105 shadow-xs';
+                      const isModified = activeBooking?.isEditedInBay;
+                      const isChecklistFailed = activeBooking?.checklist?.isFailed;
+
+                      let bayBorderColor = 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-400';
+                      if (isChecklistFailed) {
+                        bayBorderColor = 'border-rose-500 border-[3px] bg-rose-50/30 hover:border-rose-600 ring-4 ring-rose-500/10 shadow-md animate-pulse-glow';
+                      } else if (isTimeoutSforato) {
+                        bayBorderColor = 'border-red-600 border-[3px] bg-red-50/30 hover:border-red-700 shadow-md animate-pulse-glow';
+                      } else if (isModified) {
+                        bayBorderColor = 'border-amber-500 border-[3px] border-dashed bg-amber-50/40 hover:border-amber-600 ring-4 ring-amber-500/10 shadow-md';
+                      } else if (bay.status === 'OCCUPATA') {
+                        bayBorderColor = 'border-[#11BCEC]/30 bg-[#11BCEC]/5 hover:border-[#11BCEC] shadow-2xs';
+                      } else if (bay.status === 'MANUTENZIONE') {
+                        bayBorderColor = 'border-red-200 bg-red-50/30 hover:border-red-400';
                       }
 
                       return (
-                        <button
-                          key={`day-${day}`}
-                          onClick={() => setScheduleDate(dateStr)}
-                          className={`h-8 rounded-lg flex flex-col items-center justify-center transition-all cursor-pointer ${dayBgClass}`}
+                        <div
+                          key={bay.id}
+                          onClick={() => activeBooking && handleOpenBayDetail(bay, activeBooking)}
+                          className={`border rounded-xl p-4 transition-all duration-200 flex flex-col justify-between min-h-[190px] cursor-pointer ${bayBorderColor}`}
                         >
-                          <span className="text-[11px] font-bold">{day}</span>
-                          {hasBookings && (
-                            <span className="text-[7px] leading-none mt-0.5 opacity-80">
-                              {dayBookingsList.length} v.
-                            </span>
+                          <div className="flex justify-between items-center border-b border-black/5 pb-2">
+                            <div>
+                              <span className="font-mono font-bold text-sm text-black block">{bay.name}</span>
+                              <span className="text-[8px] font-mono text-gray-400 uppercase">Sez: {moduleName}</span>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              <Badge
+                                variant={
+                                  isChecklistFailed ? 'danger' :
+                                  isTimeoutSforato ? 'danger' :
+                                  bay.status === 'DISPONIBILE' ? 'success' :
+                                  bay.status === 'OCCUPATA' ? 'primary' : 'danger'
+                                }
+                              >
+                                {isChecklistFailed ? 'Bloccato Qualità' :
+                                 isTimeoutSforato ? 'TEMPO SCADUTO' :
+                                 bay.status === 'DISPONIBILE' ? 'Libera' :
+                                 bay.status === 'OCCUPATA' ? 'In Uso' : 'Manutenzione'}
+                              </Badge>
+                              {isModified && !isChecklistFailed && !isTimeoutSforato && (
+                                <span className="text-[8px] font-bold text-amber-600 bg-amber-100 border border-amber-300 px-1 rounded">
+                                  ⚠️ MODIFICATO
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="py-2 flex-grow">
+                            {bay.status === 'OCCUPATA' && activeBooking ? (
+                              <div className="font-mono text-[10px] space-y-0.5">
+                                <div className="flex justify-between">
+                                  <span className="text-ticket-muted">Trattore:</span>
+                                  <span className="font-bold text-black">{activeBooking.licensePlate}</span>
+                                </div>
+                                {activeBooking.licensePlateTrailer && (
+                                  <div className="flex justify-between">
+                                    <span className="text-ticket-muted">Rimorchio:</span>
+                                    <span className="font-bold text-black">{activeBooking.licensePlateTrailer}</span>
+                                  </div>
+                                )}
+                                <div className="flex justify-between">
+                                  <span className="text-ticket-muted">Vettore:</span>
+                                  <span className="truncate max-w-[150px] text-right font-bold text-gray-700">{carrierName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-ticket-muted">Attività:</span>
+                                  <span className="font-bold">{activeBooking.activityType} ({activeBooking.palletPlaces ?? 0} PL)</span>
+                                </div>
+                                {activeBooking.orderNumber && (
+                                  <div className="flex justify-between">
+                                    <span className="text-ticket-muted">Ord. 1:</span>
+                                    <span className="font-bold text-gray-600 truncate max-w-[120px]">{activeBooking.orderNumber}</span>
+                                  </div>
+                                )}
+                                {isTimeoutSforato && (
+                                  <div className="text-[8px] font-bold text-red-600 bg-red-100 border border-red-300 rounded p-1 text-center mt-1 animate-pulse-glow">
+                                    🚨 SFORATO DI {elapsedMinutes - timeLimit} MIN (Prev: {timeLimit}m, Sosta: {elapsedMinutes}m)
+                                  </div>
+                                )}
+                              </div>
+                            ) : bay.status === 'MANUTENZIONE' ? (
+                              <div className="text-center py-4 text-xs font-mono text-red-500 font-bold">
+                                // IN MANUTENZIONE
+                              </div>
+                            ) : (
+                              <div className="text-center py-3 space-y-1">
+                                <div className="text-xs font-mono text-emerald-600 font-bold">// PRONTA</div>
+                                <div className="text-[8px] font-mono text-gray-400 uppercase">Uso: {activeUsage?.name || 'Generico'}</div>
+                              </div>
+                            )}
+                          </div>
+
+                          {bay.status === 'OCCUPATA' ? (
+                            <div className="text-[9px] text-center text-ticket-muted font-sans border-t border-black/5 pt-1.5 mt-1">
+                              {currentRole === 'PREPOSTO' ? 'Dettagli & Checklist ➔' : 'Gestisci Rampa ➔'}
+                            </div>
+                          ) : (
+                            <div className="h-4" />
                           )}
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
+                )}
+              </Card>
+            )}
 
-                  <div className="pt-4 border-t border-black/5 flex justify-between text-[8px] font-mono text-gray-400">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2.5 h-2.5 rounded bg-[#11BCEC]/20 border border-[#11BCEC]/40" />
-                      <span>Attività Attive</span>
+            {/* VISTA: CODA PIAZZALE */}
+            {guardiolaView === 'gate' && (
+              <Card title="Coda Check-In al Cancello (Attesa Assegnazione Baia)">
+                <Table
+                  data={gateBookings}
+                  emptyMessage="Nessun camion registrato al cancello in attesa di rampa."
+                  columns={[
+                    {
+                      header: 'Triage Ticket',
+                      accessor: (b) => {
+                        const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
+                        const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
+                        return (
+                          <div className="flex flex-col items-center gap-1.5">
+                            {renderTriageTicket(b.ticketNumber)}
+                            {isIncomplete && (
+                              <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
+                                ⚠️ Incompleto
+                              </span>
+                            )}
+                            {isExpired && (
+                              <span className="text-[8px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
+                                ⚠️ SCADUTA
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+                    },
+                    {
+                      header: 'Vettore / Veicolo',
+                      accessor: (b) => {
+                        const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                        const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                        return (
+                          <div className="text-xs font-sans">
+                            <div className="font-bold text-black">{cName}</div>
+                            <div className="font-mono text-ticket-accent mt-0.5">
+                              TR: {b.licensePlate} {b.licensePlateTrailer && `/ RIM: ${b.licensePlateTrailer}`}
+                            </div>
+                            <div className="text-[10px] text-gray-500 font-bold mt-0.5">Conduttore: {b.driverName}</div>
+                            <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso Richiesto: {usageName}</div>
+                          </div>
+                        );
+                      }
+                    },
+                    {
+                      header: 'Dettagli',
+                      accessor: (b) => (
+                        <div className="text-xs max-w-[200px]">
+                          {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
+                          {b.orderNumber && <div className="text-[9px] font-mono text-gray-600 mt-1">Ord. 1: {b.orderNumber} {b.orderNumber2 && `| Ord. 2: ${b.orderNumber2}`}</div>}
+                          {b.driverPhone && <div className="text-[10px] font-mono text-gray-400 mt-0.5">Tel: {b.driverPhone}</div>}
+                          {b.notes && <div className="text-[10px] italic text-amber-600 truncate mt-0.5">{b.notes}</div>}
+                        </div>
+                      )
+                    },
+                    {
+                      header: 'Assegna Baia',
+                      accessor: (b) => {
+                        const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
+                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+
+                        const sortedBays = [...availableBays].sort((bayA, bayB) => {
+                          const matchA = b.clientUsageId && bayA.bayUsageId === b.clientUsageId ? 1 : 0;
+                          const matchB = b.clientUsageId && bayB.bayUsageId === b.clientUsageId ? 1 : 0;
+                          return matchB - matchA;
+                        });
+
+                        return (
+                          <div className="flex space-x-2">
+                            <select
+                              value={tempBayAssignment[b.id] || ''}
+                              onChange={(e) =>
+                                setTempBayAssignment((prev) => ({ ...prev, [b.id]: e.target.value }))
+                              }
+                              disabled={!isGuard}
+                              className="bg-white border border-black/10 text-xs text-black font-mono p-1.5 rounded-lg focus:ring-0 focus:outline-none cursor-pointer disabled:opacity-50"
+                            >
+                              <option value="">Seleziona baia...</option>
+                              {sortedBays.map((bay) => {
+                                const isRecommended = b.clientUsageId && bay.bayUsageId === b.clientUsageId;
+                                const usageName = bayUsages.find(u => u.id === bay.bayUsageId)?.name || 'Generica';
+                                return (
+                                  <option key={bay.id} value={bay.id} className={isRecommended ? 'font-bold text-emerald-600' : ''}>
+                                    {isRecommended ? `⭐ [CONSIGLIATA - ${usageName}] ` : ''}{bay.name}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <Button
+                              size="sm"
+                              variant="warning"
+                              onClick={() => handleAssignBay(b.id)}
+                              disabled={!tempBayAssignment[b.id] || !isGuard}
+                            >
+                              Fai Entrare
+                            </Button>
+                          </div>
+                        );
+                      },
+                    },
+                  ]}
+                />
+              </Card>
+            )}
+
+            {/* VISTA: MEZZI IN ARRIVO ATTESI OGGI */}
+            {guardiolaView === 'expected' && (
+              <Card title="Prenotazioni Slot Attese per Oggi (Attesa Arrivo)">
+                <Table
+                  data={incomingBookings}
+                  emptyMessage="Nessun transito prenotato online in attesa per oggi."
+                  columns={[
+                    {
+                      header: 'Ticket',
+                      accessor: (b) => {
+                        const isIncomplete = !b.orderNumber || !b.driverLicense || !b.driverLicenseRelease || !b.driverLicenseExpiry || !b.clientUsageId;
+                        const isExpired = b.driverLicenseExpiry && new Date(b.driverLicenseExpiry) < new Date();
+                        return (
+                          <div className="flex flex-col items-center gap-1.5">
+                            {renderTriageTicket(b.ticketNumber)}
+                            {isIncomplete && (
+                              <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
+                                ⚠️ Incompleto
+                              </span>
+                            )}
+                            {isExpired && (
+                              <span className="text-[8px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
+                                ⚠️ SCADUTA
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+                    },
+                    {
+                      header: 'Dettagli Richiesta',
+                      accessor: (b) => {
+                        const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
+                        const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                        return (
+                          <div className="text-xs">
+                            <div className="font-bold text-black">{cName}</div>
+                            <div className="font-mono text-gray-500 mt-0.5">
+                              TR: {b.licensePlate} {b.licensePlateTrailer && `/ RIM: ${b.licensePlateTrailer}`} ({b.driverName})
+                            </div>
+                            <div className="text-[9px] text-gray-400 font-mono mt-0.5">Uso/Cliente: {usageName}</div>
+                          </div>
+                        );
+                      }
+                    },
+                    {
+                      header: 'Attività / Sped.',
+                      accessor: (b) => (
+                        <div className="text-xs font-mono">
+                          <Badge variant="info">{b.activityType}</Badge>
+                          {b.orderNumber && <div className="text-[9px] mt-1 text-gray-600">Ord 1: {b.orderNumber} {b.orderNumber2 && `| Ord 2: ${b.orderNumber2}`}</div>}
+                        </div>
+                      ),
+                    },
+                    {
+                      header: 'Check-In',
+                      accessor: (b) => {
+                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+                        return (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            disabled={!isGuard}
+                            onClick={() => handleOpenCheckInModal(b)}
+                          >
+                            Check-In Cancello
+                          </Button>
+                        );
+                      },
+                    },
+                  ]}
+                />
+              </Card>
+            )}
+
+            {/* VISTA: NUOVO ARRIVO RAPIDO */}
+            {guardiolaView === 'rapid' && (
+              <Card title="Registrazione Rapida Nuovo Arrivo (Senza Prenotazione)" accent="orange">
+                {currentRole === 'PREPOSTO' ? (
+                  <p className="text-xs text-gray-400 italic text-center py-4">
+                    Funzione riservata alla sola Guardiola.
+                  </p>
+                ) : (
+                  <form onSubmit={handleRegisterManualArrival} className="space-y-4 text-xs font-sans max-w-xl mx-auto p-2 bg-gray-50/50 rounded-xl">
+                    <Select
+                      label="Vettore Selezionato *"
+                      options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
+                      value={carriers.find(c => c.id === manualCarrierId)?.name || manualCarrierId}
+                      onChange={(e) => {
+                        const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
+                        if (found) setManualCarrierId(found.id);
+                      }}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <Input
+                          label="Targa Trattore *"
+                          placeholder="AA123BB"
+                          value={manualPlate}
+                          onChange={(e) => setManualPlate(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                          required
+                        />
+                        {isManualPlateDuplicate && (
+                          <span className="text-[10px] text-amber-600 font-bold block leading-tight">
+                            ⚠️ Targa associata ad altro vettore!
+                          </span>
+                        )}
+                      </div>
+                      <Input
+                        label="Targa Rimorchio"
+                        placeholder="CC789DD"
+                        value={manualPlateTrailer}
+                        onChange={(e) => setManualPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                      />
                     </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2.5 h-2.5 rounded bg-emerald-100 border border-emerald-300" />
-                      <span>Completato</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        label="Nominativo Autista *"
+                        placeholder="Luca Verdi"
+                        value={manualDriver}
+                        onChange={(e) => setManualDriver(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Posti Pallet *"
+                        type="number"
+                        placeholder="33"
+                        value={manualPallets}
+                        onChange={(e) => setManualPallets(e.target.value === '' ? '' : Number(e.target.value))}
+                        required
+                      />
                     </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-2.5 h-2.5 rounded bg-white border border-black/5" />
-                      <span>Nessuna</span>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Select
+                        label="Riferimento Cliente / Uso Baia"
+                        options={[{ value: '', label: 'Nessuno specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
+                        value={bayUsages.find(u => u.id === manualClientUsageId)?.name || manualClientUsageId}
+                        onChange={(e) => {
+                          const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
+                          setManualClientUsageId(found ? found.id : e.target.value);
+                        }}
+                      />
+                      <Input
+                        label="Telefono Autista"
+                        placeholder="3331234567"
+                        value={manualPhone}
+                        onChange={(e) => setManualPhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        label="Rif. Carico 1 (Obbligatorio) *"
+                        placeholder="Es. ORD-12345"
+                        value={manualOrderNumber}
+                        onChange={(e) => setManualOrderNumber(e.target.value)}
+                        required
+                      />
+                      <Input
+                        label="Rif. Carico 2 (Facoltativo)"
+                        placeholder="Es. ORD-54321"
+                        value={manualOrderNumber2}
+                        onChange={(e) => setManualOrderNumber2(e.target.value)}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        label="Patente N."
+                        placeholder="U1928"
+                        value={manualDriverLicense}
+                        onChange={(e) => setManualDriverLicense(e.target.value)}
+                      />
+                      <Input
+                        label="Data Rilascio"
+                        type="date"
+                        value={manualDriverLicenseRelease}
+                        onChange={(e) => setManualDriverLicenseRelease(e.target.value)}
+                      />
+                      <div className="space-y-1">
+                        <Input
+                          label="Data Scadenza"
+                          type="date"
+                          value={manualDriverLicenseExpiry}
+                          onChange={(e) => setManualDriverLicenseExpiry(e.target.value)}
+                        />
+                        {isManualLicenseExpired && (
+                          <span className="text-[9px] text-red-600 font-bold block leading-tight animate-pulse-glow">
+                            ⚠️ SCADUTA!
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <Select
+                      label="Attività Richiesta"
+                      options={activityTypes.map(act => ({ value: act.code, label: act.name }))}
+                      value={activityTypes.find(a => a.code === manualActivityCode)?.name || manualActivityCode}
+                      onChange={(e) => {
+                        const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
+                        if (found) setManualActivityCode(found.code);
+                      }}
+                    />
+                    <Input
+                      label="Note di Ingresso"
+                      placeholder="Sigilli, anomalie, Bio..."
+                      value={manualNotes}
+                      onChange={(e) => setManualNotes(e.target.value)}
+                    />
+                    <Button type="submit" className="w-full">
+                      Esegui Check-In & Inserisci in Coda
+                    </Button>
+                  </form>
+                )}
+              </Card>
+            )}
+
+            {/* VISTA: TABELLONE & CALENDARIO */}
+            {guardiolaView === 'schedule' && (
+              <div className="grid grid-cols-1 gap-6 animate-fade-in">
+                
+                {/* CALENDARIO */}
+                <Card title="Calendario Attività Mensile" accent="orange">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center border-b border-black/5 pb-2 font-mono">
+                      <button
+                        onClick={() => {
+                          if (currentMonth === 0) {
+                            setCurrentMonth(11);
+                            setCurrentYear(prev => prev - 1);
+                          } else {
+                            setCurrentMonth(prev => prev - 1);
+                          }
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
+                      >
+                        ◀
+                      </button>
+                      <span className="font-bold text-xs uppercase tracking-wider">
+                        {monthsNames[currentMonth]} {currentYear}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (currentMonth === 11) {
+                            setCurrentMonth(0);
+                            setCurrentYear(prev => prev + 1);
+                          } else {
+                            setCurrentMonth(prev => prev + 1);
+                          }
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
+                      >
+                        ▶
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 text-center font-mono text-[9px] text-gray-400 font-bold border-b border-black/5 pb-1">
+                      <span>LUN</span><span>MAR</span><span>MER</span><span>GIO</span><span>VEN</span><span>SAB</span><span>DOM</span>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1 font-mono text-xs">
+                      {calendarDays.map((day, index) => {
+                        if (day === null) {
+                          return <div key={`empty-${index}`} className="h-8" />;
+                        }
+
+                        const dateStr = formatDateString(currentYear, currentMonth, day);
+                        const isSelected = dateStr === scheduleDate;
+                        
+                        const dayBookingsList = activeBookings.filter(b => b.date === dateStr);
+                        const hasBookings = dayBookingsList.length > 0;
+                        const allDone = hasBookings && dayBookingsList.every(b => b.status === 'COMPLETATO' || b.status === 'ANNULLATO');
+
+                        let dayBgClass = 'bg-white border border-black/5 hover:border-black/20 text-gray-700';
+                        if (hasBookings) {
+                          if (allDone) {
+                            dayBgClass = 'bg-emerald-100 border border-emerald-300 text-emerald-800 hover:bg-emerald-200';
+                          } else {
+                            dayBgClass = 'bg-[#11BCEC]/20 border border-[#11BCEC]/40 text-[#004B97] hover:bg-[#11BCEC]/30';
+                          }
+                        }
+
+                        if (isSelected) {
+                          dayBgClass += ' ring-2 ring-ticket-accent font-black scale-105 shadow-xs';
+                        }
+
+                        return (
+                          <button
+                            key={`day-${day}`}
+                            onClick={() => setScheduleDate(dateStr)}
+                            className={`h-8 rounded-lg flex flex-col items-center justify-center transition-all cursor-pointer ${dayBgClass}`}
+                          >
+                            <span className="text-[11px] font-bold">{day}</span>
+                            {hasBookings && (
+                              <span className="text-[7px] leading-none mt-0.5 opacity-80">
+                                {dayBookingsList.length} v.
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
+                </Card>
 
-                </div>
-              </Card>
-            </div>
-
-            {/* TABELLONE GIORNALIERO */}
-            <div className="lg:col-span-2">
-              <Card title={`Programmazione Attività del Cantiere - Giorno: ${scheduleDate}`}>
-                <div className="space-y-4">
-                  <p className="text-xs text-gray-500 font-sans">
-                    Elenco di tutti i transiti programmati. Le righe che presentano dati anagrafici non completati (es. patente o ordine) o patenti scadute mostrano un badge di attenzione.
-                  </p>
+                {/* TABELLONE */}
+                <Card title={`Programmazione Attività del Cantiere - Giorno: ${scheduleDate}`}>
                   <Table
                     data={dayBookings}
                     emptyMessage="Nessun transito pianificato o registrato per questa data."
@@ -1340,81 +1356,83 @@ export const MonitorYard: React.FC = () => {
                       }
                     ]}
                   />
-                </div>
-              </Card>
-            </div>
-          </div>
-        )}
+                </Card>
+              </div>
+            )}
 
-        {/* --- VISTA: ANOMALIE PLANT --- */}
-        {activeSubTab === 'anomalies' && (
-          <Card title={`Gestione Anomalie e Problematiche - Plant: ${activeDepot?.name}`}>
-            <p className="text-xs text-ticket-muted mb-4 font-mono uppercase">
-              // LOG ATTIVI DI ACCESSO AL CANTIERE CHE RICHIEDONO VERIFICHE O DEROGHE
-            </p>
-            <Table
-              data={anomalies.filter(a => a.depotId === selectedDepotId)}
-              emptyMessage="Nessun allarme o anomalia registrata per questo stabilimento."
-              rowClassName={(a) => a.resolved ? 'opacity-65 bg-gray-50/50' : 'bg-rose-50/20 border-l-4 border-rose-500'}
-              columns={[
-                {
-                  header: 'Data / Ora',
-                  accessor: (a) => <span className="font-mono text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</span>
-                },
-                {
-                  header: 'Ticket / Targa',
-                  accessor: (a) => (
-                    <div className="font-mono text-xs">
-                      {a.licensePlate && <div>Targa: <span className="font-bold">{a.licensePlate}</span></div>}
-                      {a.ticketNumber && <div className="text-[10px] text-gray-400">Ticket: {a.ticketNumber}</div>}
-                    </div>
-                  )
-                },
-                {
-                  header: 'Tipologia',
-                  accessor: (a) => {
-                    let color: 'danger' | 'warning' | 'info' | 'primary' = 'danger';
-                    if (a.type === 'TARGA_DUPLICATA') color = 'warning';
-                    if (a.type === 'SFORAMENTO_TEMPO') color = 'primary';
-                    return <Badge variant={color}>{a.type.replace('_', ' ')}</Badge>;
-                  }
-                },
-                {
-                  header: 'Descrizione Problema',
-                  accessor: (a) => <p className="text-xs max-w-[300px] font-medium">{a.message}</p>
-                },
-                {
-                  header: 'Stato / Risoluzione',
-                  accessor: (a) => {
-                    if (a.resolved) {
-                      return (
-                        <div className="text-[10px] font-sans text-emerald-800 bg-emerald-50 border border-emerald-200 p-2 rounded-lg">
-                          <span className="font-bold">Risolta da:</span> {a.resolvedBy}
-                          <div className="italic mt-0.5">Note: "{a.resolutionNotes}"</div>
+            {/* VISTA: ANOMALIE PLANT */}
+            {guardiolaView === 'anomalies' && (
+              <Card title={`Gestione Anomalie e Problematiche - Plant: ${activeDepot?.name}`}>
+                <p className="text-xs text-ticket-muted mb-4 font-mono uppercase">
+                  // LOG ATTIVI DI ACCESSO AL CANTIERE CHE RICHIEDONO VERIFICHE O DEROGHE
+                </p>
+                <Table
+                  data={anomalies.filter(a => a.depotId === selectedDepotId)}
+                  emptyMessage="Nessun allarme o anomalia registrata per questo stabilimento."
+                  rowClassName={(a) => a.resolved ? 'opacity-65 bg-gray-50/50' : 'bg-rose-50/20 border-l-4 border-rose-500'}
+                  columns={[
+                    {
+                      header: 'Data / Ora',
+                      accessor: (a) => <span className="font-mono text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</span>
+                    },
+                    {
+                      header: 'Ticket / Targa',
+                      accessor: (a) => (
+                        <div className="font-mono text-xs">
+                          {a.licensePlate && <div>Targa: <span className="font-bold">{a.licensePlate}</span></div>}
+                          {a.ticketNumber && <div className="text-[10px] text-gray-400">Ticket: {a.ticketNumber}</div>}
                         </div>
-                      );
+                      )
+                    },
+                    {
+                      header: 'Tipologia',
+                      accessor: (a) => {
+                        let color: 'danger' | 'warning' | 'info' | 'primary' = 'danger';
+                        if (a.type === 'TARGA_DUPLICATA') color = 'warning';
+                        if (a.type === 'SFORAMENTO_TEMPO') color = 'primary';
+                        return <Badge variant={color}>{a.type.replace('_', ' ')}</Badge>;
+                      }
+                    },
+                    {
+                      header: 'Descrizione Problema',
+                      accessor: (a) => <p className="text-xs max-w-[300px] font-medium">{a.message}</p>
+                    },
+                    {
+                      header: 'Stato / Risoluzione',
+                      accessor: (a) => {
+                        if (a.resolved) {
+                          return (
+                            <div className="text-[10px] font-sans text-emerald-800 bg-emerald-50 border border-emerald-200 p-2 rounded-lg">
+                              <span className="font-bold">Risolta da:</span> {a.resolvedBy}
+                              <div className="italic mt-0.5">Note: "{a.resolutionNotes}"</div>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="danger">ATTIVA</Badge>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                setActiveResolveAnomalyId(a.id);
+                                setResolveNotes('');
+                              }}
+                            >
+                              Giustifica e Risolvi
+                            </Button>
+                          </div>
+                        );
+                      }
                     }
-                    return (
-                      <div className="flex flex-col gap-1">
-                        <Badge variant="danger">ATTIVA</Badge>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            setActiveResolveAnomalyId(a.id);
-                            setResolveNotes('');
-                          }}
-                        >
-                          Giustifica e Risolvi
-                        </Button>
-                      </div>
-                    );
-                  }
-                }
-              ]}
-            />
-          </Card>
-        )}
+                  ]}
+                />
+              </Card>
+            )}
+
+          </div>
+
+        </div>
 
       </div>
 
