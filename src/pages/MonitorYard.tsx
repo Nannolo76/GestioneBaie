@@ -903,7 +903,7 @@ export const MonitorYard: React.FC = () => {
                       header: 'Assegna Baia',
                       accessor: (b) => {
                         const availableBays = activeBays.filter((bay) => bay.status === 'DISPONIBILE');
-                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO';
 
                         const sortedBays = [...availableBays].sort((bayA, bayB) => {
                           const matchA = b.clientUsageId && bayA.bayUsageId === b.clientUsageId ? 1 : 0;
@@ -1006,7 +1006,7 @@ export const MonitorYard: React.FC = () => {
                     {
                       header: 'Check-In',
                       accessor: (b) => {
-                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
+                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO';
                         return (
                           <Button
                             size="sm"
@@ -1862,7 +1862,7 @@ export const MonitorYard: React.FC = () => {
                     </Button>
                   </div>
 
-                  {(currentRole === 'GUARDIA' || currentRole === 'ADMIN') && (
+                  {(currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO') && (
                     <div className="space-y-3 pt-3 border-t border-black/5">
                       <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-amber-600 border-b border-black/5 pb-1">
                         Spostamento ad altra Baia Libera
