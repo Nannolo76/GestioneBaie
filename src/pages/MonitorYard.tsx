@@ -1006,7 +1006,7 @@ export const MonitorYard: React.FC = () => {
                     {
                       header: 'Check-In',
                       accessor: (b) => {
-                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO';
+                        const isGuard = currentRole === 'GUARDIA' || currentRole === 'ADMIN';
                         return (
                           <Button
                             size="sm"
