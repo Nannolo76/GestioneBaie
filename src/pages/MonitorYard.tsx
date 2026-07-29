@@ -109,6 +109,7 @@ export const MonitorYard: React.FC = () => {
   const [showChecklistForm, setShowChecklistForm] = useState(false);
   const [pianaleSporco, setPianaleSporco] = useState(false);
   const [presenzaInfestantiMezzo, setPresenzaInfestantiMezzo] = useState(false);
+  const [odoriAnomali, setOdoriAnomali] = useState(false);
   const [puliziaPallet, setPuliziaPallet] = useState(true);
   const [integritaPallet, setIntegritaPallet] = useState(true);
   const [presenzaInfestantiProdotto, setPresenzaInfestantiProdotto] = useState(false);
@@ -344,6 +345,7 @@ export const MonitorYard: React.FC = () => {
     if (booking.checklist) {
       setPianaleSporco(booking.checklist.pianaleSporco);
       setPresenzaInfestantiMezzo(booking.checklist.presenzaInfestantiMezzo);
+      setOdoriAnomali(booking.checklist.odoriAnomali);
       setPuliziaPallet(booking.checklist.puliziaPallet);
       setIntegritaPallet(booking.checklist.integritaPallet);
       setPresenzaInfestantiProdotto(booking.checklist.presenzaInfestantiProdotto);
@@ -356,6 +358,7 @@ export const MonitorYard: React.FC = () => {
     } else {
       setPianaleSporco(false);
       setPresenzaInfestantiMezzo(false);
+      setOdoriAnomali(false);
       setPuliziaPallet(true);
       setIntegritaPallet(true);
       setPresenzaInfestantiProdotto(false);
@@ -400,6 +403,7 @@ export const MonitorYard: React.FC = () => {
     saveQualityChecklist(activeBayDetail.booking.id, {
       pianaleSporco,
       presenzaInfestantiMezzo,
+      odoriAnomali,
       puliziaPallet,
       integritaPallet,
       presenzaInfestantiProdotto,
@@ -502,6 +506,7 @@ export const MonitorYard: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
               <div>Pianale Sporco: [ {printBooking.checklist.pianaleSporco ? 'SI' : 'NO'} ]</div>
               <div>Presenza Infestanti: [ {printBooking.checklist.presenzaInfestantiMezzo ? 'SI' : 'NO'} ]</div>
+              <div>Odori Anomali: [ {printBooking.checklist.odoriAnomali ? 'SI' : 'NO'} ]</div>
             </div>
 
             <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">2. Idoneità Igienica Prodotto & Pallet</h2>
@@ -1905,7 +1910,7 @@ export const MonitorYard: React.FC = () => {
 
                   <div className="space-y-2">
                     <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">1. Idoneità Igienica del Mezzo</span>
-                    <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-lg">
+                    <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-xs">Pianale Sporco?</span>
                         <input
@@ -1921,6 +1926,15 @@ export const MonitorYard: React.FC = () => {
                           type="checkbox"
                           checked={presenzaInfestantiMezzo}
                           onChange={(e) => setPresenzaInfestantiMezzo(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs">Odori Anomali?</span>
+                        <input
+                          type="checkbox"
+                          checked={odoriAnomali}
+                          onChange={(e) => setOdoriAnomali(e.target.checked)}
                           className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
                         />
                       </div>

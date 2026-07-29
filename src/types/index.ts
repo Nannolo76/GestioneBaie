@@ -49,6 +49,7 @@ export interface QualityChecklist {
   // Verifiche Idoneità Mezzo
   pianaleSporco: boolean;
   presenzaInfestantiMezzo: boolean;
+  odoriAnomali: boolean;
   
   // Verifiche Idoneità Prodotto
   puliziaPallet: boolean;

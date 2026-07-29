@@ -63,6 +63,7 @@ interface AppContextType {
     checklistData: {
       pianaleSporco: boolean;
       presenzaInfestantiMezzo: boolean;
+      odoriAnomali: boolean;
       puliziaPallet: boolean;
       integritaPallet: boolean;
       presenzaInfestantiProdotto: boolean;
@@ -785,6 +786,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     checklistData: {
       pianaleSporco: boolean;
       presenzaInfestantiMezzo: boolean;
+      odoriAnomali: boolean;
       puliziaPallet: boolean;
       integritaPallet: boolean;
       presenzaInfestantiProdotto: boolean;
@@ -800,6 +802,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isFailed =
       checklistData.pianaleSporco ||
       checklistData.presenzaInfestantiMezzo ||
+      checklistData.odoriAnomali ||
       !checklistData.puliziaPallet ||
       !checklistData.integritaPallet ||
       checklistData.presenzaInfestantiProdotto ||
@@ -837,6 +840,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const failedList: string[] = [];
         if (checklistData.pianaleSporco) failedList.push('Pianale sporco');
         if (checklistData.presenzaInfestantiMezzo) failedList.push('Infestanti mezzo');
+        if (checklistData.odoriAnomali) failedList.push('Odori anomali');
         if (!checklistData.puliziaPallet) failedList.push('Pallet non puliti');
         if (!checklistData.integritaPallet) failedList.push('Pallet non integri');
         if (checklistData.presenzaInfestantiProdotto) failedList.push('Infestanti prodotto');
