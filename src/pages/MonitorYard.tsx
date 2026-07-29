@@ -1673,7 +1673,7 @@ export const MonitorYard: React.FC = () => {
 
             <div className="p-5 space-y-5 font-sans text-xs">
               
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 border-b border-black/5 pb-4 bg-gray-50/50 p-3 rounded-lg font-mono">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-b border-black/5 pb-4 bg-gray-50/50 p-3 rounded-lg font-mono">
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase">Vettore</span>
                   <span className="font-bold text-black text-xs block truncate">
@@ -1702,6 +1702,18 @@ export const MonitorYard: React.FC = () => {
                   <span className="text-gray-400 block text-[9px] uppercase">Ordini N.</span>
                   <span className="font-bold text-gray-700 text-xs block truncate">
                     {activeBayDetail.booking.orderNumber} {activeBayDetail.booking.orderNumber2 && ` / ${activeBayDetail.booking.orderNumber2}`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[9px] uppercase">Posti Pallet</span>
+                  <span className="font-bold text-black text-xs block font-mono">
+                    {activeBayDetail.booking.palletPlaces !== undefined ? `${activeBayDetail.booking.palletPlaces} PL` : 'N/D'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400 block text-[9px] uppercase">Cliente Committente</span>
+                  <span className="font-bold text-gray-700 text-xs block truncate">
+                    {bayUsages.find(u => u.id === activeBayDetail.booking.clientUsageId)?.name || 'Generico'}
                   </span>
                 </div>
                 <div>
