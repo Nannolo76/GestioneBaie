@@ -626,16 +626,18 @@ export const MonitorYard: React.FC = () => {
               )}
             </button>
 
-            <button
-              onClick={() => setGuardiolaView('rapid')}
-              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
-                guardiolaView === 'rapid'
-                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
-                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
-              }`}
-            >
-              <span className="flex items-center gap-2">✍️ Nuovo Check-In</span>
-            </button>
+            {currentRole !== 'PREPOSTO' && (
+              <button
+                onClick={() => setGuardiolaView('rapid')}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                  guardiolaView === 'rapid'
+                    ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                    : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+                }`}
+              >
+                <span className="flex items-center gap-2">✍️ Nuovo Check-In</span>
+              </button>
+            )}
 
             <button
               onClick={() => setGuardiolaView('schedule')}
