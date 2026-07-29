@@ -128,6 +128,17 @@ export interface Booking {
   orderNumber?: string; // Required reference
   orderNumber2?: string; // Optional reference
   clientUsageId?: string; // Links to BayUsage (Uso Baia / Cliente)
+
+  // Reso Pallet Vuoti & Buono Pallet
+  palletReturns?: PalletReturn[];
+  palletVoucherNumber?: string;
+}
+
+export interface PalletReturn {
+  id: string;
+  palletType: 'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO';
+  quantity: number;
+  condition: 'BUONO' | 'ROTTO';
 }
 
 export interface ActivityLog {

@@ -29,6 +29,9 @@ export const MonitorYard: React.FC = () => {
     resolveChecklistAlert,
     addAnomaly,
     resolveAnomaly,
+    addPalletReturn,
+    removePalletReturn,
+    emitPalletVoucher,
   } = useApp();
 
   // Stato navigazione sottomenu a sinistra (Opzione A)
@@ -89,7 +92,10 @@ export const MonitorYard: React.FC = () => {
 
   // Dettaglio Baia
   const [activeBayDetail, setActiveBayDetail] = useState<{ bay: Bay; booking: Booking } | null>(null);
-  const [modalTab, setModalTab] = useState<'info' | 'checklist' | 'edit' | 'move'>('info');
+  const [modalTab, setModalTab] = useState<'info' | 'checklist' | 'reso' | 'edit' | 'move'>('info');
+  const [palletType, setPalletType] = useState<'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO'>('EPAL');
+  const [palletQuantity, setPalletQuantity] = useState<number | ''>('');
+  const [palletCondition, setPalletCondition] = useState<'BUONO' | 'ROTTO'>('BUONO');
   const [detailPhone, setDetailPhone] = useState('');
   const [detailPallets, setDetailPallets] = useState<number | ''>('');
   const [detailActivity, setDetailActivity] = useState('');
@@ -127,6 +133,7 @@ export const MonitorYard: React.FC = () => {
 
   // Stampa checklist
   const [printBooking, setPrintBooking] = useState<Booking | null>(null);
+  const [printType, setPrintType] = useState<'checklist' | 'voucher'>('checklist');
 
   // Risoluzione Anomalia
   const [activeResolveAnomalyId, setActiveResolveAnomalyId] = useState<string | null>(null);
@@ -343,6 +350,9 @@ export const MonitorYard: React.FC = () => {
     setRelocateBayId('');
     setRelocateReason('');
     setShowChecklistForm(false);
+    setPalletType('EPAL');
+    setPalletQuantity('');
+    setPalletCondition('BUONO');
 
     if (booking.checklist) {
       setPianaleSporco(booking.checklist.pianaleSporco);
@@ -440,6 +450,7 @@ export const MonitorYard: React.FC = () => {
   };
 
   const handlePrintChecklist = (booking: Booking) => {
+    setPrintType('checklist');
     setPrintBooking(booking);
     setTimeout(() => {
       window.print();
@@ -479,76 +490,146 @@ export const MonitorYard: React.FC = () => {
   return (
     <div className="space-y-6 relative font-sans">
       
-      {/* AREA DI STAMPA COPERTA */}
-      {printBooking && printBooking.checklist && (
+      {/* AREA DI STAMPA GENERICA */}
+      {printBooking && (
         <div id="printable-area" className="hidden print:block p-8 bg-white text-black font-sans text-xs space-y-6">
-          <div className="flex justify-between items-center border-b border-black pb-4">
-            <div>
-              <h1 className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</h1>
-              <p className="text-[10px] font-mono">YARD QUALITY ASSURANCE REPORT</p>
-            </div>
-            <div className="border border-black p-2 font-mono text-center font-bold">
-              TICKET TRIAGE: {printBooking.ticketNumber || printBooking.id}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div><strong>Targa Trattore:</strong> {printBooking.licensePlate} {printBooking.licensePlateTrailer && `(Rimorchio: ${printBooking.licensePlateTrailer})`}</div>
-            <div><strong>Autista:</strong> {printBooking.driverName}</div>
-            <div><strong>Vettore:</strong> {carriers.find(c => c.id === printBooking.carrierId)?.name || 'N/D'}</div>
-            <div><strong>Data Attività:</strong> {printBooking.date}</div>
-            <div><strong>Baia di Attracco:</strong> {bays.find(b => b.id === printBooking.bayId)?.name || 'N/D'}</div>
-            <div><strong>Attività:</strong> {printBooking.activityType}</div>
-            <div><strong>Ordine 1:</strong> {printBooking.orderNumber} {printBooking.orderNumber2 && `| Ordine 2: ${printBooking.orderNumber2}`}</div>
-            <div><strong>Patente Autista:</strong> {printBooking.driverLicense || 'N/D'} {printBooking.driverLicenseRelease && `(Ril. ${printBooking.driverLicenseRelease})`} {printBooking.driverLicenseExpiry && `(Scad. ${printBooking.driverLicenseExpiry})`}</div>
-          </div>
-
-          <div className="border border-black rounded p-3 space-y-4">
-            <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">1. Idoneità Igienico-Sanitaria Mezzo</h2>
-            <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
-              <div>Pianale Sporco: [ {printBooking.checklist.pianaleSporco ? 'SI' : 'NO'} ]</div>
-              <div>Presenza Infestanti: [ {printBooking.checklist.presenzaInfestantiMezzo ? 'SI' : 'NO'} ]</div>
-              <div>Odori Anomali: [ {printBooking.checklist.odoriAnomali ? 'SI' : 'NO'} ]</div>
-            </div>
-
-            <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">2. Idoneità Igienica Prodotto & Pallet</h2>
-            <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
-              <div>Pulizia Pallet: [ {printBooking.checklist.puliziaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
-              <div>Integrità Pallet: [ {printBooking.checklist.integritaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
-              <div>Presenza Infestanti Prodotto: [ {printBooking.checklist.presenzaInfestantiProdotto ? 'SI' : 'NO'} ]</div>
-              <div>Prodotti biologici (Bio): [ {printBooking.checklist.presenzaBio ? 'SI' : 'NO'} ]</div>
-            </div>
-            {printBooking.checklist.noteLibere && (
-              <div className="text-[10px] font-sans"><strong>Note Preposto:</strong> {printBooking.checklist.noteLibere}</div>
-            )}
-
-            <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">3. Controllo Sigillo di Sicurezza</h2>
-            <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
-              <div>Sigillo Presente: [ {printBooking.checklist.sigilloPresente ? 'SI' : 'NO'} ]</div>
-              <div>Numero Sigillo: {printBooking.checklist.numeroSigillo || 'N/D'}</div>
-              <div>Corrispondenza DDT: [ {printBooking.checklist.corrispondenzaDdt ? 'SI' : 'NO'} ]</div>
-            </div>
-            {printBooking.checklist.noteSigillo && (
-              <div className="text-[10px] font-sans"><strong>Note Sigillo:</strong> {printBooking.checklist.noteSigillo}</div>
-            )}
-          </div>
-
-          <div className="pt-8 grid grid-cols-2 gap-8 text-center font-mono">
-            <div>
-              <div className="border-b border-black h-12" />
-              <p className="mt-1 text-[10px]">Firma Conducente Mezzo</p>
-            </div>
-            <div>
-              <div className="border-b border-black h-12 flex items-end justify-center pb-1 text-xs">
-                {printBooking.checklist.compilataDa}
+          {printType === 'voucher' ? (
+            /* --- LAYOUT STAMPA BUONO PALLET --- */
+            <div className="space-y-6">
+              <div className="flex justify-between items-center border-b border-black pb-4">
+                <div>
+                  <h1 className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</h1>
+                  <p className="text-[10px] font-mono">BUONO DI RICEVUTA RESO PALLET VUOTI</p>
+                </div>
+                <div className="border border-black p-2 font-mono text-center font-bold">
+                  BUONO N: {printBooking.palletVoucherNumber}
+                </div>
               </div>
-              <p className="mt-1 text-[10px]">Firma Preposto Verificatore ({new Date(printBooking.checklist.dataOraCheck).toLocaleDateString()})</p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div><strong>Targa Trattore:</strong> {printBooking.licensePlate} {printBooking.licensePlateTrailer && `(Rimorchio: ${printBooking.licensePlateTrailer})`}</div>
+                <div><strong>Autista:</strong> {printBooking.driverName}</div>
+                <div><strong>Vettore:</strong> {carriers.find(c => c.id === printBooking.carrierId)?.name || 'N/D'}</div>
+                <div><strong>Data Emissione:</strong> {new Date().toLocaleDateString('it-IT')} {new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}</div>
+                <div><strong>Ticket Viaggio:</strong> {printBooking.ticketNumber || printBooking.id}</div>
+                <div><strong>Rif. Carico/Scarico:</strong> {printBooking.orderNumber} {printBooking.orderNumber2 && ` / ${printBooking.orderNumber2}`}</div>
+              </div>
+
+              <div className="border border-black rounded p-3 space-y-2">
+                <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">Dettagli Pallet Vuoti Consegnati</h2>
+                <table className="w-full text-left border-collapse text-[10px] font-mono">
+                  <thead>
+                    <tr className="border-b border-black text-gray-500">
+                      <th className="py-1">Tipologia Legno</th>
+                      <th className="py-1 text-center">Quantità Resa</th>
+                      <th className="py-1 text-right">Stato / Condizione</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/10">
+                    {printBooking.palletReturns?.map((item) => (
+                      <tr key={item.id}>
+                        <td className="py-1.5 font-bold">{item.palletType}</td>
+                        <td className="py-1.5 text-center font-bold">{item.quantity} PL</td>
+                        <td className="py-1.5 text-right uppercase font-bold">{item.condition === 'BUONO' ? 'BUONO / CONFORME' : 'ROTTO'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="text-[9px] text-gray-600 font-sans italic">
+                * Il presente buono attesta la sola quantità e tipologia di pallet vuoti lasciati a magazzino dall'autista ed ha valore di ricevuta.
+              </p>
+
+              <div className="pt-12 grid grid-cols-2 gap-8 text-center font-mono">
+                <div>
+                  <div className="border-b border-black h-12" />
+                  <p className="mt-1 text-[10px]">Firma Conducente / Autore Reso</p>
+                </div>
+                <div>
+                  <div className="border-b border-black h-12" />
+                  <p className="mt-1 text-[10px]">Firma Operatore / Guardiola Ricevente</p>
+                </div>
+              </div>
+              
+              <div className="text-center pt-8 font-mono text-[8px] text-gray-500">
+                Logistica Uno SpA - Yard Control Systems - Documento Generato Automaticamente
+              </div>
             </div>
-          </div>
-          
-          <div className="text-center pt-8 font-mono text-[8px] text-gray-500">
-            Logistica Uno SpA - Yard Control Systems - Documento Generato Automaticamente
-          </div>
+          ) : (
+            /* --- LAYOUT STAMPA QUALITY ASSURANCE REPORT (Esistente) --- */
+            printBooking.checklist && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center border-b border-black pb-4">
+                  <div>
+                    <h1 className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</h1>
+                    <p className="text-[10px] font-mono">YARD QUALITY ASSURANCE REPORT</p>
+                  </div>
+                  <div className="border border-black p-2 font-mono text-center font-bold">
+                    TICKET TRIAGE: {printBooking.ticketNumber || printBooking.id}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div><strong>Targa Trattore:</strong> {printBooking.licensePlate} {printBooking.licensePlateTrailer && `(Rimorchio: ${printBooking.licensePlateTrailer})`}</div>
+                  <div><strong>Autista:</strong> {printBooking.driverName}</div>
+                  <div><strong>Vettore:</strong> {carriers.find(c => c.id === printBooking.carrierId)?.name || 'N/D'}</div>
+                  <div><strong>Data Attività:</strong> {printBooking.date}</div>
+                  <div><strong>Baia di Attracco:</strong> {bays.find(b => b.id === printBooking.bayId)?.name || 'N/D'}</div>
+                  <div><strong>Attività:</strong> {printBooking.activityType}</div>
+                  <div><strong>Ordine 1:</strong> {printBooking.orderNumber} {printBooking.orderNumber2 && `| Ordine 2: ${printBooking.orderNumber2}`}</div>
+                  <div><strong>Patente Autista:</strong> {printBooking.driverLicense || 'N/D'} {printBooking.driverLicenseRelease && `(Ril. ${printBooking.driverLicenseRelease})`} {printBooking.driverLicenseExpiry && `(Scad. ${printBooking.driverLicenseExpiry})`}</div>
+                </div>
+
+                <div className="border border-black rounded p-3 space-y-4">
+                  <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">1. Idoneità Igienico-Sanitaria Mezzo</h2>
+                  <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+                    <div>Pianale Sporco: [ {printBooking.checklist.pianaleSporco ? 'SI' : 'NO'} ]</div>
+                    <div>Presenza Infestanti: [ {printBooking.checklist.presenzaInfestantiMezzo ? 'SI' : 'NO'} ]</div>
+                    <div>Odori Anomali: [ {printBooking.checklist.odoriAnomali ? 'SI' : 'NO'} ]</div>
+                  </div>
+
+                  <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">2. Idoneità Igienica Prodotto & Pallet</h2>
+                  <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+                    <div>Pulizia Pallet: [ {printBooking.checklist.puliziaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
+                    <div>Integrità Pallet: [ {printBooking.checklist.integritaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
+                    <div>Presenza Infestanti Prodotto: [ {printBooking.checklist.presenzaInfestantiProdotto ? 'SI' : 'NO'} ]</div>
+                    <div>Prodotti biologici (Bio): [ {printBooking.checklist.presenzaBio ? 'SI' : 'NO'} ]</div>
+                  </div>
+                  {printBooking.checklist.noteLibere && (
+                    <div className="text-[10px] font-sans"><strong>Note Preposto:</strong> {printBooking.checklist.noteLibere}</div>
+                  )}
+
+                  <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">3. Controllo Sigillo di Sicurezza</h2>
+                  <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+                    <div>Sigillo Presente: [ {printBooking.checklist.sigilloPresente ? 'SI' : 'NO'} ]</div>
+                    <div>Numero Sigillo: {printBooking.checklist.numeroSigillo || 'N/D'}</div>
+                    <div>Corrispondenza DDT: [ {printBooking.checklist.corrispondenzaDdt ? 'SI' : 'NO'} ]</div>
+                  </div>
+                  {printBooking.checklist.noteSigillo && (
+                    <div className="text-[10px] font-sans"><strong>Note Sigillo:</strong> {printBooking.checklist.noteSigillo}</div>
+                  )}
+                </div>
+
+                <div className="pt-8 grid grid-cols-2 gap-8 text-center font-mono">
+                  <div>
+                    <div className="border-b border-black h-12" />
+                    <p className="mt-1 text-[10px]">Firma Conducente Mezzo</p>
+                  </div>
+                  <div>
+                    <div className="border-b border-black h-12 flex items-end justify-center pb-1 text-xs">
+                      {printBooking.checklist.compilataDa}
+                    </div>
+                    <p className="mt-1 text-[10px]">Firma Preposto Verificatore ({new Date(printBooking.checklist.dataOraCheck).toLocaleDateString()})</p>
+                  </div>
+                </div>
+                
+                <div className="text-center pt-8 font-mono text-[8px] text-gray-500">
+                  Logistica Uno SpA - Yard Control Systems - Documento Generato Automaticamente
+                </div>
+              </div>
+            )
+          )}
         </div>
       )}
 
@@ -813,6 +894,11 @@ export const MonitorYard: React.FC = () => {
                                     <span className="font-bold text-gray-600 truncate max-w-[120px]">{activeBooking.orderNumber}</span>
                                   </div>
                                 )}
+                                {activeBooking.palletReturns && activeBooking.palletReturns.length > 0 && (
+                                  <div className="text-[8px] font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded p-1 text-center mt-1 animate-pulse-glow">
+                                    ⚠️ HA RESO PALLET VUOTI
+                                  </div>
+                                )}
                                 {isTimeoutSforato && (
                                   <div className="text-[8px] font-bold text-red-600 bg-red-100 border border-red-300 rounded p-1 text-center mt-1 animate-pulse-glow">
                                     🚨 SFORATO DI {elapsedMinutes - timeLimit} MIN (Prev: {timeLimit}m, Sosta: {elapsedMinutes}m)
@@ -895,8 +981,15 @@ export const MonitorYard: React.FC = () => {
                     {
                       header: 'Dettagli',
                       accessor: (b) => (
-                        <div className="text-xs max-w-[200px]">
-                          {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
+                        <div className="text-xs max-w-[200px] flex flex-col gap-1 items-start">
+                          <div className="flex gap-1.5 flex-wrap">
+                            {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
+                            {b.palletReturns && b.palletReturns.length > 0 && (
+                              <span className="text-[8px] font-bold bg-amber-500 text-white border border-amber-600 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
+                                ⚠️ HA RESO PALLET VUOTI
+                              </span>
+                            )}
+                          </div>
                           {b.orderNumber && <div className="text-[9px] font-mono text-gray-600 mt-1">Ord. 1: {b.orderNumber} {b.orderNumber2 && `| Ord. 2: ${b.orderNumber2}`}</div>}
                           {b.driverPhone && <div className="text-[10px] font-mono text-gray-400 mt-0.5">Tel: {b.driverPhone}</div>}
                           {b.notes && <div className="text-[10px] italic text-amber-600 truncate mt-0.5">{b.notes}</div>}
@@ -1352,10 +1445,20 @@ export const MonitorYard: React.FC = () => {
                         accessor: (b) => (
                           <div className="flex flex-col gap-1 items-start">
                             {getBookingStatusBadge(b.status)}
+                            {b.palletReturns && b.palletReturns.length > 0 && (
+                              <span className="text-[7px] font-bold bg-amber-500 text-white border border-amber-600 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
+                                ⚠️ RESO PALLET
+                              </span>
+                            )}
+                            {b.palletVoucherNumber && (
+                              <span className="text-[7px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
+                                Buono: {b.palletVoucherNumber}
+                              </span>
+                            )}
                             {b.checklist && (
                               <button
                                 onClick={() => handlePrintChecklist(b)}
-                                className="text-[8px] font-bold uppercase tracking-wider text-[#11BCEC] hover:underline"
+                                className="text-[8px] font-bold uppercase tracking-wider text-[#11BCEC] hover:underline cursor-pointer"
                               >
                                 🖨️ Stampa checklist
                               </button>
@@ -1745,6 +1848,14 @@ export const MonitorYard: React.FC = () => {
                   🛡️ Checklist Qualità
                 </button>
                 <button
+                  onClick={() => { setModalTab('reso'); setShowChecklistForm(false); }}
+                  className={`flex-1 text-center py-2 font-bold rounded-md transition-all cursor-pointer ${
+                    modalTab === 'reso' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  📦 Reso Pallet
+                </button>
+                <button
                   onClick={() => { setModalTab('edit'); setShowChecklistForm(false); }}
                   className={`flex-1 text-center py-2 font-bold rounded-md transition-all cursor-pointer ${
                     modalTab === 'edit' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
@@ -2007,6 +2118,168 @@ export const MonitorYard: React.FC = () => {
                           Salva e Sottoscrivi
                         </Button>
                       </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* VISTA: RESO PALLET VUOTI */}
+              {modalTab === 'reso' && (
+                <div className="space-y-4 animate-fade-in pt-1">
+                  <div className="flex justify-between items-center border-b border-black/5 pb-1">
+                    <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC]">
+                      Dichiarazione Pallet Vuoti Rilasciati a Magazzino
+                    </h4>
+                    {activeBayDetail.booking.palletVoucherNumber && (
+                      <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-lg">
+                        Buono Emesso: {activeBayDetail.booking.palletVoucherNumber}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Elenco dei resi inseriti */}
+                  <div className="border border-black/10 rounded-lg overflow-hidden bg-white">
+                    <table className="w-full text-left border-collapse text-[10px] font-mono">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-black/10 text-gray-400 text-[8px] uppercase">
+                          <th className="p-2">Tipologia Legno</th>
+                          <th className="p-2">Quantità Resa</th>
+                          <th className="p-2">Stato/Condizione</th>
+                          {(currentRole === 'PREPOSTO' || currentRole === 'ADMIN') && <th className="p-2 text-right">Azione</th>}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-black/5">
+                        {!activeBayDetail.booking.palletReturns || activeBayDetail.booking.palletReturns.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="p-4 text-center text-gray-400 italic">Nessun reso pallet registrato per questo viaggio.</td>
+                          </tr>
+                        ) : (
+                          activeBayDetail.booking.palletReturns.map((item) => (
+                            <tr key={item.id} className="hover:bg-gray-50/50">
+                              <td className="p-2 font-bold text-black">{item.palletType}</td>
+                              <td className="p-2 font-bold">{item.quantity} PL</td>
+                              <td className="p-2">
+                                <Badge variant={item.condition === 'BUONO' ? 'success' : 'danger'}>
+                                  {item.condition === 'BUONO' ? 'Conforme / Buono' : 'Rotto'}
+                                </Badge>
+                              </td>
+                              {(currentRole === 'PREPOSTO' || currentRole === 'ADMIN') && (
+                                <td className="p-2 text-right">
+                                  <button
+                                    onClick={() => {
+                                      removePalletReturn(activeBayDetail.booking.id, item.id);
+                                      // Rinfresca il booking attivo nel modal
+                                      setTimeout(() => {
+                                        const refreshed = bookings.find(b => b.id === activeBayDetail.booking.id);
+                                        if (refreshed) {
+                                          setActiveBayDetail({ bay: activeBayDetail.bay, booking: refreshed });
+                                        }
+                                      }, 50);
+                                    }}
+                                    className="text-red-500 hover:text-red-700 font-bold hover:underline cursor-pointer"
+                                  >
+                                    Elimina
+                                  </button>
+                                </td>
+                              )}
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Form di inserimento (solo Preposto/Admin) */}
+                  {(currentRole === 'PREPOSTO' || currentRole === 'ADMIN') && (
+                    <div className="bg-gray-50/80 p-3 rounded-lg border border-black/5 space-y-3 font-sans">
+                      <span className="block font-bold text-[9px] uppercase tracking-wider text-gray-400 font-mono">// REGISTRA NUOVA VOCE RESO</span>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Select
+                          label="Tipologia Legno *"
+                          options={[
+                            { value: 'EPAL', label: 'EPAL' },
+                            { value: 'CHEP', label: 'CHEP' },
+                            { value: 'DUSSELDORF', label: 'DUSSELDORF' },
+                            { value: 'MINI-DUSS', label: 'MINI-DUSS' },
+                            { value: 'ALTRO', label: 'ALTRO' }
+                          ]}
+                          value={palletType}
+                          onChange={(e) => setPalletType(e.target.value as any)}
+                        />
+                        <Input
+                          label="Quantità *"
+                          type="number"
+                          placeholder="Es. 15"
+                          value={palletQuantity}
+                          onChange={(e) => setPalletQuantity(e.target.value === '' ? '' : Number(e.target.value))}
+                        />
+                        <Select
+                          label="Stato Legno *"
+                          options={[
+                            { value: 'BUONO', label: 'BUONO / CONFORME' },
+                            { value: 'ROTTO', label: 'ROTTO / DA RIPARARE' }
+                          ]}
+                          value={palletCondition}
+                          onChange={(e) => setPalletCondition(e.target.value as any)}
+                        />
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (!palletQuantity) return;
+                          addPalletReturn(activeBayDetail.booking.id, palletType, Number(palletQuantity), palletCondition);
+                          setPalletQuantity('');
+                          // Rinfresca il booking attivo nel modal
+                          setTimeout(() => {
+                            const refreshed = bookings.find(b => b.id === activeBayDetail.booking.id);
+                            if (refreshed) {
+                              setActiveBayDetail({ bay: activeBayDetail.bay, booking: refreshed });
+                            }
+                          }, 50);
+                        }}
+                        disabled={!palletQuantity}
+                        className="w-full"
+                      >
+                        Aggiungi Reso Pallet
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Azione emissione/stampa Buono Pallet (solo Guardiola/Admin) */}
+                  {(currentRole === 'GUARDIA' || currentRole === 'ADMIN') && activeBayDetail.booking.palletReturns && activeBayDetail.booking.palletReturns.length > 0 && (
+                    <div className="pt-3 border-t border-black/5 flex gap-2">
+                      {!activeBayDetail.booking.palletVoucherNumber ? (
+                        <Button
+                          className="w-full text-xs font-bold"
+                          variant="warning"
+                          onClick={() => {
+                            emitPalletVoucher(activeBayDetail.booking.id);
+                            // Rinfresca il booking attivo nel modal
+                            setTimeout(() => {
+                              const refreshed = bookings.find(b => b.id === activeBayDetail.booking.id);
+                              if (refreshed) {
+                                setActiveBayDetail({ bay: activeBayDetail.bay, booking: refreshed });
+                              }
+                            }, 50);
+                          }}
+                        >
+                          📄 Emetti Buono Pallet Ricevuta
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full text-xs font-bold"
+                          variant="success"
+                          onClick={() => {
+                            setPrintType('voucher');
+                            setPrintBooking(activeBayDetail.booking);
+                            setTimeout(() => {
+                              window.print();
+                            }, 300);
+                          }}
+                        >
+                          🖨️ Stampa Ricevuta Buono Pallet
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

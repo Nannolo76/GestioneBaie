@@ -81,6 +81,9 @@ interface AppContextType {
   toggleReportSchedule: (id: string) => void;
   addAnomaly: (depotId: string, type: AnomalyLog['type'], message: string, bookingId?: string, ticketNumber?: string, licensePlate?: string) => void;
   resolveAnomaly: (anomalyId: string, notes: string) => void;
+  addPalletReturn: (bookingId: string, palletType: 'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO', quantity: number, condition: 'BUONO' | 'ROTTO') => void;
+  removePalletReturn: (bookingId: string, returnId: string) => void;
+  emitPalletVoucher: (bookingId: string) => void;
   setCurrentRole: (role: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null) => void;
   setCurrentUser: (user: User | null) => void;
   setCurrentCarrierId: (carrierId: string) => void;
@@ -364,6 +367,92 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const anomaly = anomalies.find((a) => a.id === anomalyId);
     if (anomaly) {
       logActivity(anomaly.depotId, `Risolta anomalia ${anomaly.type} per targa ${anomaly.licensePlate || 'N/D'} da ${resolverName}. Note: ${notes}`, 'SUCCESS');
+    }
+  };
+
+  const addPalletReturn = (
+    bookingId: string,
+    palletType: 'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO',
+    quantity: number,
+    condition: 'BUONO' | 'ROTTO'
+  ) => {
+    const newReturn = {
+      id: `return-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      palletType,
+      quantity,
+      condition,
+    };
+
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === bookingId) {
+          const returns = b.palletReturns ? [...b.palletReturns, newReturn] : [newReturn];
+          return {
+            ...b,
+            palletReturns: returns,
+          };
+        }
+        return b;
+      })
+    );
+
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (booking) {
+      logActivity(
+        booking.depotId,
+        `Registrato reso pallet vuoto su veicolo ${booking.licensePlate}: ${quantity} ${palletType} (${condition}).`,
+        'INFO'
+      );
+    }
+  };
+
+  const removePalletReturn = (bookingId: string, returnId: string) => {
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === bookingId) {
+          return {
+            ...b,
+            palletReturns: b.palletReturns ? b.palletReturns.filter((r) => r.id !== returnId) : [],
+          };
+        }
+        return b;
+      })
+    );
+
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (booking) {
+      logActivity(
+        booking.depotId,
+        `Rimosso reso pallet vuoto (ID: ${returnId}) per veicolo ${booking.licensePlate}.`,
+        'INFO'
+      );
+    }
+  };
+
+  const emitPalletVoucher = (bookingId: string) => {
+    const randomVoucherNum = Math.floor(1000 + Math.random() * 9000);
+    const prefix = depots.find((d) => d.id === selectedDepotId)?.name?.substring(0, 3).toUpperCase() || 'PLT';
+    const voucherNumber = `BPA-${prefix}-${randomVoucherNum}`;
+
+    setBookings((prev) =>
+      prev.map((b) => {
+        if (b.id === bookingId) {
+          return {
+            ...b,
+            palletVoucherNumber: voucherNumber,
+          };
+        }
+        return b;
+      })
+    );
+
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (booking) {
+      logActivity(
+        booking.depotId,
+        `Emesso Buono Pallet n. ${voucherNumber} per veicolo ${booking.licensePlate}.`,
+        'SUCCESS'
+      );
     }
   };
 
@@ -1113,6 +1202,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleReportSchedule,
         addAnomaly,
         resolveAnomaly,
+        addPalletReturn,
+        removePalletReturn,
+        emitPalletVoucher,
         setCurrentRole,
         setCurrentUser,
         setCurrentCarrierId,
