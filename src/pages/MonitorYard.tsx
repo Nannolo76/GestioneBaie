@@ -89,6 +89,7 @@ export const MonitorYard: React.FC = () => {
 
   // Dettaglio Baia
   const [activeBayDetail, setActiveBayDetail] = useState<{ bay: Bay; booking: Booking } | null>(null);
+  const [modalTab, setModalTab] = useState<'info' | 'checklist' | 'edit' | 'move'>('info');
   const [detailPhone, setDetailPhone] = useState('');
   const [detailPallets, setDetailPallets] = useState<number | ''>('');
   const [detailActivity, setDetailActivity] = useState('');
@@ -327,6 +328,7 @@ export const MonitorYard: React.FC = () => {
 
   const handleOpenBayDetail = (bay: Bay, booking: Booking) => {
     setActiveBayDetail({ bay, booking });
+    setModalTab('info');
     setDetailPhone(booking.driverPhone || '');
     setDetailPallets(booking.palletPlaces || '');
     setDetailActivity(booking.activityType);
@@ -1710,15 +1712,54 @@ export const MonitorYard: React.FC = () => {
                 </div>
               </div>
 
-              {!showChecklistForm ? (
-                <>
+              {/* BARRA DEI TAB INTERNI MODALE */}
+              <div className="flex border-b border-black/10 font-mono text-[10px] mb-4 bg-gray-50/50 rounded-lg p-1">
+                <button
+                  onClick={() => { setModalTab('info'); setShowChecklistForm(false); }}
+                  className={`flex-1 text-center py-2 font-bold rounded-md transition-all cursor-pointer ${
+                    modalTab === 'info' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  📋 Info & Note
+                </button>
+                <button
+                  onClick={() => { setModalTab('checklist'); }}
+                  className={`flex-1 text-center py-2 font-bold rounded-md transition-all cursor-pointer ${
+                    modalTab === 'checklist' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  🛡️ Checklist Qualità
+                </button>
+                <button
+                  onClick={() => { setModalTab('edit'); setShowChecklistForm(false); }}
+                  className={`flex-1 text-center py-2 font-bold rounded-md transition-all cursor-pointer ${
+                    modalTab === 'edit' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  ✏️ Modifica Dati
+                </button>
+                {(currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO') && (
+                  <button
+                    onClick={() => { setModalTab('move'); setShowChecklistForm(false); }}
+                    className={`flex-1 text-center py-2 font-bold rounded-md transition-all cursor-pointer ${
+                      modalTab === 'move' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
+                    }`}
+                  >
+                    🔄 Sposta Baia
+                  </button>
+                )}
+              </div>
+
+              {/* VISTA: INFO & NOTE */}
+              {modalTab === 'info' && (
+                <div className="space-y-4 animate-fade-in">
                   <div className="space-y-2">
                     <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
                       Cronologia Note (Case History)
                     </h4>
                     
                     <div className="border border-black/10 rounded-lg overflow-hidden bg-white">
-                      <div className="max-h-[120px] overflow-y-auto">
+                      <div className="max-h-[140px] overflow-y-auto">
                         <table className="w-full text-left border-collapse text-[10px] font-mono">
                           <thead>
                             <tr className="bg-gray-50 border-b border-black/10 text-gray-400 text-[8px] uppercase">
@@ -1757,289 +1798,324 @@ export const MonitorYard: React.FC = () => {
                       <Button size="sm" onClick={handleAddNoteDetail}>Aggiungi Nota</Button>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  {activeBayDetail.booking.checklist && (
-                    <div className={`p-3 rounded-lg border flex justify-between items-center ${activeBayDetail.booking.checklist.isFailed ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
-                      <div>
-                        <span className="font-bold block text-[10px] uppercase font-mono">Checklist di Conformità Qualità</span>
-                        <span className="text-[10px] block mt-0.5">Compilata da: {activeBayDetail.booking.checklist.compilataDa} il {new Date(activeBayDetail.booking.checklist.dataOraCheck).toLocaleDateString()}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="secondary" onClick={() => handlePrintChecklist(activeBayDetail.booking)}>
-                          🖨️ Stampa
-                        </Button>
-                        {currentRole === 'PREPOSTO' && (
-                          <Button size="sm" variant="primary" onClick={() => setShowChecklistForm(true)}>
-                            Modifica Checklist
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {!activeBayDetail.booking.checklist && currentRole === 'PREPOSTO' && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg flex justify-between items-center">
-                      <span className="text-[10px] font-bold uppercase font-mono">Checklist Qualità non compilata!</span>
-                      <Button size="sm" variant="warning" onClick={() => setShowChecklistForm(true)}>
-                        Compila Checklist Qualità ➔
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="space-y-3 pt-3 border-t border-black/5">
-                    <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
-                      Aggiornamento Anagrafica Veicolo
-                    </h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <Input
-                        label="Targa Rimorchio"
-                        value={detailPlateTrailer}
-                        onChange={(e) => setDetailPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
-                      />
-                      <Input
-                        label="Telefono Autista"
-                        value={detailPhone}
-                        onChange={(e) => setDetailPhone(e.target.value)}
-                      />
-                      <Input
-                        label="Posti Pallet"
-                        type="number"
-                        value={detailPallets === '' ? '' : detailPallets}
-                        onChange={(e) => setDetailPallets(e.target.value === '' ? '' : Number(e.target.value))}
-                      />
-                      <Select
-                        label="Uso Baia / Cliente"
-                        options={[{ value: '', label: 'Generico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
-                        value={bayUsages.find(u => u.id === detailClientUsageId)?.name || detailClientUsageId}
-                        onChange={(e) => {
-                          const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
-                          setDetailClientUsageId(found ? found.id : e.target.value);
-                        }}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                      <Input
-                        label="Rif. Carico 1 *"
-                        value={detailOrderNumber}
-                        onChange={(e) => setDetailOrderNumber(e.target.value)}
-                      />
-                      <Input
-                        label="Rif. Carico 2"
-                        value={detailOrderNumber2}
-                        onChange={(e) => setDetailOrderNumber2(e.target.value)}
-                      />
-                      <Input
-                        label="Numero Patente"
-                        value={detailLicense}
-                        onChange={(e) => setDetailLicense(e.target.value)}
-                      />
-                      <Input
-                        label="Scadenza Patente"
-                        type="date"
-                        value={detailLicenseExpiry}
-                        onChange={(e) => setDetailLicenseExpiry(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        label="Data Rilascio Patente"
-                        type="date"
-                        value={detailLicenseRelease}
-                        onChange={(e) => setDetailLicenseRelease(e.target.value)}
-                      />
-                      <Select
-                        label="Cambia Tipo Attività"
-                        options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
-                        value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
-                        onChange={(e) => {
-                          const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
-                          if (found) setDetailActivity(found.code);
-                        }}
-                      />
-                    </div>
-                    <Button size="sm" onClick={handleSaveBayDetailChanges} className="w-full">
-                      Salva Dettagli Anagrafici
-                    </Button>
-                  </div>
-
-                  {(currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO') && (
-                    <div className="space-y-3 pt-3 border-t border-black/5">
-                      <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-amber-600 border-b border-black/5 pb-1">
-                        Spostamento ad altra Baia Libera
-                      </h4>
-                      
-                      {activeBays.filter((b) => b.status === 'DISPONIBILE').length === 0 ? (
-                        <p className="text-[10px] text-rose-500 italic font-mono">// NESSUNA ALTRA BAIA LIBERA DISPONIBILE PER IL MEZZO</p>
-                      ) : (
-                        <div className="space-y-2">
-                          <Select
-                            label="Seleziona Baia Libera"
-                            options={[{ value: '', label: 'Scegli baia...' }, ...activeBays.filter(b => b.status === 'DISPONIBILE').map(b => ({ value: b.id, label: b.name }))]}
-                            value={bays.find(b => b.id === relocateBayId)?.name || relocateBayId}
-                            onChange={(e) => {
-                              const found = bays.find(b => b.name === e.target.value || b.id === e.target.value);
-                              setRelocateBayId(found ? found.id : e.target.value);
-                            }}
-                          />
-                          <Input
-                            label="Motivazione dello Spostamento *"
-                            placeholder="Inserisci motivazione..."
-                            value={relocateReason}
-                            onChange={(e) => setRelocateReason(e.target.value)}
-                          />
-                          <Button
-                            size="sm"
-                            variant="warning"
-                            onClick={handleConfirmRelocate}
-                            disabled={!relocateBayId || !relocateReason}
-                            className="w-full"
-                          >
-                            Conferma Spostamento Baia
-                          </Button>
+              {/* VISTA: CHECKLIST QUALITÀ */}
+              {modalTab === 'checklist' && (
+                <div className="space-y-4 animate-fade-in">
+                  {!showChecklistForm ? (
+                    <div className="space-y-4">
+                      {activeBayDetail.booking.checklist ? (
+                        <div className={`p-4 rounded-xl border flex justify-between items-start ${activeBayDetail.booking.checklist.isFailed ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
+                          <div className="space-y-2">
+                            <span className="font-bold block text-[11px] uppercase font-mono">Checklist di Conformità Qualità</span>
+                            <span className="text-[10px] block text-gray-500">Compilata da: {activeBayDetail.booking.checklist.compilataDa} il {new Date(activeBayDetail.booking.checklist.dataOraCheck).toLocaleString()}</span>
+                            <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-3 font-mono text-[10px] bg-white/60 p-2.5 rounded-lg border border-black/5">
+                              <div>Pianale Sporco: <span className="font-bold">{activeBayDetail.booking.checklist.pianaleSporco ? 'SI (⚠️)' : 'NO'}</span></div>
+                              <div>Presenza Infestanti Mezzo: <span className="font-bold">{activeBayDetail.booking.checklist.presenzaInfestantiMezzo ? 'SI (⚠️)' : 'NO'}</span></div>
+                              <div>Odori Anomali: <span className="font-bold">{activeBayDetail.booking.checklist.odoriAnomali ? 'SI (⚠️)' : 'NO'}</span></div>
+                              <div>Pallet Puliti: <span className="font-bold">{activeBayDetail.booking.checklist.puliziaPallet ? 'SI' : 'NO (⚠️)'}</span></div>
+                              <div>Pallet Integri: <span className="font-bold">{activeBayDetail.booking.checklist.integritaPallet ? 'SI' : 'NO (⚠️)'}</span></div>
+                              <div>Presenza Infestanti Prodotto: <span className="font-bold">{activeBayDetail.booking.checklist.presenzaInfestantiProdotto ? 'SI (⚠️)' : 'NO'}</span></div>
+                              <div>Prodotti biologici (Bio): <span className="font-bold">{activeBayDetail.booking.checklist.presenzaBio ? 'SI' : 'NO'}</span></div>
+                              <div>Sigillo di Sicurezza: <span className="font-bold">{activeBayDetail.booking.checklist.sigilloPresente ? `Presente (${activeBayDetail.booking.checklist.numeroSigillo || 'N/A'})` : 'Assente'}</span></div>
+                              {activeBayDetail.booking.checklist.sigilloPresente && (
+                                <div className="col-span-2">Corrispondenza DDT Sigillo: <span className="font-bold">{activeBayDetail.booking.checklist.corrispondenzaDdt ? 'CONFORME' : 'NON CONFORME (⚠️)'}</span></div>
+                              )}
+                            </div>
+                            {activeBayDetail.booking.checklist.noteLibere && (
+                              <p className="text-[10px] text-gray-700 bg-white/40 p-2 rounded-lg border border-black/5 mt-2"><strong>Note Libere:</strong> {activeBayDetail.booking.checklist.noteLibere}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2">
+                            <Button size="sm" variant="secondary" onClick={() => handlePrintChecklist(activeBayDetail.booking)}>
+                              🖨️ Stampa QA
+                            </Button>
+                            {currentRole === 'PREPOSTO' && (
+                              <Button size="sm" variant="primary" onClick={() => setShowChecklistForm(true)}>
+                                Modifica
+                              </Button>
+                            )}
+                          </div>
                         </div>
+                      ) : (
+                        currentRole === 'PREPOSTO' ? (
+                          <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex justify-between items-center">
+                            <div>
+                              <span className="text-[11px] font-bold uppercase font-mono">Checklist Qualità non compilata!</span>
+                              <p className="text-[10px] text-amber-700/80 mt-0.5 font-sans">Compilare la checklist per procedere con le operazioni.</p>
+                            </div>
+                            <Button size="sm" variant="warning" onClick={() => setShowChecklistForm(true)}>
+                              Compila Checklist ➔
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-xs font-mono text-gray-400 italic bg-gray-50 border border-black/5 rounded-xl">
+                            // CHECKLIST QUALITÀ NON ANCORA COMPILATA DAL PREPOSTO DI MAGAZZINO
+                          </div>
+                        )
                       )}
                     </div>
-                  )}
-                </>
-              ) : (
-                /* --- FORM COMPILAZIONE CHECKLIST QUALITÀ --- */
-                <div className="space-y-4 animate-fade-in">
-                  <h4 className="font-bold text-[11px] uppercase font-mono tracking-wider text-amber-600 border-b border-black/10 pb-1">
-                    Compilazione Checklist Qualità & Conformità Mezzo
-                  </h4>
+                  ) : (
+                    /* --- FORM COMPILAZIONE CHECKLIST QUALITÀ --- */
+                    <div className="space-y-4">
+                      <h4 className="font-bold text-[11px] uppercase font-mono tracking-wider text-amber-600 border-b border-black/10 pb-1">
+                        Compilazione Checklist Qualità & Conformità Mezzo
+                      </h4>
 
-                  <div className="space-y-2">
-                    <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">1. Idoneità Igienica del Mezzo</span>
-                    <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs">Pianale Sporco?</span>
-                        <input
-                          type="checkbox"
-                          checked={pianaleSporco}
-                          onChange={(e) => setPianaleSporco(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs">Presenza Infestanti?</span>
-                        <input
-                          type="checkbox"
-                          checked={presenzaInfestantiMezzo}
-                          onChange={(e) => setPresenzaInfestantiMezzo(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs">Odori Anomali?</span>
-                        <input
-                          type="checkbox"
-                          checked={odoriAnomali}
-                          onChange={(e) => setOdoriAnomali(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">2. Idoneità Igienica del Prodotto & Pallet</span>
-                    <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg font-mono">
-                      <div className="flex items-center justify-between">
-                        <span>Pallet Puliti?</span>
-                        <input
-                          type="checkbox"
-                          checked={puliziaPallet}
-                          onChange={(e) => setPuliziaPallet(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Pallet Integri?</span>
-                        <input
-                          type="checkbox"
-                          checked={integritaPallet}
-                          onChange={(e) => setIntegritaPallet(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Infestanti Prodotto?</span>
-                        <input
-                          type="checkbox"
-                          checked={presenzaInfestantiProdotto}
-                          onChange={(e) => setPresenzaInfestantiProdotto(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Presenza Prodotti Bio?</span>
-                        <input
-                          type="checkbox"
-                          checked={presenzaBio}
-                          onChange={(e) => setPresenzaBio(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                    </div>
-                    <Input
-                      label="Note Libere Conformità Merci"
-                      placeholder="Anomalie pallet, rotture..."
-                      value={noteLibere}
-                      onChange={(e) => setNoteLibere(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2 border-t border-black/5 pt-2">
-                    <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">3. Verifica Sigillo di Sicurezza</span>
-                    <div className="bg-gray-50 p-3 rounded-lg space-y-3 font-mono">
-                      <div className="flex items-center justify-between">
-                        <span>Sigillo Presente?</span>
-                        <input
-                          type="checkbox"
-                          checked={sigilloPresente}
-                          onChange={(e) => setSigilloPresente(e.target.checked)}
-                          className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
-                        />
-                      </div>
-                      {sigilloPresente && (
-                        <div className="grid grid-cols-2 gap-2 animate-fade-in">
-                          <Input
-                            label="Numero Sigillo"
-                            placeholder="Es. SIG-100293"
-                            value={numeroSigillo}
-                            onChange={(e) => setNumeroSigillo(e.target.value)}
-                          />
-                          <div className="flex items-center justify-between mt-6">
-                            <span className="text-[10px]">Corrisponde a DDT?</span>
+                      <div className="space-y-2">
+                        <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">1. Idoneità Igienica del Mezzo</span>
+                        <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs">Pianale Sporco?</span>
                             <input
                               type="checkbox"
-                              checked={corrispondenzaDdt}
-                              onChange={(e) => setCorrispondenzaDdt(e.target.checked)}
+                              checked={pianaleSporco}
+                              onChange={(e) => setPianaleSporco(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs">Presenza Infestanti?</span>
+                            <input
+                              type="checkbox"
+                              checked={presenzaInfestantiMezzo}
+                              onChange={(e) => setPresenzaInfestantiMezzo(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-xs">Odori Anomali?</span>
+                            <input
+                              type="checkbox"
+                              checked={odoriAnomali}
+                              onChange={(e) => setOdoriAnomali(e.target.checked)}
                               className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
                             />
                           </div>
                         </div>
-                      )}
-                    </div>
-                    <Input
-                      label="Note Sigillo"
-                      placeholder="es. Sigillo spezzato..."
-                      value={noteSigillo}
-                      onChange={(e) => setNoteSigillo(e.target.value)}
-                    />
-                  </div>
+                      </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button variant="secondary" className="flex-1" onClick={() => setShowChecklistForm(false)}>
-                      Annulla
-                    </Button>
-                    <Button variant="warning" className="flex-1" onClick={handleSaveChecklist}>
-                      Salva e Sottoscrivi
-                    </Button>
-                  </div>
+                      <div className="space-y-2">
+                        <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">2. Idoneità Igienica del Prodotto & Pallet</span>
+                        <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg font-mono">
+                          <div className="flex items-center justify-between">
+                            <span>Pallet Puliti?</span>
+                            <input
+                              type="checkbox"
+                              checked={puliziaPallet}
+                              onChange={(e) => setPuliziaPallet(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Pallet Integri?</span>
+                            <input
+                              type="checkbox"
+                              checked={integritaPallet}
+                              onChange={(e) => setIntegritaPallet(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Infestanti Prodotto?</span>
+                            <input
+                              type="checkbox"
+                              checked={presenzaInfestantiProdotto}
+                              onChange={(e) => setPresenzaInfestantiProdotto(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Presenza Prodotti Bio?</span>
+                            <input
+                              type="checkbox"
+                              checked={presenzaBio}
+                              onChange={(e) => setPresenzaBio(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                        </div>
+                        <Input
+                          label="Note Libere Conformità Merci"
+                          placeholder="Anomalie pallet, rotture..."
+                          value={noteLibere}
+                          onChange={(e) => setNoteLibere(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2 border-t border-black/5 pt-2">
+                        <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">3. Verifica Sigillo di Sicurezza</span>
+                        <div className="bg-gray-50 p-3 rounded-lg space-y-3 font-mono">
+                          <div className="flex items-center justify-between">
+                            <span>Sigillo Presente?</span>
+                            <input
+                              type="checkbox"
+                              checked={sigilloPresente}
+                              onChange={(e) => setSigilloPresente(e.target.checked)}
+                              className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                            />
+                          </div>
+                          {sigilloPresente && (
+                            <div className="grid grid-cols-2 gap-2 animate-fade-in">
+                              <Input
+                                label="Numero Sigillo"
+                                placeholder="Es. SIG-100293"
+                                value={numeroSigillo}
+                                onChange={(e) => setNumeroSigillo(e.target.value)}
+                              />
+                              <div className="flex items-center justify-between mt-6">
+                                <span className="text-[10px]">Corrisponde a DDT?</span>
+                                <input
+                                  type="checkbox"
+                                  checked={corrispondenzaDdt}
+                                  onChange={(e) => setCorrispondenzaDdt(e.target.checked)}
+                                  className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-0 cursor-pointer"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <Input
+                          label="Note Sigillo"
+                          placeholder="es. Sigillo spezzato..."
+                          value={noteSigillo}
+                          onChange={(e) => setNoteSigillo(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button variant="secondary" className="flex-1" onClick={() => setShowChecklistForm(false)}>
+                          Annulla
+                        </Button>
+                        <Button variant="warning" className="flex-1" onClick={handleSaveChecklist}>
+                          Salva e Sottoscrivi
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+
+              {/* VISTA: MODIFICA ANAGRAFICA */}
+              {modalTab === 'edit' && (
+                <div className="space-y-3 animate-fade-in pt-1">
+                  <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
+                    Aggiornamento Anagrafica Veicolo
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <Input
+                      label="Targa Rimorchio"
+                      value={detailPlateTrailer}
+                      onChange={(e) => setDetailPlateTrailer(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                    />
+                    <Input
+                      label="Telefono Autista"
+                      value={detailPhone}
+                      onChange={(e) => setDetailPhone(e.target.value)}
+                    />
+                    <Input
+                      label="Posti Pallet"
+                      type="number"
+                      value={detailPallets === '' ? '' : detailPallets}
+                      onChange={(e) => setDetailPallets(e.target.value === '' ? '' : Number(e.target.value))}
+                    />
+                    <Select
+                      label="Uso Baia / Cliente"
+                      options={[{ value: '', label: 'Generico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
+                      value={bayUsages.find(u => u.id === detailClientUsageId)?.name || detailClientUsageId}
+                      onChange={(e) => {
+                        const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
+                        setDetailClientUsageId(found ? found.id : e.target.value);
+                      }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <Input
+                      label="Rif. Carico 1 *"
+                      value={detailOrderNumber}
+                      onChange={(e) => setDetailOrderNumber(e.target.value)}
+                    />
+                    <Input
+                      label="Rif. Carico 2"
+                      value={detailOrderNumber2}
+                      onChange={(e) => setDetailOrderNumber2(e.target.value)}
+                    />
+                    <Input
+                      label="Numero Patente"
+                      value={detailLicense}
+                      onChange={(e) => setDetailLicense(e.target.value)}
+                    />
+                    <Input
+                      label="Scadenza Patente"
+                      type="date"
+                      value={detailLicenseExpiry}
+                      onChange={(e) => setDetailLicenseExpiry(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="Data Rilascio Patente"
+                      type="date"
+                      value={detailLicenseRelease}
+                      onChange={(e) => setDetailLicenseRelease(e.target.value)}
+                    />
+                    <Select
+                      label="Cambia Tipo Attività"
+                      options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
+                      value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
+                      onChange={(e) => {
+                        const found = activityTypes.find(a => a.name === e.target.value || a.code === e.target.value);
+                        if (found) setDetailActivity(found.code);
+                      }}
+                    />
+                  </div>
+                  <Button size="sm" onClick={handleSaveBayDetailChanges} className="w-full">
+                    Salva Dettagli Anagrafici
+                  </Button>
+                </div>
+              )}
+
+              {/* VISTA: SPOSTAMENTO BAIA */}
+              {modalTab === 'move' && (currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO') && (
+                <div className="space-y-3 pt-1 animate-fade-in">
+                  <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-amber-600 border-b border-black/5 pb-1">
+                    Spostamento ad altra Baia Libera
+                  </h4>
+                  
+                  {activeBays.filter((b) => b.status === 'DISPONIBILE').length === 0 ? (
+                    <p className="text-[10px] text-rose-500 italic font-mono">// NESSUNA ALTRA BAIA LIBERA DISPONIBILE PER IL MEZZO</p>
+                  ) : (
+                    <div className="space-y-2">
+                      <Select
+                        label="Seleziona Baia Libera"
+                        options={[{ value: '', label: 'Scegli baia...' }, ...activeBays.filter(b => b.status === 'DISPONIBILE').map(b => ({ value: b.id, label: b.name }))]}
+                        value={bays.find(b => b.id === relocateBayId)?.name || relocateBayId}
+                        onChange={(e) => {
+                          const found = bays.find(b => b.name === e.target.value || b.id === e.target.value);
+                          setRelocateBayId(found ? found.id : e.target.value);
+                        }}
+                      />
+                      <Input
+                        label="Motivazione dello Spostamento *"
+                        placeholder="Inserisci motivazione..."
+                        value={relocateReason}
+                        onChange={(e) => setRelocateReason(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="warning"
+                        onClick={handleConfirmRelocate}
+                        disabled={!relocateBayId || !relocateReason}
+                        className="w-full"
+                      >
+                        Conferma Spostamento Baia
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}            </div>
 
             <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50">
               <Button
