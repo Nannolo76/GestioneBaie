@@ -100,7 +100,7 @@ export const AccessoLogin: React.FC = () => {
     <div 
       className="min-h-screen w-full flex flex-col justify-center items-center p-4 relative bg-cover bg-center"
       style={{ 
-        backgroundImage: `url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=2000&q=80')` 
+        backgroundImage: `url('https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=2000&q=80')` 
       }}
     >
       {/* Overlay scuro + sfocatura per leggibilità premium */}
