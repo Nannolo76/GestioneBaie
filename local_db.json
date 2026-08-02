@@ -1,0 +1,443 @@
+{
+  "depots": [
+    {
+      "id": "depot-milano",
+      "name": "Milano Logistics Plant",
+      "city": "Milano (MI)"
+    },
+    {
+      "id": "depot-roma",
+      "name": "Roma Logistics Plant",
+      "city": "Roma (RM)"
+    },
+    {
+      "id": "depot-bari",
+      "name": "Bari Logistics Plant",
+      "city": "Bari (BA)"
+    }
+  ],
+  "warehouse_modules": [
+    {
+      "id": "module-m-1",
+      "depot_id": "depot-milano",
+      "name": "Modulo A (Secco)"
+    },
+    {
+      "id": "module-m-2",
+      "depot_id": "depot-milano",
+      "name": "Modulo B (Fresco)"
+    },
+    {
+      "id": "module-r-1",
+      "depot_id": "depot-roma",
+      "name": "Modulo Unico"
+    },
+    {
+      "id": "module-b-1",
+      "depot_id": "depot-bari",
+      "name": "Modulo Est"
+    }
+  ],
+  "bay_usages": [
+    {
+      "id": "bu-1",
+      "name": "Crossdocking",
+      "description": "Transiti rapidi e smistamento"
+    },
+    {
+      "id": "bu-2",
+      "name": "Acqua / Bevande",
+      "description": "Attracco preferenziale carichi pesanti di liquidi"
+    },
+    {
+      "id": "bu-3",
+      "name": "Pallet vuoti",
+      "description": "Stoccaggio e scarico rulliere pallet vuoti"
+    },
+    {
+      "id": "bu-4",
+      "name": "Cliente Rossi",
+      "description": "Rampa riservata spedizioni Cliente Rossi SpA"
+    }
+  ],
+  "bays": [
+    {
+      "id": "bay-m-01",
+      "depot_id": "depot-milano",
+      "module_id": "module-m-1",
+      "name": "Baia M-01 (Dry)",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": "bu-1"
+    },
+    {
+      "id": "bay-m-02",
+      "depot_id": "depot-milano",
+      "module_id": "module-m-1",
+      "name": "Baia M-02 (Dry)",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": "bu-4"
+    },
+    {
+      "id": "bay-m-03",
+      "depot_id": "depot-milano",
+      "module_id": "module-m-2",
+      "name": "Baia M-03 (Cold)",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": "bu-2"
+    },
+    {
+      "id": "bay-m-04",
+      "depot_id": "depot-milano",
+      "module_id": "module-m-2",
+      "name": "Baia M-04 (Cold)",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": "bu-3"
+    },
+    {
+      "id": "bay-r-01",
+      "depot_id": "depot-roma",
+      "module_id": "module-r-1",
+      "name": "Baia R-01",
+      "status": "OCCUPATA",
+      "current_booking_id": "book-roma-active",
+      "bay_usage_id": null
+    },
+    {
+      "id": "bay-r-02",
+      "depot_id": "depot-roma",
+      "module_id": "module-r-1",
+      "name": "Baia R-02",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": null
+    },
+    {
+      "id": "bay-r-03",
+      "depot_id": "depot-roma",
+      "module_id": "module-r-1",
+      "name": "Baia R-03",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": null
+    },
+    {
+      "id": "bay-r-04",
+      "depot_id": "depot-roma",
+      "module_id": "module-r-1",
+      "name": "Baia R-04",
+      "status": "MANUTENZIONE",
+      "current_booking_id": null,
+      "bay_usage_id": null
+    },
+    {
+      "id": "bay-b-01",
+      "depot_id": "depot-bari",
+      "module_id": "module-b-1",
+      "name": "Baia B-01",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": null
+    },
+    {
+      "id": "bay-b-02",
+      "depot_id": "depot-bari",
+      "module_id": "module-b-1",
+      "name": "Baia B-02",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": null
+    },
+    {
+      "id": "bay-b-03",
+      "depot_id": "depot-bari",
+      "module_id": "module-b-1",
+      "name": "Baia B-03",
+      "status": "DISPONIBILE",
+      "current_booking_id": null,
+      "bay_usage_id": null
+    }
+  ],
+  "carriers": [
+    {
+      "id": "carrier-1",
+      "name": "Logistica Uno Europe",
+      "email": "info@logisticauno.com",
+      "status": "APPROVATO",
+      "license_plate": "AA123BB",
+      "vat_number": "IT12345678901"
+    },
+    {
+      "id": "carrier-2",
+      "name": "Freccia Rossa Trasporti",
+      "email": "operations@frecciarossa.it",
+      "status": "APPROVATO",
+      "license_plate": "CC456DD",
+      "vat_number": "IT98765432109"
+    },
+    {
+      "id": "carrier-3",
+      "name": "Adriatica Cargo Srl",
+      "email": "logistic@adriaticacargo.it",
+      "status": "ATTESA_APPROVAZIONE",
+      "license_plate": "EE789FF",
+      "vat_number": "IT11112222333"
+    },
+    {
+      "id": "carrier-4",
+      "name": "Euro Shipping Spedizioni",
+      "email": "book@euroshipping.com",
+      "status": "ATTESA_APPROVAZIONE",
+      "license_plate": null,
+      "vat_number": "IT44445555666"
+    }
+  ],
+  "bookings": [
+    {
+      "id": "book-milano-1",
+      "carrier_id": "carrier-1",
+      "depot_id": "depot-milano",
+      "date": "2026-08-02",
+      "activity_type": "CARICO",
+      "status": "PRENOTATO",
+      "bay_id": null,
+      "license_plate": "AA123BB",
+      "license_plate_trailer": "AA777XX",
+      "driver_name": "Marco Rossi",
+      "driver_phone": "+39 347 1234567",
+      "notes": "Carico urgente merci secche",
+      "notes_history": [
+        {
+          "id": "n-init-1",
+          "timestamp": "2026-08-02T03:29:15.411Z",
+          "author": "Vettore Logistica",
+          "text": "Carico urgente merci secche"
+        }
+      ],
+      "checklist": null,
+      "pallet_places": 24,
+      "ticket_number": "MIL-C-392",
+      "driver_license": "U19283748A",
+      "driver_license_release": "2024-05-12",
+      "driver_license_expiry": "2028-05-12",
+      "client_usage_id": "bu-4",
+      "client_id": null,
+      "pallet_returns": null,
+      "pallet_voucher_number": null
+    },
+    {
+      "id": "book-milano-2",
+      "carrier_id": "carrier-2",
+      "depot_id": "depot-milano",
+      "date": "2026-08-02",
+      "activity_type": "SCARICO",
+      "status": "AL_CANCELLO",
+      "bay_id": null,
+      "license_plate": "CC456DD",
+      "license_plate_trailer": null,
+      "driver_name": "Giuseppe Bianchi",
+      "driver_phone": "+39 333 9876543",
+      "notes": "Carico fresco",
+      "notes_history": null,
+      "checklist": null,
+      "pallet_places": 12,
+      "ticket_number": "MIL-S-712",
+      "driver_license": "Y99882233B",
+      "driver_license_release": "2023-01-10",
+      "driver_license_expiry": "2027-01-10",
+      "client_usage_id": "bu-1",
+      "client_id": null,
+      "pallet_returns": null,
+      "pallet_voucher_number": null
+    },
+    {
+      "id": "book-roma-active",
+      "carrier_id": "carrier-1",
+      "depot_id": "depot-roma",
+      "date": "2026-08-02",
+      "activity_type": "CARICO",
+      "status": "IN_BAIA",
+      "bay_id": "bay-r-01",
+      "license_plate": "AA123BB",
+      "license_plate_trailer": null,
+      "driver_name": "Franco Neri",
+      "driver_phone": "+39 340 1111111",
+      "notes": "Attesa rampa",
+      "notes_history": null,
+      "checklist": null,
+      "pallet_places": 33,
+      "ticket_number": "ROM-C-992",
+      "driver_license": "D88776655A",
+      "driver_license_release": "2025-02-15",
+      "driver_license_expiry": "2029-02-15",
+      "client_usage_id": "bu-4",
+      "client_id": null,
+      "pallet_returns": null,
+      "pallet_voucher_number": null
+    }
+  ],
+  "anomalies": [],
+  "activity_logs": [],
+  "activity_types": [
+    {
+      "id": "act-1",
+      "code": "SCARICO",
+      "name": "Scarico Standard",
+      "base_duration_minutes": 15,
+      "minutes_per_pallet": 1
+    },
+    {
+      "id": "act-2",
+      "code": "CARICO",
+      "name": "Carico Standard",
+      "base_duration_minutes": 20,
+      "minutes_per_pallet": 1.5
+    },
+    {
+      "id": "act-3",
+      "code": "RESO",
+      "name": "Reso Fornitore",
+      "base_duration_minutes": 10,
+      "minutes_per_pallet": 1
+    }
+  ],
+  "report_schedules": [
+    {
+      "id": "rep-1",
+      "name": "Saturazione Giornaliera Baie",
+      "frequency": "GIORNALIERO",
+      "recipients": "milano.ops@logisticauno.it",
+      "report_type": "Saturazione Baie",
+      "active": true,
+      "depot_id": "depot-milano"
+    },
+    {
+      "id": "rep-2",
+      "name": "Performance Tempi Turnaround Vettori",
+      "frequency": "SETTIMANALE",
+      "recipients": "direzione.logistica@logisticauno.it",
+      "report_type": "Tempi Turnaround",
+      "active": true,
+      "depot_id": "depot-milano"
+    }
+  ],
+  "clients": [
+    {
+      "id": "client-rossi",
+      "name": "Rossi SpA",
+      "vat_number": "IT01234567890",
+      "email": "logistica@rossi.it"
+    },
+    {
+      "id": "client-bianchi",
+      "name": "Bianchi Srl",
+      "vat_number": "IT09876543210",
+      "email": "ordini@bianchisrl.it"
+    },
+    {
+      "id": "client-verdi",
+      "name": "Verdi Corp",
+      "vat_number": "IT11223344556",
+      "email": "supply@verdicorp.it"
+    }
+  ],
+  "pallet_types": [
+    {
+      "id": "plt-epal",
+      "name": "EPAL",
+      "description": "Pallet standard europeo (80x120)"
+    },
+    {
+      "id": "plt-chep",
+      "name": "CHEP",
+      "description": "Pallet blu a noleggio (80x120)"
+    },
+    {
+      "id": "plt-duss",
+      "name": "DUSSELDORF",
+      "description": "Mezzo pallet (60x80)"
+    },
+    {
+      "id": "plt-miniduss",
+      "name": "MINI-DUSS",
+      "description": "Mini pallet plastificato o legno"
+    },
+    {
+      "id": "plt-altro",
+      "name": "ALTRO",
+      "description": "Altre tipologie di legni"
+    }
+  ],
+  "users": [
+    {
+      "id": "user-1",
+      "name": "Alessandro Neri",
+      "email": "a.neri@logisticauno.it",
+      "role": "ADMIN",
+      "depot_id": "depot-milano"
+    },
+    {
+      "id": "user-2",
+      "name": "Fabio Gialli",
+      "email": "f.gialli@logisticauno.it",
+      "role": "GUARDIA_CANCELLO",
+      "depot_id": "depot-milano"
+    },
+    {
+      "id": "user-3",
+      "name": "Roberto Verdi",
+      "email": "r.verdi@logisticauno.it",
+      "role": "OPERATORE_YARD",
+      "depot_id": "depot-roma"
+    },
+    {
+      "id": "user-4",
+      "name": "Sara Rossi",
+      "email": "s.rossi@logisticauno.it",
+      "role": "GUARDIA_CANCELLO",
+      "depot_id": "depot-bari"
+    },
+    {
+      "id": "user-5",
+      "name": "Filippo Marroni",
+      "email": "f.marroni@logisticauno.it",
+      "role": "PREPOSTO",
+      "depot_id": "depot-milano"
+    }
+  ],
+  "shipments": [
+    {
+      "id": "ship-1",
+      "client_id": "client-rossi",
+      "carrier_id": "carrier-1",
+      "depot_id": "depot-milano",
+      "order_number": "ORD-2026-9923",
+      "activity_type": "CARICO",
+      "pallet_places": 24,
+      "status": "PIANIFICATO"
+    },
+    {
+      "id": "ship-2",
+      "client_id": "client-bianchi",
+      "carrier_id": "carrier-2",
+      "depot_id": "depot-milano",
+      "order_number": "ORD-2026-8811",
+      "activity_type": "SCARICO",
+      "pallet_places": 12,
+      "status": "PIANIFICATO"
+    },
+    {
+      "id": "ship-3",
+      "client_id": "client-verdi",
+      "carrier_id": "carrier-1",
+      "depot_id": "depot-milano",
+      "order_number": "ORD-2026-1234",
+      "activity_type": "CARICO",
+      "pallet_places": 33,
+      "status": "DA_PIANIFICARE"
+    }
+  ]
+}

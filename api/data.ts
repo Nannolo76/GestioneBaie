@@ -1,6 +1,169 @@
 import { neon } from '@neondatabase/serverless';
+import fs from 'fs';
+import path from 'path';
 
-const sql = neon(process.env.DATABASE_URL || '');
+// Manual loading of .env.local for local Windows environments where Vercel CLI fails to inject env variables
+if (!process.env.DATABASE_URL) {
+  try {
+    const envPath = path.resolve(process.cwd(), '.env.local');
+    if (fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf-8');
+      envContent.split('\n').forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          const firstEqual = trimmed.indexOf('=');
+          if (firstEqual !== -1) {
+            const key = trimmed.substring(0, firstEqual).trim();
+            let val = trimmed.substring(firstEqual + 1).trim();
+            if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+              val = val.substring(1, val.length - 1);
+            }
+            process.env[key] = val;
+          }
+        }
+      });
+    }
+  } catch (e) {
+    console.error('Failed to manually load .env.local file:', e);
+  }
+}
+
+const DB_FILE = path.resolve(process.cwd(), 'local_db.json');
+
+function readDb() {
+  if (!fs.existsSync(DB_FILE)) {
+    return {
+      depots: [],
+      warehouse_modules: [],
+      bay_usages: [],
+      bays: [],
+      carriers: [],
+      bookings: [],
+      anomalies: [],
+      activity_logs: [],
+      activity_types: [],
+      report_schedules: [],
+      clients: [],
+      pallet_types: [],
+      users: [],
+      shipments: []
+    };
+  }
+  return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+}
+
+function writeDb(data: any) {
+  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+}
+
+async function mockSql(query: string, params: any[] = []): Promise<any[]> {
+  const db = readDb();
+  const q = query.trim().replace(/\s+/g, ' ');
+
+  // 1. CREATE TABLE
+  if (q.toUpperCase().startsWith('CREATE TABLE')) {
+    return [];
+  }
+
+  // 2. SELECT count(*) as count FROM <table>
+  const countMatch = q.match(/SELECT\s+count\(\*\)\s+as\s+count\s+FROM\s+(\w+)/i);
+  if (countMatch) {
+    const table = countMatch[1].toLowerCase();
+    const list = db[table] || [];
+    return [{ count: list.length.toString() }];
+  }
+
+  // 3. SELECT * FROM <table>
+  const selectAllMatch = q.match(/SELECT\s+\*\s+FROM\s+(\w+)/i);
+  if (selectAllMatch) {
+    const table = selectAllMatch[1].toLowerCase();
+    return db[table] || [];
+  }
+
+  // 4. INSERT INTO <table> (cols...) VALUES (vals...)
+  const insertMatch = q.match(/INSERT\s+INTO\s+(\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/i);
+  if (insertMatch) {
+    const table = insertMatch[1].toLowerCase();
+    const cols = insertMatch[2].split(',').map(s => s.trim().toLowerCase());
+    const row: any = {};
+    cols.forEach((col, idx) => {
+      let val = params[idx];
+      if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+        try { val = JSON.parse(val); } catch (e) {}
+      }
+      row[col] = val;
+    });
+    if (!db[table]) db[table] = [];
+    db[table] = db[table].filter((r: any) => r.id !== row.id);
+    db[table].push(row);
+    writeDb(db);
+    return [];
+  }
+
+  // 5. UPDATE <table> SET col1=$1... WHERE id=$N
+  if (q.toUpperCase().startsWith('UPDATE')) {
+    const updateMatch = q.match(/UPDATE\s+(\w+)\s+SET\s+(.+?)\s+WHERE\s+(.+)/i);
+    if (updateMatch) {
+      const table = updateMatch[1].toLowerCase();
+      const setClause = updateMatch[2];
+      const whereClause = updateMatch[3];
+
+      const whereParamIdxMatch = whereClause.match(/\$(\d+)/);
+      if (whereParamIdxMatch) {
+        const whereVal = params[parseInt(whereParamIdxMatch[1]) - 1];
+        const list = db[table] || [];
+        
+        const rowIdx = list.findIndex((r: any) => r.id === whereVal);
+        if (rowIdx !== -1) {
+          const row = list[rowIdx];
+          
+          const assignments = setClause.split(',');
+          assignments.forEach(assign => {
+            const parts = assign.split('=');
+            if (parts.length === 2) {
+              const col = parts[0].trim().toLowerCase();
+              const valMatch = parts[1].trim().match(/\$(\d+)/);
+              if (valMatch) {
+                let val = params[parseInt(valMatch[1]) - 1];
+                if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+                  try { val = JSON.parse(val); } catch (e) {}
+                }
+                row[col] = val;
+              }
+            }
+          });
+          list[rowIdx] = row;
+          db[table] = list;
+          writeDb(db);
+        }
+      }
+    }
+    return [];
+  }
+
+  // 6. DELETE FROM <table> WHERE id = $1
+  if (q.toUpperCase().startsWith('DELETE')) {
+    const deleteMatch = q.match(/DELETE\s+FROM\s+(\w+)\s+WHERE\s+id\s*=\s*\$(\d+)/i);
+    if (deleteMatch) {
+      const table = deleteMatch[1].toLowerCase();
+      const paramIdx = parseInt(deleteMatch[2]) - 1;
+      const idVal = params[paramIdx];
+      if (db[table]) {
+        db[table] = db[table].filter((r: any) => r.id !== idVal);
+        writeDb(db);
+      }
+    }
+    return [];
+  }
+
+  return [];
+}
+
+const isLocalFallback = !process.env.DATABASE_URL || 
+                        process.env.DATABASE_URL === '[SENSITIVE]' || 
+                        !process.env.DATABASE_URL.startsWith('postgres');
+
+const sql = isLocalFallback ? mockSql : neon(process.env.DATABASE_URL!);
 
 // Funzione helper per verificare ed inizializzare il DB
 async function initializeDb() {
