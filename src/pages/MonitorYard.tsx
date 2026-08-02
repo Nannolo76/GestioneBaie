@@ -32,6 +32,7 @@ export const MonitorYard: React.FC = () => {
     addPalletReturn,
     removePalletReturn,
     emitPalletVoucher,
+    palletTypes,
   } = useApp();
 
   // Stato navigazione sottomenu a sinistra (Opzione A)
@@ -93,7 +94,7 @@ export const MonitorYard: React.FC = () => {
   // Dettaglio Baia
   const [activeBayDetail, setActiveBayDetail] = useState<{ bay: Bay; booking: Booking } | null>(null);
   const [modalTab, setModalTab] = useState<'info' | 'checklist' | 'reso' | 'edit' | 'move'>('info');
-  const [palletType, setPalletType] = useState<'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO'>('EPAL');
+  const [palletType, setPalletType] = useState<string>('EPAL');
   const [palletQuantity, setPalletQuantity] = useState<number | ''>('');
   const [palletCondition, setPalletCondition] = useState<'BUONO' | 'ROTTO'>('BUONO');
   const [detailPhone, setDetailPhone] = useState('');
@@ -2196,7 +2197,7 @@ export const MonitorYard: React.FC = () => {
                       <div className="grid grid-cols-3 gap-2">
                         <Select
                           label="Tipologia Legno *"
-                          options={[
+                          options={palletTypes.length > 0 ? palletTypes.map(p => ({ value: p.name, label: p.name })) : [
                             { value: 'EPAL', label: 'EPAL' },
                             { value: 'CHEP', label: 'CHEP' },
                             { value: 'DUSSELDORF', label: 'DUSSELDORF' },

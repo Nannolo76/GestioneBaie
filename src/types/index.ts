@@ -128,15 +128,40 @@ export interface Booking {
   orderNumber?: string; // Required reference
   orderNumber2?: string; // Optional reference
   clientUsageId?: string; // Links to BayUsage (Uso Baia / Cliente)
+  clientId?: string; // Links to Client table dynamically
 
   // Reso Pallet Vuoti & Buono Pallet
   palletReturns?: PalletReturn[];
   palletVoucherNumber?: string;
 }
 
+export interface Client {
+  id: string;
+  name: string;
+  vatNumber?: string;
+  email?: string;
+}
+
+export interface PalletType {
+  id: string;
+  name: string; // e.g. "EPAL", "CHEP", "DUSSELDORF"
+  description?: string;
+}
+
+export interface Shipment {
+  id: string;
+  clientId: string; // Links to Client
+  carrierId: string; // Links to Carrier
+  depotId: string; // Links to Depot
+  orderNumber: string;
+  activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER';
+  palletPlaces: number;
+  status: 'DA_PIANIFICARE' | 'PIANIFICATO' | 'COMPLETATO';
+}
+
 export interface PalletReturn {
   id: string;
-  palletType: 'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO';
+  palletType: string; // Links to PalletType name dynamically
   quantity: number;
   condition: 'BUONO' | 'ROTTO';
 }

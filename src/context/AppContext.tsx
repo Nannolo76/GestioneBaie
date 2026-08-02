@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog } from '../types';
+import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog, Client, PalletType, Shipment } from '../types';
 
 interface AppContextType {
   depots: Depot[];
@@ -81,7 +81,7 @@ interface AppContextType {
   toggleReportSchedule: (id: string) => void;
   addAnomaly: (depotId: string, type: AnomalyLog['type'], message: string, bookingId?: string, ticketNumber?: string, licensePlate?: string) => void;
   resolveAnomaly: (anomalyId: string, notes: string) => void;
-  addPalletReturn: (bookingId: string, palletType: 'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO', quantity: number, condition: 'BUONO' | 'ROTTO') => void;
+  addPalletReturn: (bookingId: string, palletType: string, quantity: number, condition: 'BUONO' | 'ROTTO') => void;
   removePalletReturn: (bookingId: string, returnId: string) => void;
   emitPalletVoucher: (bookingId: string) => void;
   setCurrentRole: (role: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null) => void;
@@ -89,6 +89,20 @@ interface AppContextType {
   setCurrentCarrierId: (carrierId: string) => void;
   setSelectedDepotId: (depotId: string) => void;
   resetState: () => void;
+  clients: Client[];
+  palletTypes: PalletType[];
+  users: User[];
+  shipments: Shipment[];
+  addClient: (name: string, vatNumber?: string, email?: string) => void;
+  deleteClient: (id: string) => void;
+  addPalletType: (name: string, description?: string) => void;
+  deletePalletType: (id: string) => void;
+  addUser: (name: string, email: string, role: User['role'], depotId: string) => void;
+  updateUserRole: (id: string, role: User['role']) => void;
+  deleteUser: (id: string) => void;
+  addShipment: (clientId: string, carrierId: string, depotId: string, orderNumber: string, activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER', palletPlaces: number) => void;
+  updateShipmentStatus: (id: string, status: Shipment['status']) => void;
+  deleteShipment: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -247,6 +261,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Anomalie
   const [anomalies, setAnomalies] = useState<AnomalyLog[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [palletTypes, setPalletTypes] = useState<PalletType[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [shipments, setShipments] = useState<Shipment[]>([]);
 
   // Stati di sessione
   const [currentRole, setCurrentRole] = useState<'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null>(null);
@@ -284,6 +302,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.activityLogs) setActivityLogs(data.activityLogs);
         if (data.activityTypes) setActivityTypes(data.activityTypes);
         if (data.reportSchedules) setReportSchedules(data.reportSchedules);
+        if (data.clients) setClients(data.clients);
+        if (data.palletTypes) setPalletTypes(data.palletTypes);
+        if (data.users) setUsers(data.users);
+        if (data.shipments) setShipments(data.shipments);
       } catch (err) {
         console.error('Errore durante il caricamento dal database:', err);
       }
@@ -387,7 +409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addPalletReturn = (
     bookingId: string,
-    palletType: 'EPAL' | 'CHEP' | 'DUSSELDORF' | 'MINI-DUSS' | 'ALTRO',
+    palletType: string,
     quantity: number,
     condition: 'BUONO' | 'ROTTO'
   ) => {
@@ -652,7 +674,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clientUsageId?: string,
     licensePlateTrailer?: string,
     driverLicenseExpiry?: string,
-    orderNumber2?: string
+    orderNumber2?: string,
+    clientId?: string
   ) => {
     const id = `book-${Date.now()}`;
     const carrierId = currentRole === 'VETTORE' ? currentCarrierId : 'carrier-1';
@@ -700,6 +723,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       orderNumber,
       orderNumber2,
       clientUsageId,
+      clientId,
     };
 
     setBookings((prev) => [...prev, newBooking]);
@@ -1102,7 +1126,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateBookingDetails = (
     bookingId: string,
-    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string; licensePlateTrailer?: string; driverLicenseExpiry?: string; orderNumber2?: string }
+    updates: { activityType?: string; notes?: string; driverPhone?: string; palletPlaces?: number; driverLicense?: string; driverLicenseRelease?: string; orderNumber?: string; clientUsageId?: string; licensePlateTrailer?: string; driverLicenseExpiry?: string; orderNumber2?: string; clientId?: string }
   ) => {
     setBookings((prev) =>
       prev.map((b) => {
@@ -1206,6 +1230,80 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // --- GESTIONE CLIENTI ---
+  const addClient = (name: string, vatNumber?: string, email?: string) => {
+    const id = `client-${Date.now()}`;
+    const newClient: Client = { id, name, vatNumber, email };
+    setClients((prev) => [...prev, newClient]);
+    saveAction('ADD_CLIENT', newClient);
+    logActivity(selectedDepotId, `Aggiunto cliente: ${name}`, 'SUCCESS');
+  };
+
+  const deleteClient = (id: string) => {
+    setClients((prev) => prev.filter((c) => c.id !== id));
+    saveAction('DELETE_CLIENT', { id });
+    logActivity(selectedDepotId, `Eliminato cliente con ID: ${id}`, 'WARNING');
+  };
+
+  // --- GESTIONE TIPI PALLET ---
+  const addPalletType = (name: string, description?: string) => {
+    const id = `plt-${Date.now()}`;
+    const newPallet: PalletType = { id, name, description };
+    setPalletTypes((prev) => [...prev, newPallet]);
+    saveAction('ADD_PALLET_TYPE', newPallet);
+    logActivity(selectedDepotId, `Configurato tipo pallet: ${name}`, 'SUCCESS');
+  };
+
+  const deletePalletType = (id: string) => {
+    setPalletTypes((prev) => prev.filter((p) => p.id !== id));
+    saveAction('DELETE_PALLET_TYPE', { id });
+    logActivity(selectedDepotId, `Eliminato tipo pallet con ID: ${id}`, 'WARNING');
+  };
+
+  // --- GESTIONE UTENZE ---
+  const addUser = (name: string, email: string, role: User['role'], depotId: string) => {
+    const id = `user-${Date.now()}`;
+    const newUser: User = { id, name, email, role, depotId };
+    setUsers((prev) => [...prev, newUser]);
+    saveAction('ADD_USER', newUser);
+    logActivity(depotId, `Creata utenza interna per: ${name} (${role})`, 'SUCCESS');
+  };
+
+  const updateUserRole = (id: string, role: User['role']) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, role } : u))
+    );
+    saveAction('UPDATE_USER_ROLE', { id, role });
+    logActivity(selectedDepotId, `Modificato ruolo utente ${id} in: ${role}`, 'INFO');
+  };
+
+  const deleteUser = (id: string) => {
+    setUsers((prev) => prev.filter((u) => u.id !== id));
+    saveAction('DELETE_USER', { id });
+    logActivity(selectedDepotId, `Eliminato utente con ID: ${id}`, 'WARNING');
+  };
+
+  // --- GESTIONE SPEDIZIONI ---
+  const addShipment = (clientId: string, carrierId: string, depotId: string, orderNumber: string, activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER', palletPlaces: number) => {
+    const id = `ship-${Date.now()}`;
+    const newShipment: Shipment = { id, clientId, carrierId, depotId, orderNumber, activityType, palletPlaces, status: 'DA_PIANIFICARE' };
+    setShipments((prev) => [...prev, newShipment]);
+    saveAction('ADD_SHIPMENT', newShipment);
+    logActivity(depotId, `Creata spedizione / viaggio per ordine ${orderNumber} (${activityType})`, 'SUCCESS');
+  };
+
+  const updateShipmentStatus = (id: string, status: Shipment['status']) => {
+    setShipments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, status } : s))
+    );
+    saveAction('UPDATE_SHIPMENT_STATUS', { id, status });
+  };
+
+  const deleteShipment = (id: string) => {
+    setShipments((prev) => prev.filter((s) => s.id !== id));
+    saveAction('DELETE_SHIPMENT', { id });
+  };
+
   // --- RIPRISTINO STATO ---
   const resetState = () => {
     setDepots(defaultDepots);
@@ -1277,6 +1375,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCurrentCarrierId,
         setSelectedDepotId,
         resetState,
+        clients,
+        palletTypes,
+        users,
+        shipments,
+        addClient,
+        deleteClient,
+        addPalletType,
+        deletePalletType,
+        addUser,
+        updateUserRole,
+        deleteUser,
+        addShipment,
+        updateShipmentStatus,
+        deleteShipment,
       }}
     >
       {children}

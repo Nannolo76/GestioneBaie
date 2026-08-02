@@ -139,6 +139,46 @@ async function initializeDb() {
     )
   `);
 
+  await sql(`
+    CREATE TABLE IF NOT EXISTS clients (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      vat_number TEXT,
+      email TEXT
+    )
+  `);
+
+  await sql(`
+    CREATE TABLE IF NOT EXISTS pallet_types (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT
+    )
+  `);
+
+  await sql(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      role TEXT NOT NULL,
+      depot_id TEXT NOT NULL
+    )
+  `);
+
+  await sql(`
+    CREATE TABLE IF NOT EXISTS shipments (
+      id TEXT PRIMARY KEY,
+      client_id TEXT NOT NULL,
+      carrier_id TEXT NOT NULL,
+      depot_id TEXT NOT NULL,
+      order_number TEXT NOT NULL,
+      activity_type TEXT NOT NULL,
+      pallet_places INTEGER NOT NULL,
+      status TEXT NOT NULL
+    )
+  `);
+
   // Se non ci sono plant inseriti, eseguiamo il seed iniziale
   const checkDepots = await sql('SELECT count(*) as count FROM depots');
   if (parseInt(checkDepots[0].count) === 0) {
@@ -230,6 +270,64 @@ async function initializeDb() {
       ]);
     }
 
+    // SEED CLIENTS
+    const checkClients = await sql('SELECT count(*) as count FROM clients');
+    if (parseInt(checkClients[0].count) === 0) {
+      const defaultClients = [
+        { id: 'client-rossi', name: 'Rossi SpA', vatNumber: 'IT01234567890', email: 'logistica@rossi.it' },
+        { id: 'client-bianchi', name: 'Bianchi Srl', vatNumber: 'IT09876543210', email: 'ordini@bianchisrl.it' },
+        { id: 'client-verdi', name: 'Verdi Corp', vatNumber: 'IT11223344556', email: 'supply@verdicorp.it' },
+      ];
+      for (const c of defaultClients) {
+        await sql('INSERT INTO clients (id, name, vat_number, email) VALUES ($1, $2, $3, $4)', [c.id, c.name, c.vatNumber, c.email]);
+      }
+    }
+
+    // SEED PALLET TYPES
+    const checkPalletTypes = await sql('SELECT count(*) as count FROM pallet_types');
+    if (parseInt(checkPalletTypes[0].count) === 0) {
+      const defaultPallets = [
+        { id: 'plt-epal', name: 'EPAL', description: 'Pallet standard europeo (80x120)' },
+        { id: 'plt-chep', name: 'CHEP', description: 'Pallet blu a noleggio (80x120)' },
+        { id: 'plt-duss', name: 'DUSSELDORF', description: 'Mezzo pallet (60x80)' },
+        { id: 'plt-miniduss', name: 'MINI-DUSS', description: 'Mini pallet plastificato o legno' },
+        { id: 'plt-altro', name: 'ALTRO', description: 'Altre tipologie di legni' },
+      ];
+      for (const p of defaultPallets) {
+        await sql('INSERT INTO pallet_types (id, name, description) VALUES ($1, $2, $3)', [p.id, p.name, p.description]);
+      }
+    }
+
+    // SEED USERS
+    const checkUsers = await sql('SELECT count(*) as count FROM users');
+    if (parseInt(checkUsers[0].count) === 0) {
+      const defaultUsers = [
+        { id: 'user-1', name: 'Alessandro Neri', email: 'a.neri@logisticauno.it', role: 'ADMIN', depotId: 'depot-milano' },
+        { id: 'user-2', name: 'Fabio Gialli', email: 'f.gialli@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-milano' },
+        { id: 'user-3', name: 'Roberto Verdi', email: 'r.verdi@logisticauno.it', role: 'OPERATORE_YARD', depotId: 'depot-roma' },
+        { id: 'user-4', name: 'Sara Rossi', email: 's.rossi@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-bari' },
+        { id: 'user-5', name: 'Filippo Marroni', email: 'f.marroni@logisticauno.it', role: 'PREPOSTO', depotId: 'depot-milano' },
+      ];
+      for (const u of defaultUsers) {
+        await sql('INSERT INTO users (id, name, email, role, depot_id) VALUES ($1, $2, $3, $4, $5)', [u.id, u.name, u.email, u.role, u.depotId]);
+      }
+    }
+
+    // SEED SHIPMENTS
+    const checkShipments = await sql('SELECT count(*) as count FROM shipments');
+    if (parseInt(checkShipments[0].count) === 0) {
+      const defaultShipments = [
+        { id: 'ship-1', clientId: 'client-rossi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-9923', activityType: 'CARICO', palletPlaces: 24, status: 'PIANIFICATO' },
+        { id: 'ship-2', clientId: 'client-bianchi', carrierId: 'carrier-2', depotId: 'depot-milano', orderNumber: 'ORD-2026-8811', activityType: 'SCARICO', palletPlaces: 12, status: 'PIANIFICATO' },
+        { id: 'ship-3', clientId: 'client-verdi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-1234', activityType: 'CARICO', palletPlaces: 33, status: 'DA_PIANIFICARE' },
+      ];
+      for (const s of defaultShipments) {
+        await sql('INSERT INTO shipments (id, client_id, carrier_id, depot_id, order_number, activity_type, pallet_places, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
+          s.id, s.clientId, s.carrierId, s.depotId, s.orderNumber, s.activityType, s.palletPlaces, s.status
+        ]);
+      }
+    }
+
     // SEED BOOKINGS
     const today = new Date().toISOString().split('T')[0];
     const defaultBookings = [
@@ -316,13 +414,13 @@ async function initializeDb() {
         INSERT INTO bookings (
           id, carrier_id, depot_id, date, activity_type, status, bay_id, license_plate, license_plate_trailer,
           driver_name, driver_phone, notes, notes_history, checklist, pallet_places, ticket_number,
-          driver_license, driver_license_release, driver_license_expiry, client_usage_id, pallet_returns, pallet_voucher_number
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+          driver_license, driver_license_release, driver_license_expiry, client_usage_id, client_id, pallet_returns, pallet_voucher_number
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       `, [
         b.id, b.carrierId, b.depotId, b.date, b.activityType, b.status, b.id === 'book-roma-active' ? 'bay-r-01' : null,
         b.licensePlate, b.licensePlateTrailer, b.driverName, b.driverPhone, b.notes, b.notesHistory, b.checklist,
         b.palletPlaces, b.ticketNumber, b.driverLicense, b.driverLicenseRelease, b.driverLicenseExpiry, b.clientUsageId,
-        b.palletReturns, b.palletVoucherNumber
+        b.clientId || null, b.palletReturns, b.palletVoucherNumber
       ]);
     }
   }
@@ -354,7 +452,11 @@ export default async function handler(req: any, res: any) {
         anomalies,
         activityLogs,
         activityTypes,
-        reportSchedules
+        reportSchedules,
+        clients,
+        palletTypes,
+        users,
+        shipments
       ] = await Promise.all([
         sql('SELECT * FROM depots'),
         sql('SELECT * FROM warehouse_modules'),
@@ -366,6 +468,10 @@ export default async function handler(req: any, res: any) {
         sql('SELECT * FROM activity_logs ORDER BY timestamp DESC LIMIT 200'),
         sql('SELECT * FROM activity_types'),
         sql('SELECT * FROM report_schedules'),
+        sql('SELECT * FROM clients ORDER BY name ASC'),
+        sql('SELECT * FROM pallet_types ORDER BY name ASC'),
+        sql('SELECT * FROM users ORDER BY name ASC'),
+        sql('SELECT * FROM shipments ORDER BY order_number ASC'),
       ]);
 
       // Mappiamo i campi snake_case in camelCase per mantenere la compatibilità col frontend e parse dei campi JSON
@@ -471,6 +577,25 @@ export default async function handler(req: any, res: any) {
         depotId: s.depot_id
       }));
 
+      const parsedUsers = users.map((u: any) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        depotId: u.depot_id
+      }));
+
+      const parsedShipments = shipments.map((s: any) => ({
+        id: s.id,
+        clientId: s.client_id,
+        carrierId: s.carrier_id,
+        depotId: s.depot_id,
+        orderNumber: s.order_number,
+        activityType: s.activity_type,
+        palletPlaces: s.pallet_places,
+        status: s.status
+      }));
+
       return res.status(200).json({
         depots,
         warehouseModules: parsedModules,
@@ -481,7 +606,11 @@ export default async function handler(req: any, res: any) {
         anomalies: parsedAnomalies,
         activityLogs: parsedLogs,
         activityTypes: parsedActivityTypes,
-        reportSchedules: parsedSchedules
+        reportSchedules: parsedSchedules,
+        clients,
+        palletTypes,
+        users: parsedUsers,
+        shipments: parsedShipments
       });
     }
 
@@ -550,14 +679,15 @@ export default async function handler(req: any, res: any) {
             INSERT INTO bookings (
               id, carrier_id, depot_id, date, activity_type, status, bay_id, license_plate, license_plate_trailer,
               driver_name, driver_phone, notes, notes_history, checklist, pallet_places, ticket_number,
-              driver_license, driver_license_release, driver_license_expiry, client_usage_id, pallet_returns, pallet_voucher_number
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+              driver_license, driver_license_release, driver_license_expiry, client_usage_id, client_id, pallet_returns, pallet_voucher_number
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
           `, [
             payload.id, payload.carrierId, payload.depotId, payload.date, payload.activityType, payload.status, payload.bayId || null,
             payload.licensePlate, payload.licensePlateTrailer || null, payload.driverName, payload.driverPhone || null,
             payload.notes || null, payload.notesHistory ? JSON.stringify(payload.notesHistory) : null,
             payload.checklist ? JSON.stringify(payload.checklist) : null, payload.palletPlaces || null, payload.ticketNumber || null,
             payload.driverLicense || null, payload.driverLicenseRelease || null, payload.driverLicenseExpiry || null, payload.clientUsageId || null,
+            payload.clientId || null,
             payload.palletReturns ? JSON.stringify(payload.palletReturns) : null, payload.palletVoucherNumber || null
           ]);
           break;
@@ -597,13 +727,14 @@ export default async function handler(req: any, res: any) {
               license_plate_trailer = $9, 
               driver_license_expiry = $10, 
               order_number_2 = $11,
-              is_edited_in_bay = $12
-            WHERE id = $13
+              is_edited_in_bay = $12,
+              client_id = $13
+            WHERE id = $14
           `, [
             payload.activityType, payload.notes || null, payload.driverPhone || null, payload.palletPlaces || null,
             payload.driverLicense || null, payload.driverLicenseRelease || null, payload.orderNumber || null,
             payload.clientUsageId || null, payload.licensePlateTrailer || null, payload.driverLicenseExpiry || null,
-            payload.orderNumber2 || null, payload.isEditedInBay || false, payload.id
+            payload.orderNumber2 || null, payload.isEditedInBay || false, payload.clientId || null, payload.id
           ]);
           break;
 
@@ -670,6 +801,54 @@ export default async function handler(req: any, res: any) {
 
         case 'TOGGLE_REPORT_SCHEDULE':
           await sql('UPDATE report_schedules SET active = $1 WHERE id = $2', [payload.active, payload.id]);
+          break;
+
+        case 'ADD_CLIENT':
+          await sql('INSERT INTO clients (id, name, vat_number, email) VALUES ($1, $2, $3, $4)', [
+            payload.id, payload.name, payload.vatNumber || null, payload.email || null
+          ]);
+          break;
+
+        case 'DELETE_CLIENT':
+          await sql('DELETE FROM clients WHERE id = $1', [payload.id]);
+          break;
+
+        case 'ADD_PALLET_TYPE':
+          await sql('INSERT INTO pallet_types (id, name, description) VALUES ($1, $2, $3)', [
+            payload.id, payload.name, payload.description || null
+          ]);
+          break;
+
+        case 'DELETE_PALLET_TYPE':
+          await sql('DELETE FROM pallet_types WHERE id = $1', [payload.id]);
+          break;
+
+        case 'ADD_USER':
+          await sql('INSERT INTO users (id, name, email, role, depot_id) VALUES ($1, $2, $3, $4, $5)', [
+            payload.id, payload.name, payload.email, payload.role, payload.depotId
+          ]);
+          break;
+
+        case 'UPDATE_USER_ROLE':
+          await sql('UPDATE users SET role = $1 WHERE id = $2', [payload.role, payload.id]);
+          break;
+
+        case 'DELETE_USER':
+          await sql('DELETE FROM users WHERE id = $1', [payload.id]);
+          break;
+
+        case 'ADD_SHIPMENT':
+          await sql('INSERT INTO shipments (id, client_id, carrier_id, depot_id, order_number, activity_type, pallet_places, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
+            payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.activityType, payload.palletPlaces, payload.status
+          ]);
+          break;
+
+        case 'UPDATE_SHIPMENT_STATUS':
+          await sql('UPDATE shipments SET status = $1 WHERE id = $2', [payload.status, payload.id]);
+          break;
+
+        case 'DELETE_SHIPMENT':
+          await sql('DELETE FROM shipments WHERE id = $1', [payload.id]);
           break;
 
         default:

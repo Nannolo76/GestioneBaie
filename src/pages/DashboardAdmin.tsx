@@ -6,15 +6,9 @@ import { Input, Select } from '../components/ui/Input';
 import { Table } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
 
-interface InternalUser {
-  id: string;
-  name: string;
-  email: string;
-  role: 'ADMIN' | 'OPERATORE_YARD' | 'GUARDIA_CANCELLO' | 'PREPOSTO';
-  depotId: string;
-}
 
-export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' }> = ({ defaultTab = 'hubs' }) => {
+
+export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments' }> = ({ defaultTab = 'hubs' }) => {
   const {
     depots,
     warehouseModules,
@@ -37,9 +31,23 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     addReportSchedule,
     toggleReportSchedule,
     resolveAnomaly,
+    clients,
+    palletTypes,
+    users,
+    shipments,
+    addClient,
+    deleteClient,
+    addPalletType,
+    deletePalletType,
+    addUser,
+    updateUserRole,
+    deleteUser,
+    addShipment,
+    updateShipmentStatus,
+    deleteShipment,
   } = useApp();
 
-  const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies'>(defaultTab);
+  const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments'>(defaultTab);
 
   // Stati Hub
   const [newHubName, setNewHubName] = useState('');
@@ -76,14 +84,22 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [activeResolveAnomalyId, setActiveResolveAnomalyId] = useState<string | null>(null);
   const [resolveNotes, setResolveNotes] = useState('');
 
-  // Stati Utenti
-  const [internalUsers, setInternalUsers] = useState<InternalUser[]>([
-    { id: 'user-1', name: 'Alessandro Neri', email: 'a.neri@logisticauno.it', role: 'ADMIN', depotId: 'depot-milano' },
-    { id: 'user-2', name: 'Fabio Gialli', email: 'f.gialli@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-milano' },
-    { id: 'user-3', name: 'Roberto Verdi', email: 'r.verdi@logisticauno.it', role: 'OPERATORE_YARD', depotId: 'depot-roma' },
-    { id: 'user-4', name: 'Sara Rossi', email: 's.rossi@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-bari' },
-    { id: 'user-5', name: 'Filippo Marroni', email: 'f.marroni@logisticauno.it', role: 'PREPOSTO', depotId: 'depot-milano' },
-  ]);
+  // Stati Clienti
+  const [newClientName, setNewClientName] = useState('');
+  const [newClientVat, setNewClientVat] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+
+  // Stati Tipi Pallet
+  const [newPalletName, setNewPalletName] = useState('');
+  const [newPalletDesc, setNewPalletDesc] = useState('');
+
+  // Stati Spedizioni
+  const [newShipClientId, setNewShipClientId] = useState('');
+  const [newShipCarrierId, setNewShipCarrierId] = useState('');
+  const [newShipDepotId, setNewShipDepotId] = useState(depots[0]?.id || '');
+  const [newShipOrderNum, setNewShipOrderNum] = useState('');
+  const [newShipActivityType, setNewShipActivityType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
+  const [newShipPalletPlaces, setNewShipPalletPlaces] = useState<number>(24);
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -145,22 +161,41 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName || !newUserEmail) return;
-    const newUser: InternalUser = {
-      id: `user-${Date.now()}`,
-      name: newUserName,
-      email: newUserEmail,
-      role: newUserRole,
-      depotId: newUserDepot,
-    };
-    setInternalUsers((prev) => [...prev, newUser]);
+    addUser(newUserName, newUserEmail, newUserRole, newUserDepot);
     setNewUserName('');
     setNewUserEmail('');
   };
 
-  const handleChangeUserRole = (userId: string, role: InternalUser['role']) => {
-    setInternalUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role } : u))
-    );
+  const handleChangeUserRole = (userId: string, role: any) => {
+    updateUserRole(userId, role);
+  };
+
+  const handleAddClient = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newClientName) return;
+    addClient(newClientName, newClientVat || undefined, newClientEmail || undefined);
+    setNewClientName('');
+    setNewClientVat('');
+    setNewClientEmail('');
+  };
+
+  const handleAddPalletType = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPalletName) return;
+    addPalletType(newPalletName, newPalletDesc || undefined);
+    setNewPalletName('');
+    setNewPalletDesc('');
+  };
+
+  const handleAddShipment = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cId = newShipClientId || clients[0]?.id;
+    const carrId = newShipCarrierId || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
+    const dId = newShipDepotId || depots[0]?.id;
+    if (!cId || !carrId || !dId || !newShipOrderNum) return;
+    addShipment(cId, carrId, dId, newShipOrderNum, newShipActivityType, newShipPalletPlaces);
+    setNewShipOrderNum('');
+    setNewShipPalletPlaces(24);
   };
 
   const activeHubModules = warehouseModules.filter((m) => m.depotId === selectedHubForBay);
@@ -243,7 +278,31 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
             adminTab === 'users' ? 'border-ticket-accent text-ticket-accent bg-white/50' : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
           }`}
         >
-          👤 Utenti & Permessi
+          👤 Utenti & Permessi ({users.length})
+        </button>
+        <button
+          onClick={() => setAdminTab('clients')}
+          className={`px-3 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
+            adminTab === 'clients' ? 'border-ticket-accent text-ticket-accent bg-white/50' : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
+          }`}
+        >
+          🏢 Gestione Clienti ({clients.length})
+        </button>
+        <button
+          onClick={() => setAdminTab('pallettypes')}
+          className={`px-3 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
+            adminTab === 'pallettypes' ? 'border-ticket-accent text-ticket-accent bg-white/50' : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
+          }`}
+        >
+          🪵 Tipologie Pallet ({palletTypes.length})
+        </button>
+        <button
+          onClick={() => setAdminTab('shipments')}
+          className={`px-3 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
+            adminTab === 'shipments' ? 'border-ticket-accent text-ticket-accent bg-white/50' : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
+          }`}
+        >
+          🚢 Spedizioni / Viaggi ({shipments.length})
         </button>
       </div>
 
@@ -957,7 +1016,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
           <div className="lg:col-span-2">
             <Card title="Registro Utenti Interni & Ruoli">
               <Table
-                data={internalUsers}
+                data={users}
                 columns={[
                   {
                     header: 'Nome Utente',
@@ -1008,6 +1067,276 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                       </select>
                     ),
                   },
+                  {
+                    header: 'Elimina',
+                    accessor: (u) => (
+                      <Button size="sm" variant="danger" onClick={() => deleteUser(u.id)}>Rimuovi</Button>
+                    ),
+                  },
+                ]}
+              />
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: GESTIONE CLIENTI --- */}
+      {adminTab === 'clients' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+          <div>
+            <Card title="Nuovo Cliente Committente" accent="orange">
+              <form onSubmit={handleAddClient} className="space-y-4">
+                <Input
+                  label="Ragione Sociale Cliente *"
+                  placeholder="Es. Rossi SpA"
+                  value={newClientName}
+                  onChange={(e) => setNewClientName(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Partita IVA"
+                  placeholder="Es. IT01234567890"
+                  value={newClientVat}
+                  onChange={(e) => setNewClientVat(e.target.value)}
+                />
+                <Input
+                  label="E-mail Referente"
+                  type="email"
+                  placeholder="Es. logistica@cliente.it"
+                  value={newClientEmail}
+                  onChange={(e) => setNewClientEmail(e.target.value)}
+                />
+                <Button type="submit" className="w-full">
+                  Registra Cliente
+                </Button>
+              </form>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2">
+            <Card title="Elenco Clienti Committenti Attivi">
+              <Table
+                data={clients}
+                emptyMessage="Nessun cliente registrato."
+                columns={[
+                  {
+                    header: 'Ragione Sociale',
+                    accessor: (c) => <span className="font-bold text-xs">{c.name}</span>
+                  },
+                  {
+                    header: 'Partita IVA',
+                    accessor: (c) => <span className="font-mono text-xs">{c.vatNumber || '-'}</span>
+                  },
+                  {
+                    header: 'E-mail Referente',
+                    accessor: (c) => <span className="font-mono text-xs lowercase">{c.email || '-'}</span>
+                  },
+                  {
+                    header: 'Azioni',
+                    accessor: (c) => (
+                      <Button size="sm" variant="danger" onClick={() => deleteClient(c.id)}>
+                        Elimina
+                      </Button>
+                    )
+                  }
+                ]}
+              />
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: TIPOLOGIE PALLET --- */}
+      {adminTab === 'pallettypes' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+          <div>
+            <Card title="Aggiungi Tipologia Pallet" accent="orange">
+              <form onSubmit={handleAddPalletType} className="space-y-4">
+                <Input
+                  label="Sigla / Codice Pallet *"
+                  placeholder="Es. EPAL, CHEP, DUSSELDORF"
+                  value={newPalletName}
+                  onChange={(e) => setNewPalletName(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Descrizione Tipologia"
+                  placeholder="Es. Pallet in legno standard europeo"
+                  value={newPalletDesc}
+                  onChange={(e) => setNewPalletDesc(e.target.value)}
+                />
+                <Button type="submit" className="w-full">
+                  Aggiungi Pallet
+                </Button>
+              </form>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2">
+            <Card title="Tipologie Pallet (Legni) Abilitati">
+              <Table
+                data={palletTypes}
+                emptyMessage="Nessun tipo pallet configurato."
+                columns={[
+                  {
+                    header: 'Codice Pallet',
+                    accessor: (p) => <span className="font-bold text-xs uppercase text-ticket-accent">{p.name}</span>
+                  },
+                  {
+                    header: 'Descrizione',
+                    accessor: (p) => <span className="text-xs text-gray-600">{p.description || '-'}</span>
+                  },
+                  {
+                    header: 'Azioni',
+                    accessor: (p) => (
+                      <Button size="sm" variant="danger" onClick={() => deletePalletType(p.id)}>
+                        Rimuovi
+                      </Button>
+                    )
+                  }
+                ]}
+              />
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB: GESTIONE SPEDIZIONI --- */}
+      {adminTab === 'shipments' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+          <div>
+            <Card title="Nuovo Viaggio / Spedizione" accent="orange">
+              <form onSubmit={handleAddShipment} className="space-y-4">
+                <Select
+                  label="Cliente Committente *"
+                  options={clients.map(c => ({ value: c.id, label: c.name }))}
+                  value={clients.find(c => c.id === newShipClientId)?.name || (clients[0]?.name || '')}
+                  onChange={(e) => {
+                    const found = clients.find(c => c.name === e.target.value || c.id === e.target.value);
+                    if (found) setNewShipClientId(found.id);
+                  }}
+                  required
+                />
+                <Select
+                  label="Vettore Assegnato *"
+                  options={carriers.filter(c => c.status === 'APPROVATO').map(c => ({ value: c.id, label: c.name }))}
+                  value={carriers.find(c => c.id === newShipCarrierId)?.name || (carriers.filter(c => c.status === 'APPROVATO')[0]?.name || '')}
+                  onChange={(e) => {
+                    const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
+                    if (found) setNewShipCarrierId(found.id);
+                  }}
+                  required
+                />
+                <Select
+                  label="Stabilimento Plant *"
+                  options={depots.map(d => ({ value: d.id, label: d.name }))}
+                  value={depots.find(d => d.id === newShipDepotId)?.name || (depots[0]?.name || '')}
+                  onChange={(e) => {
+                    const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
+                    if (found) setNewShipDepotId(found.id);
+                  }}
+                  required
+                />
+                <Input
+                  label="Numero Ordine / Riferimento *"
+                  placeholder="Es. ORD-2026-X"
+                  value={newShipOrderNum}
+                  onChange={(e) => setNewShipOrderNum(e.target.value)}
+                  required
+                />
+                <Select
+                  label="Tipo Attività *"
+                  options={[
+                    { value: 'CARICO', label: 'Spedizione (Carico)' },
+                    { value: 'SCARICO', label: 'Accettazione (Scarico)' },
+                    { value: 'RESO', label: 'Reso Merce' },
+                    { value: 'CONTAINER', label: 'Attività Container' }
+                  ]}
+                  value={newShipActivityType}
+                  onChange={(e) => setNewShipActivityType(e.target.value as any)}
+                  required
+                />
+                <Input
+                  label="Posti Pallet Previsti *"
+                  type="number"
+                  value={newShipPalletPlaces}
+                  onChange={(e) => setNewShipPalletPlaces(Number(e.target.value))}
+                  required
+                />
+                <Button type="submit" className="w-full">
+                  Registra Spedizione
+                </Button>
+              </form>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2">
+            <Card title="Viaggi e Spedizioni Commissionati">
+              <Table
+                data={shipments}
+                emptyMessage="Nessun viaggio commissionato."
+                columns={[
+                  {
+                    header: 'Numero Ordine',
+                    accessor: (s) => <span className="font-bold text-xs font-mono">{s.orderNumber}</span>
+                  },
+                  {
+                    header: 'Cliente Committente',
+                    accessor: (s) => {
+                      const clientName = clients.find(c => c.id === s.clientId)?.name || 'Sconosciuto';
+                      return <span className="text-xs">{clientName}</span>;
+                    }
+                  },
+                  {
+                    header: 'Vettore',
+                    accessor: (s) => {
+                      const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Sconosciuto';
+                      return <span className="text-xs">{carrierName}</span>;
+                    }
+                  },
+                  {
+                    header: 'Stabilimento',
+                    accessor: (s) => {
+                      const depotName = depots.find(d => d.id === s.depotId)?.name || 'Sconosciuto';
+                      return <span className="text-xs uppercase">{depotName}</span>;
+                    }
+                  },
+                  {
+                    header: 'Tipo',
+                    accessor: (s) => <Badge variant={s.activityType === 'CARICO' ? 'info' : 'primary'}>{s.activityType}</Badge>
+                  },
+                  {
+                    header: 'Plt Previsti',
+                    accessor: (s) => <span className="font-bold font-mono text-xs text-right block">{s.palletPlaces} PLT</span>
+                  },
+                  {
+                    header: 'Stato',
+                    accessor: (s) => (
+                      <Badge variant={s.status === 'COMPLETATO' ? 'success' : s.status === 'PIANIFICATO' ? 'info' : 'warning'}>
+                        {s.status.replace('_', ' ')}
+                      </Badge>
+                    )
+                  },
+                  {
+                    header: 'Azioni',
+                    accessor: (s) => (
+                      <div className="flex gap-1">
+                        {s.status === 'DA_PIANIFICARE' && (
+                          <Button size="sm" variant="success" onClick={() => updateShipmentStatus(s.id, 'PIANIFICATO')}>
+                            Pianificato
+                          </Button>
+                        )}
+                        {s.status === 'PIANIFICATO' && (
+                          <Button size="sm" variant="primary" onClick={() => updateShipmentStatus(s.id, 'COMPLETATO')}>
+                            Completa
+                          </Button>
+                        )}
+                        <Button size="sm" variant="danger" onClick={() => deleteShipment(s.id)}>
+                          Rimuovi
+                        </Button>
+                      </div>
+                    )
+                  }
                 ]}
               />
             </Card>
