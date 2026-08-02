@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -105,6 +105,15 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'ADMIN' | 'OPERATORE_YARD' | 'GUARDIA_CANCELLO' | 'PREPOSTO'>('GUARDIA_CANCELLO');
   const [newUserDepot, setNewUserDepot] = useState(depots[0]?.id || '');
+
+  useEffect(() => {
+    if (depots.length > 0) {
+      if (!selectedHubForBay) setSelectedHubForBay(depots[0].id);
+      if (!newModHubId) setNewModHubId(depots[0].id);
+      if (!newShipDepotId) setNewShipDepotId(depots[0].id);
+      if (!newUserDepot) setNewUserDepot(depots[0].id);
+    }
+  }, [depots, selectedHubForBay, newModHubId, newShipDepotId, newUserDepot]);
 
   // Form Submits
   const handleAddHub = (e: React.FormEvent) => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -71,6 +71,22 @@ export const MonitorYard: React.FC = () => {
   const [manualNotes, setManualNotes] = useState('');
   const [manualCarrierId, setManualCarrierId] = useState(carriers.filter(c => c.status === 'APPROVATO')[0]?.id || '');
   const [manualActivityCode, setManualActivityCode] = useState(activityTypes[0]?.code || 'SCARICO');
+
+  useEffect(() => {
+    const approved = carriers.filter(c => c.status === 'APPROVATO');
+    if (approved.length > 0 && !manualCarrierId) {
+      setManualCarrierId(approved[0].id);
+    }
+  }, [carriers, manualCarrierId]);
+
+  useEffect(() => {
+    if (activityTypes.length > 0 && (!manualActivityCode || manualActivityCode === 'SCARICO')) {
+      const exists = activityTypes.some(a => a.code === manualActivityCode);
+      if (!exists && activityTypes[0]) {
+        setManualActivityCode(activityTypes[0].code);
+      }
+    }
+  }, [activityTypes, manualActivityCode]);
   
   const [manualDriverLicense, setManualDriverLicense] = useState('');
   const [manualDriverLicenseRelease, setManualDriverLicenseRelease] = useState('');

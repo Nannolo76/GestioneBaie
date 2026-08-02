@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -27,6 +27,21 @@ export const PortaleVettori: React.FC = () => {
   const [targetDepotId, setTargetDepotId] = useState(depots[0]?.id || '');
   const [targetDate, setTargetDate] = useState('');
   const [selectedActivityCode, setSelectedActivityCode] = useState(activityTypes[0]?.code || 'SCARICO');
+
+  useEffect(() => {
+    if (depots.length > 0 && !targetDepotId) {
+      setTargetDepotId(depots[0].id);
+    }
+  }, [depots, targetDepotId]);
+
+  useEffect(() => {
+    if (activityTypes.length > 0 && (!selectedActivityCode || selectedActivityCode === 'SCARICO')) {
+      const exists = activityTypes.some(a => a.code === selectedActivityCode);
+      if (!exists && activityTypes[0]) {
+        setSelectedActivityCode(activityTypes[0].code);
+      }
+    }
+  }, [activityTypes, selectedActivityCode]);
   const [licensePlate, setLicensePlate] = useState('');
   const [licensePlateTrailer, setLicensePlateTrailer] = useState('');
   const [driverName, setDriverName] = useState('');

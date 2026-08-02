@@ -19,11 +19,23 @@ export const AccessoLogin: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'admin' | 'guardiola' | 'vettore' | 'preposto'>('guardiola');
   
-  // Stati Plant
   const [selectedPlantId, setSelectedPlantId] = useState(depots[0]?.id || '');
+
+  useEffect(() => {
+    if (depots.length > 0 && !selectedPlantId) {
+      setSelectedPlantId(depots[0].id);
+    }
+  }, [depots, selectedPlantId]);
 
   // Stati Vettore
   const [selectedCarrierId, setSelectedCarrierId] = useState(carriers.filter(c => c.status === 'APPROVATO')[0]?.id || '');
+
+  useEffect(() => {
+    const approved = carriers.filter(c => c.status === 'APPROVATO');
+    if (approved.length > 0 && !selectedCarrierId) {
+      setSelectedCarrierId(approved[0].id);
+    }
+  }, [carriers, selectedCarrierId]);
   const [showRegForm, setShowRegForm] = useState(false);
 
   // Form di Registrazione Vettore
