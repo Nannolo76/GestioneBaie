@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -14,6 +14,7 @@ export const AccessoLogin: React.FC = () => {
     setCurrentUser,
     setCurrentCarrierId,
     setSelectedDepotId,
+    users,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'admin' | 'guardiola' | 'vettore' | 'preposto'>('guardiola');
@@ -33,36 +34,77 @@ export const AccessoLogin: React.FC = () => {
   const [regSuccess, setRegSuccess] = useState(false);
   const [regError, setRegError] = useState('');
 
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+
+  useEffect(() => {
+    if (!users || users.length === 0) return;
+    if (activeTab === 'guardiola') {
+      const found = users.find(u => u.role === 'GUARDIA_CANCELLO');
+      if (found) {
+        setSelectedUserId(found.id);
+        if (found.depotId) setSelectedPlantId(found.depotId);
+      }
+    } else if (activeTab === 'preposto') {
+      const found = users.find(u => u.role === 'PREPOSTO' || u.role === 'OPERATORE_YARD');
+      if (found) {
+        setSelectedUserId(found.id);
+        if (found.depotId) setSelectedPlantId(found.depotId);
+      }
+    } else if (activeTab === 'admin') {
+      const found = users.find(u => u.role === 'ADMIN');
+      if (found) setSelectedUserId(found.id);
+    }
+  }, [activeTab, users]);
+
   const handleLogin = () => {
     if (activeTab === 'admin') {
+      const userObj = users.find(u => u.id === selectedUserId) || {
+        id: 'usr-admin-1',
+        name: 'Alessandro Neri',
+        email: 'a.neri@logisticauno.it',
+        role: 'ADMIN',
+      };
       setCurrentRole('ADMIN');
       setCurrentUser({
-        id: 'usr-admin-1',
-        name: 'Mario Rossi (Admin)',
-        email: 'mario.admin@logisticauno.it',
+        id: userObj.id,
+        name: userObj.name,
+        email: userObj.email,
         role: 'ADMIN',
+        depotId: userObj.depotId,
       });
     } else if (activeTab === 'guardiola') {
-      setCurrentRole('GUARDIA');
-      setSelectedDepotId(selectedPlantId);
-      const plantName = depots.find(d => d.id === selectedPlantId)?.name || 'Plant';
-      setCurrentUser({
+      const userObj = users.find(u => u.id === selectedUserId) || {
         id: `usr-guard-${selectedPlantId}`,
-        name: `Guardiola ${plantName}`,
+        name: `Guardiola di Presidio`,
         email: `guardiola.${selectedPlantId}@logisticauno.it`,
         role: 'GUARDIA_CANCELLO',
         depotId: selectedPlantId,
+      };
+      setCurrentRole('GUARDIA');
+      setSelectedDepotId(userObj.depotId || selectedPlantId);
+      setCurrentUser({
+        id: userObj.id,
+        name: userObj.name,
+        email: userObj.email,
+        role: 'GUARDIA_CANCELLO',
+        depotId: userObj.depotId || selectedPlantId,
       });
     } else if (activeTab === 'preposto') {
-      setCurrentRole('PREPOSTO');
-      setSelectedDepotId(selectedPlantId);
-      const plantName = depots.find(d => d.id === selectedPlantId)?.name || 'Plant';
-      setCurrentUser({
+      const userObj = users.find(u => u.id === selectedUserId) || {
         id: `usr-preposto-${selectedPlantId}`,
-        name: `Preposto ${plantName}`,
+        name: `Preposto di Presidio`,
         email: `preposto.${selectedPlantId}@logisticauno.it`,
         role: 'PREPOSTO',
         depotId: selectedPlantId,
+      };
+      setCurrentRole('PREPOSTO');
+      setSelectedDepotId(userObj.depotId || selectedPlantId);
+      setCurrentUser({
+        id: userObj.id,
+        name: userObj.name,
+        email: userObj.email,
+        role: 'PREPOSTO',
+        depotId: userObj.depotId || selectedPlantId,
       });
     } else if (activeTab === 'vettore') {
       if (!selectedCarrierId) {
@@ -170,20 +212,23 @@ export const AccessoLogin: React.FC = () => {
 
             {/* CONTENUTO TAB: GUARDIOLA */}
             {activeTab === 'guardiola' && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fade-in">
                 <p className="text-xs text-gray-500 font-sans leading-relaxed">
-                  Seleziona lo stabilimento (Plant) logistico presso cui sei operativo per monitorare il piazzale e registrare gli arrivi dei camion.
+                  Seleziona la tua utenza operatore Guardiola registrata nel database per monitorare il piazzale ed effettuare i check-in dei camion.
                 </p>
                 <Select
-                  label="Stabilimento Plant Attivo"
-                  options={depots.map((d) => ({ value: d.id, label: `${d.name} (${d.city})` }))}
-                  value={plantIdToLabel(selectedPlantId)}
+                  label="Seleziona Operatore Reale *"
+                  options={users.filter(u => u.role === 'GUARDIA_CANCELLO').map(u => ({ value: u.id, label: `${u.name} (Presidio: ${depots.find(d => d.id === u.depotId)?.name || 'Tutti'})` }))}
+                  value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
-                    const opt = depots.find(d => `${d.name} (${d.city})` === e.target.value || d.id === e.target.value);
-                    if (opt) setSelectedPlantId(opt.id);
+                    const found = users.find(u => u.name === e.target.value || u.id === e.target.value);
+                    if (found) {
+                      setSelectedUserId(found.id);
+                      if (found.depotId) setSelectedPlantId(found.depotId);
+                    }
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-4">
+                <Button onClick={handleLogin} className="w-full mt-2">
                   Accedi come Guardiola
                 </Button>
               </div>
@@ -191,20 +236,23 @@ export const AccessoLogin: React.FC = () => {
 
             {/* CONTENUTO TAB: PREPOSTO */}
             {activeTab === 'preposto' && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fade-in">
                 <p className="text-xs text-gray-500 font-sans leading-relaxed">
-                  Seleziona lo stabilimento (Plant) logistico in cui operi come preposto per compilare le check-list di conformità igienica e ultimare i carichi/scarichi.
+                  Seleziona la tua utenza operatore Preposto registrata nel database per compilare le check-list di conformità ed autorizzare le baie.
                 </p>
                 <Select
-                  label="Stabilimento Plant Attivo"
-                  options={depots.map((d) => ({ value: d.id, label: `${d.name} (${d.city})` }))}
-                  value={plantIdToLabel(selectedPlantId)}
+                  label="Seleziona Operatore Reale *"
+                  options={users.filter(u => u.role === 'PREPOSTO' || u.role === 'OPERATORE_YARD').map(u => ({ value: u.id, label: `${u.name} (Presidio: ${depots.find(d => d.id === u.depotId)?.name || 'Tutti'})` }))}
+                  value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
-                    const opt = depots.find(d => `${d.name} (${d.city})` === e.target.value || d.id === e.target.value);
-                    if (opt) setSelectedPlantId(opt.id);
+                    const found = users.find(u => u.name === e.target.value || u.id === e.target.value);
+                    if (found) {
+                      setSelectedUserId(found.id);
+                      if (found.depotId) setSelectedPlantId(found.depotId);
+                    }
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-4">
+                <Button onClick={handleLogin} className="w-full mt-2">
                   Accedi come Preposto
                 </Button>
               </div>
@@ -253,10 +301,19 @@ export const AccessoLogin: React.FC = () => {
 
             {/* CONTENUTO TAB: ADMIN */}
             {activeTab === 'admin' && (
-              <div className="space-y-4">
+              <div className="space-y-4 animate-fade-in">
                 <p className="text-xs text-gray-500 font-sans leading-relaxed">
                   Console di amministrazione di sistema per la configurazione dei Plant, dei moduli magazzino, abilitazione utenze e approvazione dei vettori.
                 </p>
+                <Select
+                  label="Seleziona Utenza Admin *"
+                  options={users.filter(u => u.role === 'ADMIN').map(u => ({ value: u.id, label: u.name }))}
+                  value={users.find(u => u.id === selectedUserId)?.name || ''}
+                  onChange={(e) => {
+                    const found = users.find(u => u.name === e.target.value || u.id === e.target.value);
+                    if (found) setSelectedUserId(found.id);
+                  }}
+                />
                 <Button onClick={handleLogin} className="w-full mt-2" variant="warning">
                   Accedi come Amministratore
                 </Button>
@@ -337,14 +394,49 @@ export const AccessoLogin: React.FC = () => {
             )}
           </Card>
         )}
+      
+      {/* Credenziali di test in calce */}
+      {!showRegForm && (
+        <div className="w-full max-w-md mt-6 p-4 rounded-xl bg-black/75 border border-white/10 backdrop-blur-xs text-gray-300 space-y-3 font-mono text-[9px] shadow-lg animate-fade-in relative z-10">
+          <span className="block text-white font-bold text-center border-b border-white/10 pb-2 uppercase tracking-wider">// Credenziali di Test Reali (Postgres)</span>
+          <div className="space-y-2">
+            <div>
+              <span className="text-[#11BCEC] font-bold">⚙️ ADMIN:</span>
+              <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                <li>Alessandro Neri (<span className="text-gray-400">Ruolo: ADMIN</span>)</li>
+              </ul>
+            </div>
+            <div>
+              <span className="text-[#11BCEC] font-bold">🎥 GUARDIOLA:</span>
+              <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                <li>Fabio Gialli (<span className="text-gray-400">Milano Logistics Plant</span>)</li>
+                <li>Sara Rossi (<span className="text-gray-400">Bari Logistics Plant</span>)</li>
+              </ul>
+            </div>
+            <div>
+              <span className="text-[#11BCEC] font-bold">📋 PREPOSTO:</span>
+              <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                <li>Filippo Marroni (<span className="text-gray-400">Milano Logistics Plant</span>)</li>
+                <li>Roberto Verdi (<span className="text-gray-400">Roma Logistics Plant</span>)</li>
+              </ul>
+            </div>
+            <div>
+              <span className="text-[#11BCEC] font-bold">🚛 VETTORI:</span>
+              <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
+                <li>Logistica Uno Europe / Freccia Rossa Trasporti</li>
+              </ul>
+            </div>
+          </div>
+          <p className="text-[8px] text-gray-500 text-center italic border-t border-white/5 pt-2">
+            Usa i menu a tendina sopra per selezionare queste anagrafiche reali caricate dal database. Le modifiche effettuate nel pannello Admin si rifletteranno qui all'istante.
+          </p>
+        </div>
+      )}
       </div>
     </div>
   );
 
-  function plantIdToLabel(id: string) {
-    const d = depots.find(x => x.id === id);
-    return d ? `${d.name} (${d.city})` : id;
-  }
+
   function carrierIdToLabel(id: string) {
     const c = carriers.find(x => x.id === id);
     return c ? c.name : id;
