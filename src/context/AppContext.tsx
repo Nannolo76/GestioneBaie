@@ -234,16 +234,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ];
 
   // --- STATO INIZIALIZZATO ---
-  const [depots, setDepots] = useState<Depot[]>(defaultDepots);
-  const [warehouseModules, setWarehouseModules] = useState<WarehouseModule[]>(defaultWarehouseModules);
-  const [bays, setBays] = useState<Bay[]>(defaultBays);
-  const [carriers, setCarriers] = useState<Carrier[]>(defaultCarriers);
-  const [bookings, setBookings] = useState<Booking[]>(defaultBookings);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(defaultLogs);
-  const [activityTypes, setActivityTypes] = useState<ActivityType[]>(defaultActivityTypes);
-  const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>(defaultReportSchedules);
+  const [depots, setDepots] = useState<Depot[]>([]);
+  const [warehouseModules, setWarehouseModules] = useState<WarehouseModule[]>([]);
+  const [bays, setBays] = useState<Bay[]>([]);
+  const [carriers, setCarriers] = useState<Carrier[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
+  const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>([]);
   const [checklistAlerts, setChecklistAlerts] = useState<ChecklistFailureAlert[]>([]);
-  const [bayUsages, setBayUsages] = useState<BayUsage[]>(defaultBayUsages);
+  const [bayUsages, setBayUsages] = useState<BayUsage[]>([]);
   
   // Anomalie
   const [anomalies, setAnomalies] = useState<AnomalyLog[]>([]);
@@ -254,55 +254,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentCarrierId, setCurrentCarrierId] = useState<string>('');
   const [selectedDepotId, setSelectedDepotId] = useState<string>('depot-milano');
 
-  // Caricamento iniziale
+  // Helper per inviare le modifiche al database serverless
+  const saveAction = async (action: string, payload: any) => {
+    try {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload })
+      });
+    } catch (err) {
+      console.error(`Errore invio azione ${action} al DB:`, err);
+    }
+  };
+
+  // Caricamento iniziale dal Database Postgres di Vercel
   useEffect(() => {
+    const loadDbData = async () => {
+      try {
+        const res = await fetch('/api/data');
+        if (!res.ok) throw new Error('Database request failed');
+        const data = await res.json();
+        if (data.depots) setDepots(data.depots);
+        if (data.warehouseModules) setWarehouseModules(data.warehouseModules);
+        if (data.bayUsages) setBayUsages(data.bayUsages);
+        if (data.bays) setBays(data.bays);
+        if (data.carriers) setCarriers(data.carriers);
+        if (data.bookings) setBookings(data.bookings);
+        if (data.anomalies) setAnomalies(data.anomalies);
+        if (data.activityLogs) setActivityLogs(data.activityLogs);
+        if (data.activityTypes) setActivityTypes(data.activityTypes);
+        if (data.reportSchedules) setReportSchedules(data.reportSchedules);
+      } catch (err) {
+        console.error('Errore durante il caricamento dal database:', err);
+      }
+    };
+    loadDbData();
+
+    // Carica le preferenze locali del browser da localStorage
     const savedState = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (savedState) {
       try {
         const parsed = JSON.parse(savedState);
-        if (parsed.depots) setDepots(parsed.depots);
-        if (parsed.warehouseModules) setWarehouseModules(parsed.warehouseModules);
-        if (parsed.bays) setBays(parsed.bays);
-        if (parsed.carriers) setCarriers(parsed.carriers);
-        if (parsed.bookings) setBookings(parsed.bookings);
-        if (parsed.activityLogs) setActivityLogs(parsed.activityLogs);
-        if (parsed.activityTypes) setActivityTypes(parsed.activityTypes);
-        if (parsed.reportSchedules) setReportSchedules(parsed.reportSchedules);
-        if (parsed.checklistAlerts) setChecklistAlerts(parsed.checklistAlerts);
-        if (parsed.bayUsages) setBayUsages(parsed.bayUsages);
-        if (parsed.anomalies) setAnomalies(parsed.anomalies);
-        
         if (parsed.currentRole !== undefined) setCurrentRole(parsed.currentRole);
         if (parsed.currentUser !== undefined) setCurrentUser(parsed.currentUser);
         if (parsed.currentCarrierId !== undefined) setCurrentCarrierId(parsed.currentCarrierId);
         if (parsed.selectedDepotId !== undefined) setSelectedDepotId(parsed.selectedDepotId);
       } catch (e) {
-        console.error('Errore nel caricamento del localStorage', e);
+        console.error('Errore nel caricamento delle preferenze locali', e);
       }
     }
   }, []);
 
-  // Salvataggio su LocalStorage
+  // Salvataggio preferenze locali su LocalStorage
   useEffect(() => {
     const stateToSave = {
-      depots,
-      warehouseModules,
-      bays,
-      carriers,
-      bookings,
-      activityLogs,
-      activityTypes,
-      reportSchedules,
-      checklistAlerts,
-      bayUsages,
-      anomalies,
       currentRole,
       currentUser,
       currentCarrierId,
       selectedDepotId,
     };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
-  }, [depots, warehouseModules, bays, carriers, bookings, activityLogs, activityTypes, reportSchedules, checklistAlerts, bayUsages, anomalies, currentRole, currentUser, currentCarrierId, selectedDepotId]);
+  }, [currentRole, currentUser, currentCarrierId, selectedDepotId]);
 
   // --- OPERAZIONI DI LOG ---
   const logActivity = (depotId: string, message: string, type: ActivityLog['type'] = 'INFO') => {
@@ -314,6 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       type,
     };
     setActivityLogs((prev) => [newLog, ...prev]);
+    saveAction('ADD_LOG', newLog);
   };
 
   // --- GESTIONE ANOMALIE ---
@@ -345,6 +358,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setAnomalies((prev) => [newAnomaly, ...prev]);
     logActivity(depotId, `🚨 ANOMALIA REGISTRATA: [${type}] ${message}`, 'WARNING');
+    saveAction('ADD_ANOMALY', newAnomaly);
   };
 
   const resolveAnomaly = (anomalyId: string, notes: string) => {
@@ -368,6 +382,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (anomaly) {
       logActivity(anomaly.depotId, `Risolta anomalia ${anomaly.type} per targa ${anomaly.licensePlate || 'N/D'} da ${resolverName}. Note: ${notes}`, 'SUCCESS');
     }
+    saveAction('RESOLVE_ANOMALY', { id: anomalyId, resolutionNotes: notes, resolvedBy: resolverName, resolvedAt: new Date().toISOString() });
   };
 
   const addPalletReturn = (
@@ -403,6 +418,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `Registrato reso pallet vuoto su veicolo ${booking.licensePlate}: ${quantity} ${palletType} (${condition}).`,
         'INFO'
       );
+      // Trova l'array aggiornato per inviarlo
+      const currentB = bookings.find(b => b.id === bookingId);
+      if (currentB) {
+        const updatedReturns = currentB.palletReturns ? [...currentB.palletReturns, newReturn] : [newReturn];
+        saveAction('ADD_PALLET_RETURN', { bookingId, palletReturns: updatedReturns });
+      } else {
+        saveAction('ADD_PALLET_RETURN', { bookingId, palletReturns: [newReturn] });
+      }
     }
   };
 
@@ -426,6 +449,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `Rimosso reso pallet vuoto (ID: ${returnId}) per veicolo ${booking.licensePlate}.`,
         'INFO'
       );
+      const currentB = bookings.find(b => b.id === bookingId);
+      if (currentB) {
+        const updatedReturns = currentB.palletReturns ? currentB.palletReturns.filter(r => r.id !== returnId) : [];
+        saveAction('ADD_PALLET_RETURN', { bookingId, palletReturns: updatedReturns });
+      }
     }
   };
 
@@ -453,6 +481,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         `Emesso Buono Pallet n. ${voucherNumber} per veicolo ${booking.licensePlate}.`,
         'SUCCESS'
       );
+      saveAction('EMIT_PALLET_VOUCHER', { bookingId, palletVoucherNumber: voucherNumber });
     }
   };
 
@@ -462,6 +491,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newDepot: Depot = { id, name, city };
     setDepots((prev) => [...prev, newDepot]);
     logActivity(id, `Creato nuovo stabilimento Plant: ${name} (${city})`, 'SUCCESS');
+    saveAction('ADD_DEPOT', newDepot);
   };
 
   const addWarehouseModule = (depotId: string, name: string, description?: string) => {
@@ -469,6 +499,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newModule: WarehouseModule = { id, depotId, name, description };
     setWarehouseModules((prev) => [...prev, newModule]);
     logActivity(depotId, `Creato nuovo modulo di magazzino: ${name}`, 'SUCCESS');
+    saveAction('ADD_WAREHOUSE_MODULE', newModule);
   };
 
   const addBay = (depotId: string, name: string, moduleId?: string, bayUsageId?: string) => {
@@ -476,6 +507,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newBay: Bay = { id, depotId, moduleId, name, status: 'DISPONIBILE', bayUsageId };
     setBays((prev) => [...prev, newBay]);
     logActivity(depotId, `Aggiunta nuova baia: ${name}`, 'SUCCESS');
+    saveAction('ADD_BAY', newBay);
   };
 
   const updateBayStatus = (bayId: string, status: Bay['status']) => {
@@ -495,6 +527,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (targetBay) {
       logActivity(targetBay.depotId, `Stato della baia ${targetBay.name} modificato in: ${status}`, status === 'MANUTENZIONE' ? 'WARNING' : 'INFO');
     }
+    const currentBookingId = status === 'MANUTENZIONE' ? null : (bays.find(b => b.id === bayId)?.currentBookingId);
+    saveAction('UPDATE_BAY_STATUS', { id: bayId, status, currentBookingId });
   };
 
   const updateBayUsage = (bayId: string, bayUsageId?: string) => {
@@ -505,6 +539,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (targetBay) {
       logActivity(targetBay.depotId, `Aggiornato uso baia per ${targetBay.name}`, 'INFO');
     }
+    saveAction('UPDATE_BAY_USAGE', { id: bayId, usageId: bayUsageId });
   };
 
   const addBayUsage = (name: string, description?: string) => {
@@ -512,6 +547,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const newUsage: BayUsage = { id, name, description };
     setBayUsages((prev) => [...prev, newUsage]);
     logActivity(selectedDepotId, `Creato nuovo Uso Baia: ${name}`, 'SUCCESS');
+    saveAction('ADD_BAY_USAGE', newUsage);
   };
 
   const deleteBayUsage = (id: string) => {
@@ -523,6 +559,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prevBookings.map((b) => (b.clientUsageId === id ? { ...b, clientUsageId: undefined } : b))
     );
     logActivity(selectedDepotId, `Eliminato Uso Baia: ${id}`, 'WARNING');
+    saveAction('DELETE_BAY_USAGE', { id });
   };
 
   // --- AZIONI VETTORI ---
@@ -542,6 +579,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setCarriers((prev) => [...prev, newCarrier]);
     logActivity(selectedDepotId, `Creato anagrafica vettore da Admin: ${name}`, 'SUCCESS');
+    saveAction('ADD_CARRIER', newCarrier);
   };
 
   const registerCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string) => {
@@ -557,6 +595,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       licensePlate: cleanPlate,
     };
     setCarriers((prev) => [...prev, newCarrier]);
+    saveAction('ADD_CARRIER', newCarrier);
   };
 
   const approveCarrier = (carrierId: string) => {
@@ -567,6 +606,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (carrier) {
       logActivity(selectedDepotId, `Approvato vettore: ${carrier.name}. Generata abilitazione all'accesso.`, 'SUCCESS');
     }
+    saveAction('APPROVE_CARRIER', { id: carrierId });
   };
 
   const rejectCarrier = (carrierId: string) => {
@@ -577,6 +617,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (carrier) {
       logActivity(selectedDepotId, `Richiesta vettore rifiutata: ${carrier.name}`, 'WARNING');
     }
+    saveAction('REJECT_CARRIER', { id: carrierId });
   };
 
   const updateCarrierProfile = (id: string, email: string, licensePlate?: string, phone?: string, licensePlateTrailer?: string) => {
@@ -587,6 +628,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((c) => (c.id === id ? { ...c, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer } : c))
     );
     logActivity(selectedDepotId, `Vettore ${id} ha aggiornato il proprio profilo anagrafico.`, 'INFO');
+    const updatedCarrier = carriers.find(c => c.id === id);
+    if (updatedCarrier) {
+      saveAction('UPDATE_CARRIER_PROFILE', { id, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer, name: updatedCarrier.name, vatNumber: updatedCarrier.vatNumber });
+    } else {
+      saveAction('UPDATE_CARRIER_PROFILE', { id, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer });
+    }
   };
 
   // --- AZIONI PRENOTAZIONI ---
@@ -821,6 +868,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           `Mezzo ${oldBooking.licensePlate} [${ticketText}] in baia ${targetBayName}.`,
           'SUCCESS'
         );
+      }
+      // Aggiorna sul DB
+      const timeInGate = status === 'AL_CANCELLO' ? new Date().toISOString() : (oldBooking.timeInGate || null);
+      const timeInBay = status === 'IN_BAIA' ? new Date().toISOString() : (oldBooking.timeInBay || null);
+      const timeOutBay = status === 'COMPLETATO' ? new Date().toISOString() : (oldBooking.timeOutBay || null);
+      const timeOutGate = status === 'COMPLETATO' ? new Date().toISOString() : (oldBooking.timeOutGate || null);
+      saveAction('UPDATE_BOOKING_STATUS', {
+        id: bookingId,
+        status,
+        bayId: status === 'IN_BAIA' ? bayId : (status === 'PRENOTATO' ? null : (oldBooking.bayId || null)),
+        timeInGate,
+        timeInBay,
+        timeOutBay,
+        timeOutGate
+      });
+      if (oldBooking.bayId) {
+        saveAction('UPDATE_BAY_STATUS', { id: oldBooking.bayId, status: 'DISPONIBILE', currentBookingId: null });
+      }
+      if (status === 'IN_BAIA' && bayId) {
+        saveAction('UPDATE_BAY_STATUS', { id: bayId, status: 'OCCUPATA', currentBookingId: bookingId });
       } else if (status === 'AL_CANCELLO') {
         logActivity(
           targetDepotId,
