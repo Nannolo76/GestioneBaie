@@ -97,23 +97,31 @@ export const AccessoLogin: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F5F0EB] flex flex-col justify-center items-center p-4">
+    <div 
+      className="min-h-screen w-full flex flex-col justify-center items-center p-4 relative bg-cover bg-center"
+      style={{ 
+        backgroundImage: `url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=2000&q=80')` 
+      }}
+    >
+      {/* Overlay scuro + sfocatura per leggibilità premium */}
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
+
       {/* Brand logo in alto */}
-      <div className="flex items-center gap-3 mb-8 select-none">
+      <div className="relative z-10 flex items-center gap-3 mb-8 select-none">
         <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#003a75] to-[#0062b8] flex items-center justify-center text-white font-black text-lg shadow-md border border-white/20">
           L1
         </div>
         <div className="min-w-0">
-          <h1 className="text-xl font-extrabold text-gray-800 tracking-tight uppercase leading-none">
+          <h1 className="text-xl font-extrabold text-white tracking-tight uppercase leading-none">
             Logistica Uno
           </h1>
-          <span className="text-[10px] font-mono text-gray-400 tracking-widest uppercase mt-1 block">
+          <span className="text-[10px] font-mono text-gray-300 tracking-widest uppercase mt-1 block">
             YARD & DOCK MANAGEMENT SYSTEM
           </span>
         </div>
       </div>
 
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-md relative z-10">
         {!showRegForm ? (
           <Card title="Autenticazione Portale" className="shadow-lg border-black/10">
             {/* Tabs per tipologia d'accesso */}
