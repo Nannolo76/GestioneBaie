@@ -31,6 +31,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     addReportSchedule,
     toggleReportSchedule,
     resolveAnomaly,
+    bookings,
     clients,
     palletTypes,
     users,
@@ -98,8 +99,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newShipCarrierId, setNewShipCarrierId] = useState('');
   const [newShipDepotId, setNewShipDepotId] = useState(depots[0]?.id || '');
   const [newShipOrderNum, setNewShipOrderNum] = useState('');
+  const [newShipOrderNum2, setNewShipOrderNum2] = useState('');
   const [newShipActivityType, setNewShipActivityType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
   const [newShipPalletPlaces, setNewShipPalletPlaces] = useState<number>(24);
+  const [newShipExpectedDate, setNewShipExpectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newShipExpectedTime, setNewShipExpectedTime] = useState('');
+  const [newShipOriginOrDestination, setNewShipOriginOrDestination] = useState('');
+  const [newShipGoodsType, setNewShipGoodsType] = useState('');
+  const [newShipExpectedDeliveryDate, setNewShipExpectedDeliveryDate] = useState('');
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
@@ -202,9 +209,27 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     const carrId = newShipCarrierId || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
     const dId = newShipDepotId || depots[0]?.id;
     if (!cId || !carrId || !dId || !newShipOrderNum) return;
-    addShipment(cId, carrId, dId, newShipOrderNum, newShipActivityType, newShipPalletPlaces);
+    addShipment(
+      cId,
+      carrId,
+      dId,
+      newShipOrderNum,
+      newShipOrderNum2,
+      newShipActivityType,
+      newShipPalletPlaces,
+      newShipExpectedDate,
+      newShipExpectedTime,
+      newShipOriginOrDestination,
+      newShipGoodsType,
+      newShipExpectedDeliveryDate || undefined
+    );
     setNewShipOrderNum('');
+    setNewShipOrderNum2('');
     setNewShipPalletPlaces(24);
+    setNewShipExpectedTime('');
+    setNewShipOriginOrDestination('');
+    setNewShipGoodsType('');
+    setNewShipExpectedDeliveryDate('');
   };
 
   const activeHubModules = warehouseModules.filter((m) => m.depotId === selectedHubForBay);
@@ -424,7 +449,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
               />
             </Card>
 
-            <Card title="Layout e Uso Baie del Cantiere (Gestione Rampa)">
+            <Card title="Layout e Uso Baie del Yard (Gestione Rampa)">
               <p className="text-xs text-ticket-muted mb-4 font-mono uppercase">
                 // Modifica al volo la destinazione d'uso o assegna le baie delle rampe a clienti specifici.
               </p>
@@ -999,7 +1024,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   label="Ruolo Organizzativo"
                   options={[
                     { value: 'ADMIN', label: 'Amministratore di Sistema' },
-                    { value: 'OPERATORE_YARD', label: 'Operatore Yard / Cantiere' },
+                    { value: 'OPERATORE_YARD', label: 'Operatore Yard' },
                     { value: 'GUARDIA_CANCELLO', label: 'Guardia Cancello (Guardiola)' },
                     { value: 'PREPOSTO', label: 'Preposto Magazzino (Qualità)' }
                   ]}
@@ -1246,13 +1271,58 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   }}
                   required
                 />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    label="Riferimento 1 (Ref 1) *"
+                    placeholder="Es. ORD-2026-X"
+                    value={newShipOrderNum}
+                    onChange={(e) => setNewShipOrderNum(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Riferimento 2 (Ref 2)"
+                    placeholder="Es. REF-XYZ"
+                    value={newShipOrderNum2}
+                    onChange={(e) => setNewShipOrderNum2(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    label="Data Prevista *"
+                    type="date"
+                    value={newShipExpectedDate}
+                    onChange={(e) => setNewShipExpectedDate(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Ora Prevista"
+                    placeholder="Es. 09:30"
+                    value={newShipExpectedTime}
+                    onChange={(e) => setNewShipExpectedTime(e.target.value)}
+                  />
+                </div>
                 <Input
-                  label="Numero Ordine / Riferimento *"
-                  placeholder="Es. ORD-2026-X"
-                  value={newShipOrderNum}
-                  onChange={(e) => setNewShipOrderNum(e.target.value)}
+                  label="Provenienza / Destinazione *"
+                  placeholder="Es. Hub Milano / Client Location"
+                  value={newShipOriginOrDestination}
+                  onChange={(e) => setNewShipOriginOrDestination(e.target.value)}
                   required
                 />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    label="Tipologia Merce"
+                    placeholder="Es. Alimentare"
+                    value={newShipGoodsType}
+                    onChange={(e) => setNewShipGoodsType(e.target.value)}
+                  />
+                  <Input
+                    label="Posti Pallet Previsti *"
+                    type="number"
+                    value={newShipPalletPlaces}
+                    onChange={(e) => setNewShipPalletPlaces(Number(e.target.value))}
+                    required
+                  />
+                </div>
                 <Select
                   label="Tipo Attività *"
                   options={[
@@ -1265,13 +1335,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   onChange={(e) => setNewShipActivityType(e.target.value as any)}
                   required
                 />
-                <Input
-                  label="Posti Pallet Previsti *"
-                  type="number"
-                  value={newShipPalletPlaces}
-                  onChange={(e) => setNewShipPalletPlaces(Number(e.target.value))}
-                  required
-                />
+                {newShipActivityType === 'CARICO' && (
+                  <Input
+                    label="Data Consegna Prevista"
+                    type="date"
+                    value={newShipExpectedDeliveryDate}
+                    onChange={(e) => setNewShipExpectedDeliveryDate(e.target.value)}
+                  />
+                )}
                 <Button type="submit" className="w-full">
                   Registra Spedizione
                 </Button>
@@ -1286,37 +1357,69 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                 emptyMessage="Nessun viaggio commissionato."
                 columns={[
                   {
-                    header: 'Numero Ordine',
-                    accessor: (s) => <span className="font-bold text-xs font-mono">{s.orderNumber}</span>
+                    header: 'Riferimenti',
+                    accessor: (s) => (
+                      <div className="font-mono text-xs">
+                        <span className="font-bold text-ticket-accent block">{s.orderNumber}</span>
+                        {s.orderNumber2 && <span className="text-gray-400 text-[10px] block">Ref 2: {s.orderNumber2}</span>}
+                      </div>
+                    )
                   },
                   {
-                    header: 'Cliente Committente',
+                    header: 'Data / Ora Prev.',
+                    accessor: (s) => (
+                      <div className="text-xs font-mono">
+                        <span>{s.expectedDate}</span>
+                        {s.expectedTime && <span className="block text-ticket-accent">[{s.expectedTime}]</span>}
+                      </div>
+                    )
+                  },
+                  {
+                    header: 'Cliente / Vettore',
                     accessor: (s) => {
                       const clientName = clients.find(c => c.id === s.clientId)?.name || 'Sconosciuto';
-                      return <span className="text-xs">{clientName}</span>;
-                    }
-                  },
-                  {
-                    header: 'Vettore',
-                    accessor: (s) => {
                       const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Sconosciuto';
-                      return <span className="text-xs">{carrierName}</span>;
+                      return (
+                        <div className="text-xs font-sans">
+                          <span className="font-bold block">{clientName}</span>
+                          {s.subjectName && <span className="text-ticket-accent text-[10px] block">Sogg: {s.subjectName}</span>}
+                          <span className="text-gray-500 text-[10px] block">Vettore: {carrierName}</span>
+                        </div>
+                      );
                     }
                   },
                   {
-                    header: 'Stabilimento',
+                    header: 'Tratta / Merce',
+                    accessor: (s) => (
+                      <div className="text-xs font-sans">
+                        <span className="font-bold block">{s.city || s.originOrDestination || 'N/D'} {s.province && `(${s.province})`}</span>
+                        {s.goodsType && <span className="text-gray-500 text-[10px] block">Merce: {s.goodsType}</span>}
+                      </div>
+                    )
+                  },
+                  {
+                    header: 'Dettagli / Plt',
+                    accessor: (s) => (
+                      <div className="text-xs">
+                        <Badge variant={s.activityType === 'CARICO' ? 'info' : 'primary'}>{s.activityType}</Badge>
+                        <span className="block font-bold font-mono text-[10px] mt-0.5">{s.palletPlaces} PLT</span>
+                      </div>
+                    )
+                  },
+                  {
+                    header: 'Viaggio Abbinato',
                     accessor: (s) => {
-                      const depotName = depots.find(d => d.id === s.depotId)?.name || 'Sconosciuto';
-                      return <span className="text-xs uppercase">{depotName}</span>;
+                      if (s.bookingId) {
+                        const booking = bookings.find(b => b.id === s.bookingId);
+                        return (
+                          <div className="text-xs">
+                            <span className="font-bold font-mono text-emerald-600 block">{booking?.ticketNumber || 'Abbinato'}</span>
+                            {s.licensePlate && <span className="text-gray-400 text-[10px] font-mono block">Targa: {s.licensePlate}</span>}
+                          </div>
+                        );
+                      }
+                      return <span className="text-gray-400 italic text-[10px]">Non Abbinato</span>;
                     }
-                  },
-                  {
-                    header: 'Tipo',
-                    accessor: (s) => <Badge variant={s.activityType === 'CARICO' ? 'info' : 'primary'}>{s.activityType}</Badge>
-                  },
-                  {
-                    header: 'Plt Previsti',
-                    accessor: (s) => <span className="font-bold font-mono text-xs text-right block">{s.palletPlaces} PLT</span>
                   },
                   {
                     header: 'Stato',

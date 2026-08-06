@@ -5,7 +5,8 @@ import { Card } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
-import type { Booking, Bay, BookingNote } from '../types';
+import type { Booking, Bay, BookingNote, Shipment } from '../types';
+import { getGeoDetailsByCap, getGeoDetailsByProv } from '../utils/geo';
 
 export const MonitorYard: React.FC = () => {
   const {
@@ -33,11 +34,70 @@ export const MonitorYard: React.FC = () => {
     removePalletReturn,
     emitPalletVoucher,
     palletTypes,
+    shipments,
+    clients,
+    addShipment,
+    deleteShipment,
+    deleteShipments,
+    bindShipmentsToBooking,
+    unbindShipmentFromBooking,
+    updateShipment,
   } = useApp();
 
   // Stato navigazione sottomenu a sinistra (Opzione A)
-  const [guardiolaView, setGuardiolaView] = useState<'bays' | 'gate' | 'expected' | 'rapid' | 'schedule' | 'anomalies'>('bays');
+  const [guardiolaView, setGuardiolaView] = useState<'station' | 'bays' | 'gate' | 'expected' | 'rapid' | 'schedule' | 'anomalies'>('station');
+  
+  // Stati TMS Spedizioni / Viaggi
+  const [stationSubTab, setStationSubTab] = useState<'arrivi' | 'partenze'>('arrivi');
+  const [selectedShipmentIdsForCheckIn, setSelectedShipmentIdsForCheckIn] = useState<string[]>([]);
+  const [activeLinkingShipmentId, setActiveLinkingShipmentId] = useState<string | null>(null);
+  const [linkingBookingId, setLinkingBookingId] = useState<string>('');
+
+  // Stati Gestione Spedizioni Guardiola
+  const [shipmentFormId, setShipmentFormId] = useState('');
+  const [shipmentFormClient, setShipmentFormClient] = useState('');
+  const [shipmentFormCarrier, setShipmentFormCarrier] = useState('');
+  const [shipmentFormOrder, setShipmentFormOrder] = useState('');
+  const [shipmentFormOrder2, setShipmentFormOrder2] = useState('');
+  const [shipmentFormType, setShipmentFormType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
+  const [shipmentFormPallets, setShipmentFormPallets] = useState<number>(24);
+  const [shipmentFormExpectedDate, setShipmentFormExpectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [shipmentFormExpectedTime, setShipmentFormExpectedTime] = useState('');
+  const [shipmentFormOriginDest, setShipmentFormOriginDest] = useState('');
+  const [shipmentFormGoods, setShipmentFormGoods] = useState('');
+  const [shipmentFormDeliveryDate, setShipmentFormDeliveryDate] = useState('');
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
+
+  // Nuovi stati per spedizioni estese (mittente/destinatario e logistica)
+  const [shipmentFormSubjectName, setShipmentFormSubjectName] = useState('');
+  const [shipmentFormAddress, setShipmentFormAddress] = useState('');
+  const [shipmentFormCity, setShipmentFormCity] = useState('');
+  const [shipmentFormCap, setShipmentFormCap] = useState('');
+  const [shipmentFormProvince, setShipmentFormProvince] = useState('');
+  const [shipmentFormRegion, setShipmentFormRegion] = useState('');
+  const [shipmentFormCountry, setShipmentFormCountry] = useState('');
+  const [shipmentFormGrossWeight, setShipmentFormGrossWeight] = useState('');
+  const [shipmentFormDeliveryNotes, setShipmentFormDeliveryNotes] = useState('');
+  const [shipmentFormInternalNotes, setShipmentFormInternalNotes] = useState('');
+
+  // Stati Modali e Selezioni Multipli
+  const [isNewShipmentModalOpen, setIsNewShipmentModalOpen] = useState(false);
+  const [isImportShipmentModalOpen, setIsImportShipmentModalOpen] = useState(false);
+  const [selectedShipmentIds, setSelectedShipmentIds] = useState<string[]>([]);
+
+  // Stati Filtri Avanzati
+  const [filterReference, setFilterReference] = useState('');
+  const [filterSearch, setFilterSearch] = useState('');
+  const [filterProvince, setFilterProvince] = useState('');
+  const [filterCountry, setFilterCountry] = useState('');
+
+  // Stati Importazione da file/testo
+  const [importText, setImportText] = useState('');
+  const [importError, setImportError] = useState('');
+  const [importSuccess, setImportSuccess] = useState('');
+  // Stati KPI & Statistiche
+  const [kpiDataSource, setKpiDataSource] = useState<'reali' | 'simulati'>('simulati');
+  const [kpiTimeRange, setKpiTimeRange] = useState<'oggi' | '7g' | '30g'>('7g');
   
   // Data selezionata per le attività
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().split('T')[0]);
@@ -74,10 +134,17 @@ export const MonitorYard: React.FC = () => {
 
   useEffect(() => {
     const approved = carriers.filter(c => c.status === 'APPROVATO');
-    if (approved.length > 0 && !manualCarrierId) {
-      setManualCarrierId(approved[0].id);
+    if (approved.length > 0) {
+      if (!manualCarrierId) setManualCarrierId(approved[0].id);
+      if (!shipmentFormCarrier) setShipmentFormCarrier(approved[0].id);
     }
-  }, [carriers, manualCarrierId]);
+  }, [carriers, manualCarrierId, shipmentFormCarrier]);
+
+  useEffect(() => {
+    if (clients.length > 0) {
+      if (!shipmentFormClient) setShipmentFormClient(clients[0].id);
+    }
+  }, [clients, shipmentFormClient]);
 
   useEffect(() => {
     if (activityTypes.length > 0 && (!manualActivityCode || manualActivityCode === 'SCARICO')) {
@@ -264,7 +331,7 @@ export const MonitorYard: React.FC = () => {
     if (!manualPlate || !manualDriver || !manualOrderNumber) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    addBooking(
+    const newBId = addBooking(
       selectedDepotId,
       todayStr,
       manualActivityCode,
@@ -282,6 +349,11 @@ export const MonitorYard: React.FC = () => {
       manualOrderNumber2 || undefined
     );
     
+    if (selectedShipmentIdsForCheckIn.length > 0) {
+      bindShipmentsToBooking(selectedShipmentIdsForCheckIn, newBId);
+    }
+    
+    setSelectedShipmentIdsForCheckIn([]);
     setManualPlate('');
     setManualPlateTrailer('');
     setManualDriver('');
@@ -325,6 +397,10 @@ export const MonitorYard: React.FC = () => {
       clientUsageId: checkInClientUsageId || undefined,
       licensePlateTrailer: checkInPlateTrailer || undefined,
     });
+    if (selectedShipmentIdsForCheckIn.length > 0) {
+      bindShipmentsToBooking(selectedShipmentIdsForCheckIn, checkInBooking.id);
+    }
+    setSelectedShipmentIdsForCheckIn([]);
     setCheckInBooking(null);
     setGuardiolaView('gate');
   };
@@ -474,6 +550,212 @@ export const MonitorYard: React.FC = () => {
     }, 300);
   };
 
+  const resetShipmentForm = () => {
+    setShipmentFormId('');
+    setShipmentFormOrder('');
+    setShipmentFormOrder2('');
+    setShipmentFormPallets(24);
+    setShipmentFormExpectedTime('');
+    setShipmentFormOriginDest('');
+    setShipmentFormGoods('');
+    setShipmentFormDeliveryDate('');
+    setShipmentFormSubjectName('');
+    setShipmentFormAddress('');
+    setShipmentFormCity('');
+    setShipmentFormCap('');
+    setShipmentFormProvince('');
+    setShipmentFormRegion('');
+    setShipmentFormCountry('');
+    setShipmentFormGrossWeight('');
+    setShipmentFormDeliveryNotes('');
+    setShipmentFormInternalNotes('');
+  };
+
+  const handleEditShipmentClick = (s: Shipment) => {
+    setShipmentFormId(s.id);
+    setShipmentFormClient(s.clientId);
+    setShipmentFormCarrier(s.carrierId);
+    setShipmentFormOrder(s.orderNumber);
+    setShipmentFormOrder2(s.orderNumber2 || '');
+    setShipmentFormType(s.activityType);
+    setShipmentFormPallets(s.palletPlaces);
+    setShipmentFormExpectedDate(s.expectedDate);
+    setShipmentFormExpectedTime(s.expectedTime || '');
+    setShipmentFormOriginDest(s.originOrDestination || '');
+    setShipmentFormGoods(s.goodsType || '');
+    setShipmentFormDeliveryDate(s.expectedDeliveryDate || '');
+    
+    // nuovi campi
+    setShipmentFormSubjectName(s.subjectName || '');
+    setShipmentFormAddress(s.address || '');
+    setShipmentFormCity(s.city || '');
+    setShipmentFormCap(s.cap || '');
+    setShipmentFormProvince(s.province || '');
+    setShipmentFormRegion(s.region || '');
+    setShipmentFormCountry(s.country || '');
+    setShipmentFormGrossWeight(s.grossWeight ? String(s.grossWeight) : '');
+    setShipmentFormDeliveryNotes(s.deliveryNotes || '');
+    setShipmentFormInternalNotes(s.internalNotes || '');
+
+    setIsNewShipmentModalOpen(true);
+  };
+
+  const handleSaveShipmentForm = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cId = shipmentFormClient || clients[0]?.id;
+    const carrId = shipmentFormCarrier || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
+    if (!cId || !carrId || !shipmentFormOrder) return;
+
+    const payloadUpdates = {
+      clientId: cId,
+      carrierId: carrId,
+      orderNumber: shipmentFormOrder,
+      orderNumber2: shipmentFormOrder2 || undefined,
+      activityType: shipmentFormType,
+      palletPlaces: shipmentFormPallets,
+      expectedDate: shipmentFormExpectedDate,
+      expectedTime: shipmentFormExpectedTime || undefined,
+      originOrDestination: shipmentFormOriginDest || undefined,
+      goodsType: shipmentFormGoods || undefined,
+      expectedDeliveryDate: shipmentFormDeliveryDate || undefined,
+      subjectName: shipmentFormSubjectName || undefined,
+      address: shipmentFormAddress || undefined,
+      city: shipmentFormCity || undefined,
+      cap: shipmentFormCap || undefined,
+      province: shipmentFormProvince || undefined,
+      region: shipmentFormRegion || undefined,
+      country: shipmentFormCountry || undefined,
+      grossWeight: shipmentFormGrossWeight ? Number(shipmentFormGrossWeight) : undefined,
+      deliveryNotes: shipmentFormDeliveryNotes || undefined,
+      internalNotes: shipmentFormInternalNotes || undefined,
+    };
+
+    if (shipmentFormId) {
+      updateShipment(shipmentFormId, payloadUpdates);
+    } else {
+      addShipment(
+        cId,
+        carrId,
+        selectedDepotId,
+        shipmentFormOrder,
+        shipmentFormOrder2,
+        shipmentFormType,
+        shipmentFormPallets,
+        shipmentFormExpectedDate,
+        shipmentFormExpectedTime,
+        shipmentFormOriginDest,
+        shipmentFormGoods,
+        shipmentFormDeliveryDate || undefined,
+        shipmentFormSubjectName,
+        shipmentFormAddress,
+        shipmentFormCity,
+        shipmentFormCap,
+        shipmentFormProvince,
+        shipmentFormRegion,
+        shipmentFormCountry,
+        shipmentFormGrossWeight ? Number(shipmentFormGrossWeight) : undefined,
+        shipmentFormDeliveryNotes,
+        shipmentFormInternalNotes
+      );
+    }
+
+    resetShipmentForm();
+    setIsNewShipmentModalOpen(false);
+  };
+
+  const handleImportShipments = () => {
+    if (!importText.trim()) {
+      setImportError('Il testo di importazione è vuoto.');
+      return;
+    }
+
+    const lines = importText.split('\n');
+    let successCount = 0;
+    let errorCount = 0;
+
+    const defaultClient = clients[0]?.id;
+    const defaultCarrier = carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
+
+    if (!defaultClient || !defaultCarrier) {
+      setImportError('Impossibile determinare cliente o vettore predefinito.');
+      return;
+    }
+
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (!trimmed || (idx === 0 && trimmed.toLowerCase().includes('rif'))) {
+        return;
+      }
+
+      const separator = trimmed.includes(';') ? ';' : ',';
+      const parts = trimmed.split(separator).map(s => s.trim());
+
+      if (parts.length < 5) {
+        errorCount++;
+        return;
+      }
+
+      const orderNumber = parts[0];
+      const orderNumber2 = parts[1];
+      let activityType = parts[2]?.toUpperCase();
+      if (!['CARICO', 'SCARICO', 'RESO', 'CONTAINER'].includes(activityType)) {
+        activityType = 'CARICO';
+      }
+      const palletPlaces = Number(parts[3]) || 24;
+      const grossWeight = Number(parts[4]) || 1000;
+      const subjectName = parts[5] || 'Importato';
+      const city = parts[6] || 'N/D';
+      const cap = parts[7] || '';
+      const province = parts[8] || 'N/D';
+      const expectedDate = parts[9] || new Date().toISOString().split('T')[0];
+      const expectedTime = parts[10] || '';
+      const goodsType = parts[11] || '';
+      const address = parts[12] || '';
+      const region = parts[13] || '';
+      const country = parts[14] || 'Italia';
+      const deliveryNotes = parts[15] || '';
+      const internalNotes = parts[16] || '';
+
+      addShipment(
+        defaultClient,
+        defaultCarrier,
+        selectedDepotId,
+        orderNumber,
+        orderNumber2,
+        activityType as any,
+        palletPlaces,
+        expectedDate,
+        expectedTime,
+        city,
+        goodsType,
+        expectedDate,
+        subjectName,
+        address,
+        city,
+        cap,
+        province,
+        region,
+        country,
+        grossWeight,
+        deliveryNotes,
+        internalNotes
+      );
+      successCount++;
+    });
+
+    if (successCount > 0) {
+      setImportSuccess(`Importate con successo ${successCount} spedizioni! (${errorCount} righe errate saltate)`);
+      setImportText('');
+      setImportError('');
+      setTimeout(() => {
+        setIsImportShipmentModalOpen(false);
+        setImportSuccess('');
+      }, 2000);
+    } else {
+      setImportError('Nessuna riga valida trovata. Controlla il formato.');
+    }
+  };
+
   const formatDateString = (y: number, m: number, d: number) => {
     const mm = String(m + 1).padStart(2, '0');
     const dd = String(d).padStart(2, '0');
@@ -504,6 +786,199 @@ export const MonitorYard: React.FC = () => {
 
   const activeAnomaliesCount = anomalies.filter(a => a.depotId === selectedDepotId && !a.resolved).length;
 
+  // --- CALCOLO DEI KPI E DELLE STATISTICHE ---
+  const calculateKpis = () => {
+    const depotBookings = bookings.filter(b => b.depotId === selectedDepotId);
+    
+    const filterByTimeRange = (bDate: string) => {
+      if (kpiTimeRange === 'oggi') {
+        return bDate === scheduleDate;
+      } else if (kpiTimeRange === '7g') {
+        const d = new Date(scheduleDate);
+        const b = new Date(bDate);
+        const diff = (d.getTime() - b.getTime()) / (1000 * 3600 * 24);
+        return diff >= 0 && diff <= 7;
+      } else {
+        const d = new Date(scheduleDate);
+        const b = new Date(bDate);
+        const diff = (d.getTime() - b.getTime()) / (1000 * 3600 * 24);
+        return diff >= 0 && diff <= 30;
+      }
+    };
+
+    const periodBookings = depotBookings.filter(b => filterByTimeRange(b.date));
+
+    // Tempi di attesa ed efficienza
+    let tatSum = 0;
+    let tatCount = 0;
+    let waitSum = 0;
+    let waitCount = 0;
+    let dwellSum = 0;
+    let dwellCount = 0;
+    let depDelaySum = 0;
+    let depDelayCount = 0;
+    let otifOnTime = 0;
+    let otifTotal = 0;
+    let lateCount = 0;
+
+    periodBookings.forEach(b => {
+      const matchedShip = shipments.find(s => s.bookingId === b.id);
+      const slotTimeStr = matchedShip?.expectedTime || '09:00';
+      
+      if (b.timeInGate && b.timeOutGate) {
+        const diff = (new Date(b.timeOutGate).getTime() - new Date(b.timeInGate).getTime()) / 60000;
+        if (diff > 0) {
+          tatSum += diff;
+          tatCount++;
+        }
+      }
+
+      if (b.timeInGate && b.timeInBay) {
+        const diff = (new Date(b.timeInBay).getTime() - new Date(b.timeInGate).getTime()) / 60000;
+        if (diff > 0) {
+          waitSum += diff;
+          waitCount++;
+        }
+      }
+
+      if (b.timeInBay && b.timeOutBay) {
+        const diff = (new Date(b.timeOutBay).getTime() - new Date(b.timeInBay).getTime()) / 60000;
+        if (diff > 0) {
+          dwellSum += diff;
+          dwellCount++;
+        }
+      }
+
+      if (b.timeInGate) {
+        otifTotal++;
+        const [slotH, slotM] = slotTimeStr.split(':').map(Number);
+        const actualArrival = new Date(b.timeInGate);
+        const slotDate = new Date(b.date);
+        slotDate.setHours(slotH || 9, slotM || 0, 0, 0);
+
+        const latenessMinutes = (actualArrival.getTime() - slotDate.getTime()) / 60000;
+        if (latenessMinutes <= 15) {
+          otifOnTime++;
+        } else {
+          lateCount++;
+        }
+      }
+
+      if (b.timeOutGate) {
+        const [slotH, slotM] = slotTimeStr.split(':').map(Number);
+        const slotDate = new Date(b.date);
+        slotDate.setHours(slotH || 9, slotM || 0, 0, 0);
+        const expectedExit = slotDate.getTime() + (60 * 60000);
+        const actualExit = new Date(b.timeOutGate).getTime();
+        const delay = (actualExit - expectedExit) / 60000;
+        if (delay > 0) {
+          depDelaySum += delay;
+          depDelayCount++;
+        }
+      }
+    });
+
+    const avgTat = tatCount > 0 ? Math.round(tatSum / tatCount) : 0;
+    const avgWait = waitCount > 0 ? Math.round(waitSum / waitCount) : 0;
+    const avgDwell = dwellCount > 0 ? Math.round(dwellSum / dwellCount) : 0;
+    const avgDepDelay = depDelayCount > 0 ? Math.round(depDelaySum / depDelayCount) : 0;
+    const otifRate = otifTotal > 0 ? Math.round((otifOnTime / otifTotal) * 100) : 100;
+    const lateRate = otifTotal > 0 ? Math.round((lateCount / otifTotal) * 100) : 0;
+
+    const inboundBookings = periodBookings.filter(b => ['SCARICO', 'RESO'].includes(b.activityType));
+    const outboundBookings = periodBookings.filter(b => ['CARICO', 'CONTAINER'].includes(b.activityType));
+    const inboundPallets = inboundBookings.reduce((sum, b) => sum + (b.palletPlaces || 0), 0);
+    const outboundPallets = outboundBookings.reduce((sum, b) => sum + (b.palletPlaces || 0), 0);
+
+    const depotShipments = shipments.filter(s => s.depotId === selectedDepotId);
+    const assignedCount = depotShipments.filter(s => s.bookingId).length;
+    const unassignedCount = depotShipments.filter(s => !s.bookingId).length;
+    const totalShipments = depotShipments.length;
+    const assignedRatio = totalShipments > 0 ? Math.round((assignedCount / totalShipments) * 100) : 100;
+    const unassignedRatio = totalShipments > 0 ? Math.round((unassignedCount / totalShipments) * 100) : 0;
+
+    const depotBays = bays.filter(b => b.depotId === selectedDepotId);
+    const bayOccupancy = depotBays.map(bay => {
+      let occupiedMinutes = 0;
+      periodBookings.filter(b => b.bayId === bay.id).forEach(b => {
+        if (b.timeInBay && b.timeOutBay) {
+          const m = (new Date(b.timeOutBay).getTime() - new Date(b.timeInBay).getTime()) / 60000;
+          if (m > 0) occupiedMinutes += m;
+        } else if (b.timeInBay && b.status === 'IN_BAIA') {
+          const m = (new Date().getTime() - new Date(b.timeInBay).getTime()) / 60000;
+          if (m > 0) occupiedMinutes += m;
+        }
+      });
+      const totalOperativeMinutes = 480;
+      const rate = Math.min(100, Math.round((occupiedMinutes / totalOperativeMinutes) * 100));
+      return {
+        bayId: bay.id,
+        bayName: bay.name,
+        occupiedMinutes,
+        rate
+      };
+    });
+
+    const avgDockUtilization = bayOccupancy.length > 0
+      ? Math.round(bayOccupancy.reduce((sum, b) => sum + b.rate, 0) / bayOccupancy.length)
+      : 0;
+
+    if (kpiDataSource === 'simulati') {
+      const seed = selectedDepotId === 'depot-milano' ? 1.0 : selectedDepotId === 'depot-roma' ? 0.85 : 0.72;
+      return {
+        tat: Math.round(48 * seed),
+        waitTime: Math.round(18 * seed),
+        dwellTime: Math.round(30 * seed),
+        otif: Math.round(92 - (seed * 8)),
+        lateRate: Math.round(8 + (seed * 5)),
+        departureDelay: Math.round(12 * seed),
+        throughput: {
+          inboundCount: Math.round(24 * seed),
+          inboundPallets: Math.round(480 * seed),
+          outboundCount: Math.round(18 * seed),
+          outboundPallets: Math.round(360 * seed)
+        },
+        ratios: {
+          assigned: Math.round(85 * seed),
+          unassigned: Math.round(100 - (85 * seed))
+        },
+        bayOccupancy: depotBays.map((bay, idx) => ({
+          bayId: bay.id,
+          bayName: bay.name,
+          rate: Math.round(Math.min(95, (60 + (idx * 8)) * seed))
+        })),
+        avgDockUtilization: Math.round(68 * seed)
+      };
+    }
+
+    return {
+      tat: avgTat,
+      waitTime: avgWait,
+      dwellTime: avgDwell,
+      otif: otifRate,
+      lateRate: lateRate,
+      departureDelay: avgDepDelay,
+      throughput: {
+        inboundCount: inboundBookings.length,
+        inboundPallets,
+        outboundCount: outboundBookings.length,
+        outboundPallets
+      },
+      ratios: {
+        assigned: assignedRatio,
+        unassigned: unassignedRatio
+      },
+      bayOccupancy: bayOccupancy.map(bo => ({
+        bayId: bo.bayId,
+        bayName: bo.bayName,
+        rate: bo.rate
+      })),
+      avgDockUtilization: avgDockUtilization
+    };
+  };
+
+  const kpis = calculateKpis();
+
   return (
     <div className="space-y-6 relative font-sans">
       
@@ -515,7 +990,7 @@ export const MonitorYard: React.FC = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center border-b border-black pb-4">
                 <div>
-                  <h1 className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</h1>
+                  <div className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</div>
                   <p className="text-[10px] font-mono">BUONO DI RICEVUTA RESO PALLET VUOTI</p>
                 </div>
                 <div className="border border-black p-2 font-mono text-center font-bold">
@@ -579,7 +1054,7 @@ export const MonitorYard: React.FC = () => {
               <div className="space-y-6">
                 <div className="flex justify-between items-center border-b border-black pb-4">
                   <div>
-                    <h1 className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</h1>
+                    <div className="text-lg font-black uppercase tracking-wider">Logistica Uno Europe</div>
                     <p className="text-[10px] font-mono">YARD QUALITY ASSURANCE REPORT</p>
                   </div>
                   <div className="border border-black p-2 font-mono text-center font-bold">
@@ -679,6 +1154,20 @@ export const MonitorYard: React.FC = () => {
             <div className="text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-3 px-2">// MENU GUARDIOLA</div>
             
             <button
+              onClick={() => setGuardiolaView('station')}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === 'station'
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">🚂 Yard Board</span>
+              <Badge variant={guardiolaView === 'station' ? 'info' : 'primary'}>
+                {shipments.filter(s => s.depotId === selectedDepotId && s.status !== 'COMPLETATO').length}
+              </Badge>
+            </button>
+
+            <button
               onClick={() => setGuardiolaView('bays')}
               className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
                 guardiolaView === 'bays'
@@ -764,6 +1253,31 @@ export const MonitorYard: React.FC = () => {
               )}
             </button>
 
+            <button
+              onClick={() => setGuardiolaView('shipments' as any)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === ('shipments' as any)
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">🚢 Gestione Spedizioni</span>
+              <Badge variant={guardiolaView === ('shipments' as any) ? 'info' : 'primary'}>
+                {shipments.filter(s => s.depotId === selectedDepotId).length}
+              </Badge>
+            </button>
+
+            <button
+              onClick={() => setGuardiolaView('kpis' as any)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl font-bold transition-all text-left cursor-pointer border ${
+                guardiolaView === ('kpis' as any)
+                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                  : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
+              }`}
+            >
+              <span className="flex items-center gap-2">📊 Statistiche & KPI</span>
+            </button>
+
             <div className="pt-4 border-t border-black/5 mt-4">
               <label className="block text-[9px] text-gray-400 font-bold uppercase tracking-wider mb-1.5 px-1">Filtra per Data:</label>
               <input
@@ -782,6 +1296,635 @@ export const MonitorYard: React.FC = () => {
           {/* Area Contenuto (Destra) */}
           <div className="lg:col-span-4">
             
+            {/* VISTA: TABELLONE YARD BOARD */}
+            {guardiolaView === 'station' && (
+              <div className="space-y-6 animate-fade-in">
+                {/* Board Layout (Grafica Standard) */}
+                <Card
+                  title={`YARD BOARD ARRIVI E PARTENZE - Plant: ${activeDepot?.name}`}
+                  accent="orange"
+                  headerAction={
+                    <div className="flex gap-2 font-mono">
+                      <button
+                        onClick={() => setStationSubTab('arrivi')}
+                        className={`px-3 py-1.5 font-mono text-xs font-bold uppercase transition-all rounded-lg cursor-pointer border ${
+                          stationSubTab === 'arrivi'
+                            ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                            : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
+                        }`}
+                      >
+                        🛬 Arrivi / Accettazione ({shipments.filter(s => s.depotId === selectedDepotId && s.activityType !== 'CARICO').length})
+                      </button>
+                      <button
+                        onClick={() => setStationSubTab('partenze')}
+                        className={`px-3 py-1.5 font-mono text-xs font-bold uppercase transition-all rounded-lg cursor-pointer border ${
+                          stationSubTab === 'partenze'
+                            ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                            : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
+                        }`}
+                      >
+                        🛫 Partenze / Spedizioni ({shipments.filter(s => s.depotId === selectedDepotId && s.activityType === 'CARICO').length})
+                      </button>
+                    </div>
+                  }
+                >
+                  {stationSubTab === 'arrivi' ? (
+                    <Table
+                      data={shipments
+                        .filter(s => s.depotId === selectedDepotId && s.activityType !== 'CARICO')
+                        .sort((a, b) => {
+                          const dateComp = (a.expectedDate || '').localeCompare(b.expectedDate || '');
+                          if (dateComp !== 0) return dateComp;
+                          return (a.expectedTime || '').localeCompare(b.expectedTime || '');
+                        })}
+                      emptyMessage="Nessun arrivo in tabella per questo stabilimento."
+                      columns={[
+                        {
+                          header: 'Ora Slot',
+                          accessor: (s) => <span className="font-bold text-xs font-mono text-ticket-accent">{s.expectedTime || '--:--'}</span>
+                        },
+                        {
+                          header: 'Cliente Committente',
+                          accessor: (s) => {
+                            const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                            const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Vettore';
+                            return (
+                              <div className="text-xs font-sans">
+                                <span className="font-bold block text-gray-800">{clientName}</span>
+                                <span className="text-[10px] text-gray-400 block">{carrierName}</span>
+                              </div>
+                            );
+                          }
+                        },
+                        {
+                          header: 'Riferimenti',
+                          accessor: (s) => (
+                            <div className="text-xs font-mono">
+                              <span className="font-bold block text-gray-800">{s.orderNumber}</span>
+                              {s.orderNumber2 && <span className="text-[10px] text-gray-400 block">Ref 2: {s.orderNumber2}</span>}
+                            </div>
+                          )
+                        },
+                        {
+                          header: 'Provenienza',
+                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.originOrDestination || '-'}</span>
+                        },
+                        {
+                          header: 'Merce',
+                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.goodsType || '-'}</span>
+                        },
+                        {
+                          header: 'PLT',
+                          accessor: (s) => <span className="font-bold text-xs font-mono text-gray-700">{s.palletPlaces} PL</span>
+                        },
+                        {
+                          header: 'Targa',
+                          accessor: (s) => {
+                            const booking = s.bookingId ? bookings.find(b => b.id === s.bookingId) : null;
+                            return <span className="text-xs font-mono text-gray-800">{s.licensePlate || booking?.licensePlate || '-'}</span>;
+                          }
+                        },
+                        {
+                          header: 'Stato Viaggio',
+                          accessor: (s) => {
+                            const booking = s.bookingId ? bookings.find(b => b.id === s.bookingId) : null;
+                            const isAssigned = !!s.bookingId;
+                            return isAssigned ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <Badge variant="success">🔗 {booking?.ticketNumber || 'Abbinato'}</Badge>
+                                {booking?.status && <span className="text-[8px] text-gray-400 font-mono uppercase">({booking.status.replace('_', ' ')})</span>}
+                              </div>
+                            ) : (
+                              <Badge variant="warning">📭 Da abbinare</Badge>
+                            );
+                          }
+                        }
+                      ]}
+                    />
+                  ) : (
+                    <Table
+                      data={shipments
+                        .filter(s => s.depotId === selectedDepotId && s.activityType === 'CARICO')
+                        .sort((a, b) => {
+                          const dateComp = (a.expectedDate || '').localeCompare(b.expectedDate || '');
+                          if (dateComp !== 0) return dateComp;
+                          return (a.expectedTime || '').localeCompare(b.expectedTime || '');
+                        })}
+                      emptyMessage="Nessuna spedizione in tabella per questo stabilimento."
+                      columns={[
+                        {
+                          header: 'Ora Slot',
+                          accessor: (s) => <span className="font-bold text-xs font-mono text-ticket-accent">{s.expectedTime || '--:--'}</span>
+                        },
+                        {
+                          header: 'Cliente Committente',
+                          accessor: (s) => {
+                            const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                            const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Vettore';
+                            return (
+                              <div className="text-xs font-sans">
+                                <span className="font-bold block text-gray-800">{clientName}</span>
+                                <span className="text-[10px] text-gray-400 block">{carrierName}</span>
+                              </div>
+                            );
+                          }
+                        },
+                        {
+                          header: 'Riferimenti',
+                          accessor: (s) => (
+                            <div className="text-xs font-mono">
+                              <span className="font-bold block text-gray-800">{s.orderNumber}</span>
+                              {s.orderNumber2 && <span className="text-[10px] text-gray-400 block">Ref 2: {s.orderNumber2}</span>}
+                            </div>
+                          )
+                        },
+                        {
+                          header: 'Destinazione',
+                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.originOrDestination || '-'}</span>
+                        },
+                        {
+                          header: 'Merce',
+                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.goodsType || '-'}</span>
+                        },
+                        {
+                          header: 'PLT',
+                          accessor: (s) => <span className="font-bold text-xs font-mono text-gray-700">{s.palletPlaces} PL</span>
+                        },
+                        {
+                          header: 'Targa',
+                          accessor: (s) => {
+                            const booking = s.bookingId ? bookings.find(b => b.id === s.bookingId) : null;
+                            return <span className="text-xs font-mono text-gray-800">{s.licensePlate || booking?.licensePlate || '-'}</span>;
+                          }
+                        },
+                        {
+                          header: 'Stato Viaggio',
+                          accessor: (s) => {
+                            const booking = s.bookingId ? bookings.find(b => b.id === s.bookingId) : null;
+                            const isAssigned = !!s.bookingId;
+                            return isAssigned ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <Badge variant="success">🔗 {booking?.ticketNumber || 'Abbinato'}</Badge>
+                                {booking?.status && <span className="text-[8px] text-gray-400 font-mono uppercase">({booking.status.replace('_', ' ')})</span>}
+                              </div>
+                            ) : (
+                              <Badge variant="warning">📭 Da abbinare</Badge>
+                            );
+                          }
+                        }
+                      ]}
+                    />
+                  )}
+                </Card>
+              </div>
+            )}
+
+            {/* AREA ASSOCIAZIONE POSTUMA - Solo nello Yard Board */}
+            {guardiolaView === 'station' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Spedizioni da abbinare */}
+                  <Card title="Spedizioni in attesa di abbinamento a camion fisici" accent="orange">
+                    <div className="space-y-4 max-h-[350px] overflow-y-auto">
+                      {shipments
+                        .filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO')
+                        .map(s => {
+                          const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                          const isLinking = activeLinkingShipmentId === s.id;
+                          
+                          // Filtra i mezzi attivi presenti in Yard
+                          const activeYardVehicles = bookings.filter(b => b.depotId === selectedDepotId && b.status !== 'COMPLETATO');
+
+                          return (
+                            <div key={s.id} className="p-3 bg-gray-50 border border-black/5 rounded-xl space-y-2">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <span className="font-bold font-mono text-ticket-accent text-xs block">{s.orderNumber}</span>
+                                  {s.orderNumber2 && <span className="text-[10px] text-gray-400 block font-mono">Ref 2: {s.orderNumber2}</span>}
+                                  <span className="text-[10px] font-sans text-gray-700 block mt-0.5">
+                                    Cliente: <span className="font-bold">{clientName}</span> | {s.palletPlaces} PLT | {s.activityType}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] font-mono bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded">
+                                  {s.expectedTime ? `${s.expectedDate} [${s.expectedTime}]` : s.expectedDate}
+                                </span>
+                              </div>
+
+                              {isLinking ? (
+                                <div className="p-2 bg-white border border-amber-500/30 rounded-lg space-y-2 font-sans">
+                                  <label className="block text-[9px] font-mono uppercase text-gray-500">Seleziona Veicolo in Yard:</label>
+                                  <select
+                                    value={linkingBookingId}
+                                    onChange={(e) => setLinkingBookingId(e.target.value)}
+                                    className="w-full bg-gray-50 border p-1 rounded font-mono text-xs focus:outline-none"
+                                  >
+                                    <option value="">Seleziona...</option>
+                                    {activeYardVehicles.map(b => (
+                                      <option key={b.id} value={b.id}>
+                                        {b.ticketNumber} | Targa: {b.licensePlate} ({b.driverName})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <div className="flex gap-2 justify-end">
+                                    <Button size="sm" variant="secondary" onClick={() => { setActiveLinkingShipmentId(null); setLinkingBookingId(''); }}>
+                                      Annulla
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="success"
+                                      disabled={!linkingBookingId}
+                                      onClick={() => {
+                                        bindShipmentsToBooking([s.id], linkingBookingId);
+                                        setActiveLinkingShipmentId(null);
+                                        setLinkingBookingId('');
+                                      }}
+                                    >
+                                      Conferma Abbina
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex justify-end pt-1">
+                                  <Button size="sm" variant="primary" className="text-[10px]" onClick={() => { setActiveLinkingShipmentId(s.id); setLinkingBookingId(''); }}>
+                                    🔗 Collega a Veicolo
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      {shipments.filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO').length === 0 && (
+                        <div className="text-center py-6 text-gray-400 italic text-xs">
+                          Nessuna spedizione orfana in attesa.
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+
+                  {/* Spedizioni associate attive */}
+                  <Card title="Spedizioni già associate ai viaggi in corso" accent="green">
+                    <div className="space-y-4 max-h-[350px] overflow-y-auto">
+                      {shipments
+                        .filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO')
+                        .map(s => {
+                          const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                          const booking = bookings.find(b => b.id === s.bookingId);
+
+                          return (
+                            <div key={s.id} className="p-3 bg-white border border-emerald-100 rounded-xl space-y-2 shadow-xs">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <span className="font-bold font-mono text-emerald-600 text-xs block">{s.orderNumber}</span>
+                                  <span className="text-[10px] font-sans text-gray-700 block mt-0.5">
+                                    Cliente: <span className="font-bold">{clientName}</span> | {s.palletPlaces} PLT | {s.activityType}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-gray-400 block mt-1">
+                                    Veicolo: <span className="font-bold text-ticket-accent">{booking?.ticketNumber || 'Sconosciuto'}</span> ({booking?.licensePlate})
+                                  </span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="danger"
+                                  className="text-[9px] py-1 px-2"
+                                  onClick={() => unbindShipmentFromBooking(s.id)}
+                                >
+                                  Scollega
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      {shipments.filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO').length === 0 && (
+                        <div className="text-center py-6 text-gray-400 italic text-xs">
+                          Nessuna spedizione associata attiva al momento.
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+            )}
+
+            {/* VISTA: GESTIONE SPEDIZIONI GUARDIOLA */}
+            {guardiolaView === ('shipments' as any) && (
+              <div className="lg:col-span-3 space-y-6 animate-fade-in font-sans">
+                
+                {/* BARRA DELLE AZIONI PRINCIPALI (BOTTONI MANUALE & IMPORT E BATCH DELETE) */}
+                <div className="flex flex-wrap gap-3 items-center justify-between bg-white border border-black/10 p-4 rounded-xl shadow-xs">
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="primary" 
+                      onClick={() => {
+                        resetShipmentForm();
+                        setIsNewShipmentModalOpen(true);
+                      }}
+                      className="font-bold text-xs uppercase tracking-wide cursor-pointer"
+                    >
+                      ➕ Nuova Spedizione Manuale
+                    </Button>
+                    <Button 
+                      variant="secondary" 
+                      onClick={() => {
+                        setIsImportShipmentModalOpen(true);
+                      }}
+                      className="font-bold text-xs uppercase tracking-wide cursor-pointer"
+                    >
+                      📥 Import Spedizioni (CSV/TXT)
+                    </Button>
+                  </div>
+
+                  {/* AZIONI MASSIVE (Solo se ci sono elementi selezionati) */}
+                  {selectedShipmentIds.length > 0 && (
+                    <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-lg animate-fade-in">
+                      <span className="text-[10px] font-mono text-rose-700 font-bold">
+                        {selectedShipmentIds.length} spedizion{selectedShipmentIds.length === 1 ? 'e' : 'i'} selezionat{selectedShipmentIds.length === 1 ? 'a' : 'e'}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          if (confirm(`Sei sicuro di voler eliminare permanentemente queste ${selectedShipmentIds.length} spedizioni?`)) {
+                            deleteShipments(selectedShipmentIds);
+                            setSelectedShipmentIds([]);
+                          }
+                        }}
+                        className="py-1 text-[9px] uppercase font-bold"
+                      >
+                        🗑️ Elimina Selezionate
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* BARRA FILTRI AVANZATI CON CARATTERE speciale & */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-gray-50 border border-black/5 p-4 rounded-xl">
+                  <div>
+                    <label className="text-[9px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                      Cerca Riferimento (Es. ORD1&ORD2)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Codice ordine o riferimento..."
+                      value={filterReference}
+                      onChange={(e) => setFilterReference(e.target.value)}
+                      className="w-full bg-white border border-black/10 rounded-lg px-3 py-1.5 text-xs font-mono focus:ring-0 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                      Cerca Soggetto / Città / Tratta (Con &)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nome, comune o tratta..."
+                      value={filterSearch}
+                      onChange={(e) => setFilterSearch(e.target.value)}
+                      className="w-full bg-white border border-black/10 rounded-lg px-3 py-1.5 text-xs font-mono focus:ring-0 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                      Filtra per Provincia (Es. RM&LT)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Sigla provincia (MI, RM, etc)..."
+                      value={filterProvince}
+                      onChange={(e) => setFilterProvince(e.target.value)}
+                      className="w-full bg-white border border-black/10 rounded-lg px-3 py-1.5 text-xs font-mono focus:ring-0 focus:outline-none uppercase"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[9px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                      Filtra per Nazione (Es. Italia&Francia)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Stato di provenienza/consegna..."
+                      value={filterCountry}
+                      onChange={(e) => setFilterCountry(e.target.value)}
+                      className="w-full bg-white border border-black/10 rounded-lg px-3 py-1.5 text-xs font-mono focus:ring-0 focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* TABELLA FULL-WIDTH DEI RISULTATI */}
+                <Card title="Viaggi e Spedizioni Daily Program">
+                  <Table
+                    data={shipments.filter(s => {
+                      if (s.depotId !== selectedDepotId) return false;
+
+                      // Riferimenti
+                      if (filterReference.trim()) {
+                        const query = filterReference.trim().toLowerCase();
+                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+                        if (terms.length > 0) {
+                          const matchesAny = terms.some(term => 
+                            s.orderNumber.toLowerCase() === term || 
+                            (s.orderNumber2 && s.orderNumber2.toLowerCase() === term)
+                          );
+                          if (!matchesAny) return false;
+                        }
+                      }
+
+                      // Ricerca Libera
+                      if (filterSearch.trim()) {
+                        const query = filterSearch.trim().toLowerCase();
+                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+                        if (terms.length > 0) {
+                          const matchesAny = terms.some(term => {
+                            const sName = (s.subjectName || '').toLowerCase();
+                            const sCity = (s.city || '').toLowerCase();
+                            const sProv = (s.province || '').toLowerCase();
+                            const sCountry = (s.country || '').toLowerCase();
+                            const sOriginDest = (s.originOrDestination || '').toLowerCase();
+                            return sName.includes(term) || 
+                                   sCity.includes(term) || 
+                                   sProv.includes(term) || 
+                                   sCountry.includes(term) ||
+                                   sOriginDest.includes(term);
+                          });
+                          if (!matchesAny) return false;
+                        }
+                      }
+
+                      // Provincia
+                      if (filterProvince.trim()) {
+                        const query = filterProvince.trim().toLowerCase();
+                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+                        if (terms.length > 0) {
+                          const matchesAny = terms.some(term => (s.province || '').toLowerCase() === term);
+                          if (!matchesAny) return false;
+                        }
+                      }
+
+                      // Nazione
+                      if (filterCountry.trim()) {
+                        const query = filterCountry.trim().toLowerCase();
+                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+                        if (terms.length > 0) {
+                          const matchesAny = terms.some(term => (s.country || '').toLowerCase() === term);
+                          if (!matchesAny) return false;
+                        }
+                      }
+
+                      return true;
+                    })}
+                    emptyMessage="Nessun viaggio commissionato corrisponde ai filtri impostati."
+                    columns={[
+                      {
+                        header: (
+                          <input
+                            type="checkbox"
+                            checked={
+                              shipments.filter(s => s.depotId === selectedDepotId).length > 0 &&
+                              selectedShipmentIds.length === shipments.filter(s => s.depotId === selectedDepotId).length
+                            }
+                            onChange={(e) => {
+                              const deptShips = shipments.filter(s => s.depotId === selectedDepotId);
+                              if (e.target.checked) {
+                                setSelectedShipmentIds(deptShips.map(s => s.id));
+                              } else {
+                                setSelectedShipmentIds([]);
+                              }
+                            }}
+                            className="rounded border-black/10 text-[#004B97] focus:ring-[#004B97] cursor-pointer"
+                          />
+                        ),
+                        className: "w-10 text-center",
+                        accessor: (s) => (
+                          <input
+                            type="checkbox"
+                            checked={selectedShipmentIds.includes(s.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedShipmentIds(prev => [...prev, s.id]);
+                              } else {
+                                setSelectedShipmentIds(prev => prev.filter(id => id !== s.id));
+                              }
+                            }}
+                            className="rounded border-black/10 text-[#004B97] focus:ring-[#004B97] cursor-pointer"
+                          />
+                        )
+                      },
+                      {
+                        header: 'Flusso',
+                        accessor: (s) => (
+                          <div className="space-y-1">
+                            <Badge variant={['SCARICO', 'RESO'].includes(s.activityType) ? 'info' : 'success'}>
+                              {['SCARICO', 'RESO'].includes(s.activityType) ? 'ARRIVO PLANT' : 'PARTENZA PLANT'}
+                            </Badge>
+                            <span className="block text-[8px] text-gray-400 font-bold uppercase tracking-wider">{s.activityType}</span>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Riferimenti',
+                        accessor: (s) => (
+                          <div className="font-mono text-xs">
+                            <span className="font-bold text-ticket-accent block">{s.orderNumber}</span>
+                            {s.orderNumber2 && <span className="text-gray-400 text-[10px] block">Rif 2: {s.orderNumber2}</span>}
+                            {s.deliveryNotes && (
+                              <span className="inline-block mt-1 text-[9px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.deliveryNotes}>
+                                📝 {s.deliveryNotes}
+                              </span>
+                            )}
+                            {s.internalNotes && (
+                              <span className="inline-block mt-1 text-[9px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.internalNotes}>
+                                🔒 {s.internalNotes}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Committente / Soggetto & Tratta',
+                        accessor: (s) => {
+                          const clientName = clients.find(c => c.id === s.clientId)?.name || 'Sconosciuto';
+                          const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Sconosciuto';
+                          return (
+                            <div className="text-xs font-sans space-y-0.5">
+                              <div><span className="text-[9px] text-gray-400 font-mono">Client:</span> <span className="font-bold">{clientName}</span></div>
+                              {s.subjectName && (
+                                <div>
+                                  <span className="text-[9px] text-gray-400 font-mono">Soggetto:</span> <span className="font-semibold text-ticket-accent">{s.subjectName}</span>
+                                </div>
+                              )}
+                              <div className="text-[10px] text-gray-500 font-semibold mt-1">
+                                📍 {s.city || s.originOrDestination || 'N/D'} 
+                                {s.province && ` (${s.province})`}
+                                {s.country && ` - ${s.country}`}
+                              </div>
+                              {s.address && <div className="text-[9px] text-gray-400 italic">via {s.address}</div>}
+                              <div className="text-gray-500 text-[9px] mt-1 italic">Vettore: {carrierName}</div>
+                            </div>
+                          );
+                        }
+                      },
+                      {
+                        header: 'Data / Ora Slot',
+                        accessor: (s) => (
+                          <div className="text-xs font-mono">
+                            <span className="font-bold">{s.expectedDate}</span>
+                            {s.expectedTime && <span className="block text-ticket-accent">[{s.expectedTime}]</span>}
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Carico',
+                        accessor: (s) => (
+                          <div className="text-xs font-mono">
+                            <span className="block font-bold">{s.palletPlaces} PLT</span>
+                            {s.grossWeight !== undefined && <span className="block text-[10px] text-gray-500">{s.grossWeight} kg</span>}
+                            {s.goodsType && <span className="block text-[9px] text-gray-400 truncate max-w-[100px]">{s.goodsType}</span>}
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Viaggio',
+                        accessor: (s) => {
+                          if (s.bookingId) {
+                            const booking = bookings.find(b => b.id === s.bookingId);
+                            return (
+                              <div className="text-xs font-mono">
+                                <span className="font-bold text-emerald-600 block">{booking?.ticketNumber || 'Abbinato'}</span>
+                                {s.licensePlate && <span className="text-gray-400 text-[10px] block">Targa: {s.licensePlate}</span>}
+                              </div>
+                            );
+                          }
+                          return <span className="text-gray-400 italic text-[10px] font-sans">Non Abbinato</span>;
+                        }
+                      },
+                      {
+                        header: 'Stato',
+                        accessor: (s) => (
+                          <Badge variant={s.status === 'COMPLETATO' ? 'success' : s.status === 'PIANIFICATO' ? 'info' : 'warning'}>
+                            {s.status.replace('_', ' ')}
+                          </Badge>
+                        )
+                      },
+                      {
+                        header: 'Azioni',
+                        className: "w-28 text-center",
+                        accessor: (s) => (
+                          <div className="flex gap-1 justify-center">
+                            <Button size="sm" variant="secondary" onClick={() => handleEditShipmentClick(s)}>
+                              Modifica
+                            </Button>
+                            <Button size="sm" variant="danger" onClick={() => {
+                              if (confirm('Sei sicuro di voler eliminare questa spedizione?')) {
+                                deleteShipment(s.id);
+                              }
+                            }}>
+                              Rimuovi
+                            </Button>
+                          </div>
+                        )
+                      }
+                    ]}
+                  />
+                </Card>
+              </div>
+            )}
+
             {/* VISTA: STATO BAIE */}
             {guardiolaView === 'bays' && (
               <Card
@@ -1227,6 +2370,73 @@ export const MonitorYard: React.FC = () => {
                         onChange={(e) => setManualOrderNumber2(e.target.value)}
                       />
                     </div>
+
+                    {/* SMART CHECK-IN MATCHING SYSTEM */}
+                    {manualOrderNumber && (
+                      <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-2">
+                        {shipments.filter(s =>
+                          s.depotId === selectedDepotId &&
+                          !s.bookingId &&
+                          s.status !== 'COMPLETATO' &&
+                          (
+                            (manualOrderNumber && s.orderNumber?.toUpperCase().includes(manualOrderNumber.toUpperCase())) ||
+                            (manualOrderNumber && s.orderNumber2?.toUpperCase().includes(manualOrderNumber.toUpperCase())) ||
+                            (manualPlate && s.licensePlate?.toUpperCase().replace(/\s+/g, '') === manualPlate.toUpperCase().replace(/\s+/g, ''))
+                          )
+                        ).length > 0 ? (
+                          <>
+                            <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold uppercase tracking-wider font-mono">
+                              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                              🎯 Spedizioni Abbinabili Trovate!
+                            </div>
+                            <p className="text-[9px] text-gray-500 font-sans">Seleziona le spedizioni previste a sistema per questo carico:</p>
+                            <div className="space-y-1.5 font-mono text-[10px]">
+                              {shipments.filter(s =>
+                                s.depotId === selectedDepotId &&
+                                !s.bookingId &&
+                                s.status !== 'COMPLETATO' &&
+                                (
+                                  (manualOrderNumber && s.orderNumber?.toUpperCase().includes(manualOrderNumber.toUpperCase())) ||
+                                  (manualOrderNumber && s.orderNumber2?.toUpperCase().includes(manualOrderNumber.toUpperCase())) ||
+                                  (manualPlate && s.licensePlate?.toUpperCase().replace(/\s+/g, '') === manualPlate.toUpperCase().replace(/\s+/g, ''))
+                                )
+                              ).map(s => {
+                                const clientName = bayUsages.find(u => u.id === s.clientId)?.name || 'Cliente';
+                                const isChecked = selectedShipmentIdsForCheckIn.includes(s.id);
+                                return (
+                                  <label key={s.id} className="flex items-center gap-2 bg-white border p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-all select-none border-black/5">
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedShipmentIdsForCheckIn(prev => [...prev, s.id]);
+                                        } else {
+                                          setSelectedShipmentIdsForCheckIn(prev => prev.filter(id => id !== s.id));
+                                        }
+                                      }}
+                                    />
+                                    <div>
+                                      <span className="font-bold text-ticket-accent">{s.orderNumber}</span>
+                                      {s.orderNumber2 && <span className="text-gray-400"> (Ref 2: {s.orderNumber2})</span>}
+                                      <span className="block text-[9px] text-gray-500">Cliente: {clientName} | {s.palletPlaces} PLT | {s.activityType}</span>
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-start gap-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[10px] font-sans">
+                            <span className="text-xs">⚠️</span>
+                            <div>
+                              <span className="font-bold block">Nessun viaggio/spedizione pianificato trovato per '{manualOrderNumber}'</span>
+                              <span className="text-rose-600 block mt-0.5">Il mezzo verrà registrato in Yard sul piazzale come transito generico. Potrà essere abbinato postumo nel tabellone.</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="grid grid-cols-3 gap-2">
                       <Input
                         label="Patente N."
@@ -1366,7 +2576,7 @@ export const MonitorYard: React.FC = () => {
                 </Card>
 
                 {/* TABELLONE */}
-                <Card title={`Programmazione Attività del Cantiere - Giorno: ${scheduleDate}`}>
+                <Card title={`Programmazione Attività del Yard - Giorno: ${scheduleDate}`}>
                   <Table
                     data={dayBookings}
                     emptyMessage="Nessun transito pianificato o registrato per questa data."
@@ -1493,7 +2703,7 @@ export const MonitorYard: React.FC = () => {
             {guardiolaView === 'anomalies' && (
               <Card title={`Gestione Anomalie e Problematiche - Plant: ${activeDepot?.name}`}>
                 <p className="text-xs text-ticket-muted mb-4 font-mono uppercase">
-                  // LOG ATTIVI DI ACCESSO AL CANTIERE CHE RICHIEDONO VERIFICHE O DEROGHE
+                  // LOG ATTIVI DI ACCESSO AL YARD CHE RICHIEDONO VERIFICHE O DEROGHE
                 </p>
                 <Table
                   data={anomalies.filter(a => a.depotId === selectedDepotId)}
@@ -1557,6 +2767,354 @@ export const MonitorYard: React.FC = () => {
                   ]}
                 />
               </Card>
+            )}
+
+            {/* VISTA: STATISTICHE E KPI */}
+            {guardiolaView === ('kpis' as any) && (
+              <div className="lg:col-span-4 space-y-6 animate-fade-in font-sans">
+                
+                {/* Barra di Controllo Filtri */}
+                <div className="flex flex-wrap gap-4 items-center justify-between bg-white border border-black/10 p-4 rounded-xl shadow-xs">
+                  <div>
+                    <h3 className="font-bold text-sm uppercase text-ticket-accent tracking-wide">
+                      📊 Cruscotto Direzionale KPI & Performance
+                    </h3>
+                    <p className="text-[9px] text-gray-400 font-mono mt-0.5">
+                      Statistiche di efficienza piazzale, puntualità vettori e saturazione baie per {activeDepot?.name}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-3">
+                    {/* Filtro Periodo */}
+                    <div className="flex rounded-lg bg-gray-100 p-0.5 border border-black/5 font-mono text-[9px]">
+                      <button
+                        onClick={() => setKpiTimeRange('oggi')}
+                        className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                          kpiTimeRange === 'oggi' ? 'bg-white text-black shadow-xs' : 'text-gray-400 hover:text-black'
+                        }`}
+                      >
+                        OGGI
+                      </button>
+                      <button
+                        onClick={() => setKpiTimeRange('7g')}
+                        className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                          kpiTimeRange === '7g' ? 'bg-white text-black shadow-xs' : 'text-gray-400 hover:text-black'
+                        }`}
+                      >
+                        7 GIORNI
+                      </button>
+                      <button
+                        onClick={() => setKpiTimeRange('30g')}
+                        className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                          kpiTimeRange === '30g' ? 'bg-white text-black shadow-xs' : 'text-gray-400 hover:text-black'
+                        }`}
+                      >
+                        30 GIORNI
+                      </button>
+                    </div>
+
+                    {/* Filtro Sorgente Dati */}
+                    <div className="flex rounded-lg bg-gray-100 p-0.5 border border-black/5 font-mono text-[9px]">
+                      <button
+                        onClick={() => setKpiDataSource('reali')}
+                        className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                          kpiDataSource === 'reali' ? 'bg-[#004B97] text-white shadow-xs' : 'text-gray-400 hover:text-black'
+                        }`}
+                      >
+                        DATI REALI
+                      </button>
+                      <button
+                        onClick={() => setKpiDataSource('simulati')}
+                        className={`px-2.5 py-1.5 rounded-md font-bold transition-all cursor-pointer ${
+                          kpiDataSource === 'simulati' ? 'bg-[#004B97] text-white shadow-xs' : 'text-gray-400 hover:text-black'
+                        }`}
+                      >
+                        DEMO SIMULATI
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* GRIGLIA KPI PRINCIPALI */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* KPI 1: Turnaround Time */}
+                  <Card title="Avg Turnaround Time (TAT)" accent="orange">
+                    <div className="flex flex-col items-center py-4 space-y-3">
+                      <div className="relative w-32 h-32">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="#f3f4f6" strokeWidth="8" fill="transparent" />
+                          <circle 
+                            cx="50" 
+                            cy="50" 
+                            r="40" 
+                            stroke="#f97316" 
+                            strokeWidth="8" 
+                            fill="transparent" 
+                            strokeDasharray="251.2"
+                            strokeDashoffset={251.2 - (251.2 * Math.min(100, (kpis.tat / 90) * 100)) / 100}
+                            className="transition-all duration-1000 ease-out"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
+                          <span className="text-2xl font-bold text-black">{kpis.tat}</span>
+                          <span className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">MINUTI</span>
+                        </div>
+                      </div>
+                      <div className="text-center font-mono text-[10px] text-gray-500 space-y-1">
+                        <div>Tempo medio totale del mezzo nel plant</div>
+                        <div className="text-orange-600 font-bold uppercase text-[9px]">Soglia Target: &lt; 60 min</div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* KPI 2: OTIF Carrier Performance */}
+                  <Card title="Slot Adherence / OTIF" accent="green">
+                    <div className="flex flex-col items-center py-4 space-y-3">
+                      <div className="relative w-32 h-32">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="#f3f4f6" strokeWidth="8" fill="transparent" />
+                          <circle 
+                            cx="50" 
+                            cy="50" 
+                            r="40" 
+                            stroke="#10b981" 
+                            strokeWidth="8" 
+                            fill="transparent" 
+                            strokeDasharray="251.2"
+                            strokeDashoffset={251.2 - (251.2 * kpis.otif) / 100}
+                            className="transition-all duration-1000 ease-out"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
+                          <span className="text-2xl font-bold text-black">{kpis.otif}%</span>
+                          <span className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">PUNTUALE</span>
+                        </div>
+                      </div>
+                      <div className="text-center font-mono text-[10px] text-gray-500 space-y-1">
+                        <div>Vettori arrivati entro 15m dallo slot</div>
+                        <div className="text-emerald-600 font-bold uppercase text-[9px]">Target: &gt; 90%</div>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* KPI 3: Dock Utilization */}
+                  <Card title="Avg Dock Utilization" accent="blue">
+                    <div className="flex flex-col items-center py-4 space-y-3">
+                      <div className="relative w-32 h-32">
+                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="40" stroke="#f3f4f6" strokeWidth="8" fill="transparent" />
+                          <circle 
+                            cx="50" 
+                            cy="50" 
+                            r="40" 
+                            stroke="#3b82f6" 
+                            strokeWidth="8" 
+                            fill="transparent" 
+                            strokeDasharray="251.2"
+                            strokeDashoffset={251.2 - (251.2 * kpis.avgDockUtilization) / 100}
+                            className="transition-all duration-1000 ease-out"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center font-mono">
+                          <span className="text-2xl font-bold text-black">{kpis.avgDockUtilization}%</span>
+                          <span className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">SATURATO</span>
+                        </div>
+                      </div>
+                      <div className="text-center font-mono text-[10px] text-gray-500 space-y-1">
+                        <div>Percentuale occupazione baie (8h)</div>
+                        <div className="text-blue-600 font-bold uppercase text-[9px]">Ottimale: 60% - 80%</div>
+                      </div>
+                    </div>
+                  </Card>
+                </div>
+
+                {/* DETTAGLI DELLE MACRO-AREE IN GRIGLIA */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  
+                  {/* SINISTRA: TEMPI OPERATIVI E DI ATTESA */}
+                  <div className="lg:col-span-2 space-y-6">
+                    <Card title="1. Dettaglio Efficienza Tempi (Operational & Wait)">
+                      <div className="space-y-4 font-mono text-xs">
+                        
+                        {/* Yard Wait Time */}
+                        <div className="space-y-1.5 p-3.5 bg-gray-50 border border-black/5 rounded-xl">
+                          <div className="flex justify-between font-bold text-[10px] uppercase text-gray-500">
+                            <span>Yard Wait Time (Attesa Piazzale)</span>
+                            <span className="text-ticket-accent font-bold">{kpis.waitTime} Minuti</span>
+                          </div>
+                          <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-orange-400 transition-all duration-500" 
+                              style={{ width: `${Math.min(100, (kpis.waitTime / 45) * 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-[9px] text-gray-400 leading-normal">
+                            Tempo intercorso tra il check-in in Guardiola e l'aggancio in baia. Obiettivo: ridurre al minimo per sbloccare la coda a piazzale.
+                          </p>
+                        </div>
+
+                        {/* Dwell Time Loading/Unloading */}
+                        <div className="space-y-1.5 p-3.5 bg-gray-50 border border-black/5 rounded-xl">
+                          <div className="flex justify-between font-bold text-[10px] uppercase text-gray-500">
+                            <span>Dwell Loading/Unloading Time (Carico/Scarico)</span>
+                            <span className="text-ticket-accent font-bold">{kpis.dwellTime} Minuti</span>
+                          </div>
+                          <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-emerald-400 transition-all duration-500" 
+                              style={{ width: `${Math.min(100, (kpis.dwellTime / 60) * 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-[9px] text-gray-400 leading-normal">
+                            Tempo effettivo speso alla rampa di carico. Misura l'efficienza degli addetti interni alla movimentazione.
+                          </p>
+                        </div>
+
+                        {/* Departure Delay */}
+                        <div className="space-y-1.5 p-3.5 bg-gray-50 border border-black/5 rounded-xl">
+                          <div className="flex justify-between font-bold text-[10px] uppercase text-gray-500">
+                            <span>Departure Delay (Ritardo in Partenza)</span>
+                            <span className="text-rose-600 font-bold">{kpis.departureDelay} Minuti</span>
+                          </div>
+                          <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-rose-400 transition-all duration-500" 
+                              style={{ width: `${Math.min(100, (kpis.departureDelay / 30) * 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-[9px] text-gray-400 leading-normal">
+                            Tempo accumulato oltre lo slot previsto per l'uscita, solitamente dovuto a ritardi documentali (DDT/Buoni).
+                          </p>
+                        </div>
+
+                      </div>
+                    </Card>
+
+                    {/* Carrier Performance */}
+                    <Card title="2. Affidabilità e Ritardi Vettori (Carrier Performance)">
+                      <div className="space-y-4 font-mono text-xs">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="p-3 bg-red-50 border border-red-100 text-red-800 rounded-xl space-y-1">
+                            <span className="text-[9px] text-red-500 font-bold uppercase tracking-wider block">Tasso di Ritardo</span>
+                            <div className="text-xl font-bold">{kpis.lateRate}%</div>
+                            <span className="text-[8px] text-gray-400 block font-sans">Vettori fuori dallo slot concordato</span>
+                          </div>
+                          
+                          <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl space-y-1">
+                            <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider block">Unassigned Ratio</span>
+                            <div className="text-xl font-bold">{kpis.ratios.unassigned}%</div>
+                            <span className="text-[8px] text-gray-400 block font-sans">Spedizioni orfane senza mezzo associato</span>
+                          </div>
+                        </div>
+
+                        {/* Carrier list */}
+                        <div className="space-y-2.5">
+                          <div className="text-[9px] font-bold uppercase text-gray-400 tracking-wider border-b border-black/5 pb-1">Slot Adherence per Carrier</div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span>Logistica Uno Europe</span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{ width: '94%' }} />
+                                </div>
+                                <span className="font-bold">94%</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span>Freccia Rossa Trasporti</span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{ width: '88%' }} />
+                                </div>
+                                <span className="font-bold">88%</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-center text-[10px]">
+                              <span>Adriatica Cargo Srl</span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                  <div className="h-full bg-amber-500" style={{ width: '75%' }} />
+                                </div>
+                                <span className="font-bold">75%</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    </Card>
+                  </div>
+
+                  {/* DESTRA: UTILIZZO RISORSE E VOLUMI */}
+                  <div className="lg:col-span-1 space-y-6">
+                    
+                    {/* Throughput */}
+                    <Card title="3. Throughput & Volumi Gestiti">
+                      <div className="space-y-4 font-mono text-xs">
+                        
+                        {/* Inbound */}
+                        <div className="p-3.5 bg-blue-50 border border-blue-100 text-blue-900 rounded-xl space-y-2">
+                          <div className="flex justify-between items-center font-bold text-[10px] uppercase">
+                            <span>📥 Inbound (Entrata)</span>
+                            <span className="font-bold">{kpis.throughput.inboundCount} Camion</span>
+                          </div>
+                          <div className="text-lg font-bold">{kpis.throughput.inboundPallets} PLT</div>
+                          <span className="text-[8px] text-gray-400 block font-sans">Attività di Scarico e Ricezione Resi</span>
+                        </div>
+
+                        {/* Outbound */}
+                        <div className="p-3.5 bg-emerald-50 border border-emerald-100 text-emerald-900 rounded-xl space-y-2">
+                          <div className="flex justify-between items-center font-bold text-[10px] uppercase">
+                            <span>📤 Outbound (Uscita)</span>
+                            <span className="font-bold">{kpis.throughput.outboundCount} Camion</span>
+                          </div>
+                          <div className="text-lg font-bold">{kpis.throughput.outboundPallets} PLT</div>
+                          <span className="text-[8px] text-gray-400 block font-sans">Attività di Carico e Containerizzazioni</span>
+                        </div>
+
+                      </div>
+                    </Card>
+
+                    {/* Dock Utilization */}
+                    <Card title="4. Saturazione Baie (Dock Usage)">
+                      <div className="space-y-3 font-mono text-xs">
+                        <p className="text-[9px] text-gray-400 leading-normal border-b border-black/5 pb-2">
+                          Tasso di saturazione su base 8 ore operative per singola baia dello stabilimento.
+                        </p>
+                        
+                        <div className="space-y-3">
+                          {kpis.bayOccupancy.map(bay => (
+                            <div key={bay.bayId} className="space-y-1">
+                              <div className="flex justify-between text-[10px]">
+                                <span className="font-bold">{bay.bayName}</span>
+                                <span className="font-bold text-ticket-accent">{bay.rate}%</span>
+                              </div>
+                              <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all duration-500 ${
+                                    bay.rate > 85 ? 'bg-rose-500' : bay.rate > 60 ? 'bg-blue-500' : 'bg-gray-400'
+                                  }`}
+                                  style={{ width: `${bay.rate}%` }}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          {kpis.bayOccupancy.length === 0 && (
+                            <div className="text-center py-6 text-gray-400 italic text-xs">
+                              Nessuna baia configurata in questo stabilimento.
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
+                    </Card>
+
+                  </div>
+
+                </div>
+
+              </div>
             )}
 
           </div>
@@ -1705,6 +3263,73 @@ export const MonitorYard: React.FC = () => {
                   onChange={(e) => setCheckInOrderNumber2(e.target.value)}
                 />
               </div>
+
+              {/* SMART CHECK-IN MATCHING SYSTEM IN MODAL */}
+              {checkInOrderNumber && (
+                <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl space-y-2">
+                  {shipments.filter(s =>
+                    s.depotId === selectedDepotId &&
+                    !s.bookingId &&
+                    s.status !== 'COMPLETATO' &&
+                    (
+                      (checkInOrderNumber && s.orderNumber?.toUpperCase().includes(checkInOrderNumber.toUpperCase())) ||
+                      (checkInOrderNumber && s.orderNumber2?.toUpperCase().includes(checkInOrderNumber.toUpperCase())) ||
+                      (checkInBooking?.licensePlate && s.licensePlate?.toUpperCase().replace(/\s+/g, '') === checkInBooking.licensePlate.toUpperCase().replace(/\s+/g, ''))
+                    )
+                  ).length > 0 ? (
+                    <>
+                      <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold uppercase tracking-wider font-mono">
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                        🎯 Spedizioni Abbinabili Trovate!
+                      </div>
+                      <p className="text-[9px] text-gray-500 font-sans">Seleziona le spedizioni previste a sistema per questo carico:</p>
+                      <div className="space-y-1.5 font-mono text-[10px]">
+                        {shipments.filter(s =>
+                          s.depotId === selectedDepotId &&
+                          !s.bookingId &&
+                          s.status !== 'COMPLETATO' &&
+                          (
+                            (checkInOrderNumber && s.orderNumber?.toUpperCase().includes(checkInOrderNumber.toUpperCase())) ||
+                            (checkInOrderNumber && s.orderNumber2?.toUpperCase().includes(checkInOrderNumber.toUpperCase())) ||
+                            (checkInBooking?.licensePlate && s.licensePlate?.toUpperCase().replace(/\s+/g, '') === checkInBooking.licensePlate.toUpperCase().replace(/\s+/g, ''))
+                          )
+                        ).map(s => {
+                          const clientName = bayUsages.find(u => u.id === s.clientId)?.name || 'Cliente';
+                          const isChecked = selectedShipmentIdsForCheckIn.includes(s.id);
+                          return (
+                            <label key={s.id} className="flex items-center gap-2 bg-white border p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-all select-none border-black/5">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedShipmentIdsForCheckIn(prev => [...prev, s.id]);
+                                  } else {
+                                    setSelectedShipmentIdsForCheckIn(prev => prev.filter(id => id !== s.id));
+                                  }
+                                }}
+                              />
+                              <div>
+                                <span className="font-bold text-ticket-accent">{s.orderNumber}</span>
+                                {s.orderNumber2 && <span className="text-gray-400"> (Ref 2: {s.orderNumber2})</span>}
+                                <span className="block text-[9px] text-gray-500">Cliente: {clientName} | {s.palletPlaces} PLT | {s.activityType}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-start gap-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[10px] font-sans">
+                      <span className="text-xs">⚠️</span>
+                      <div>
+                        <span className="font-bold block">Nessun viaggio/spedizione pianificato trovato per '{checkInOrderNumber}'</span>
+                        <span className="text-rose-600 block mt-0.5">Il mezzo farà ingresso senza spedizioni collegate a sistema.</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-1">
                 <Input
@@ -2438,6 +4063,350 @@ export const MonitorYard: React.FC = () => {
                   Completa Attività & Libera
                 </Button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE DI INSERIMENTO / MODIFICA SPEDIZIONE MANUALE */}
+      {isNewShipmentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full border border-black/10 overflow-hidden my-8">
+            <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white p-4 flex justify-between items-center">
+              <h3 className="font-bold text-sm uppercase tracking-wide">
+                {shipmentFormId ? "Modifica Spedizione Manuale" : "Nuova Spedizione Manuale"}
+              </h3>
+              <button 
+                onClick={() => { resetShipmentForm(); setIsNewShipmentModalOpen(false); }}
+                className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
+              >
+                ×
+              </button>
+            </div>
+            <form onSubmit={handleSaveShipmentForm} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+              
+              {/* DISTINZIONE NETTA ARRIVO / PARTENZA */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
+                  Tipologia Flusso (Distinzione Arrivo/Partenza sul Plant)
+                </label>
+                <div className="flex rounded-xl bg-gray-100 p-1 border border-black/5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShipmentFormType('SCARICO');
+                    }}
+                    className={`flex-grow py-2 text-center text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      ['SCARICO', 'RESO'].includes(shipmentFormType)
+                        ? 'bg-[#004B97] text-white shadow-sm'
+                        : 'text-gray-500 hover:text-black'
+                    }`}
+                  >
+                    📥 Arrivo sul Plant (Accettazione / Scarico / Reso)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShipmentFormType('CARICO');
+                    }}
+                    className={`flex-grow py-2 text-center text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                      ['CARICO', 'CONTAINER'].includes(shipmentFormType)
+                        ? 'bg-[#004B97] text-white shadow-sm'
+                        : 'text-gray-500 hover:text-black'
+                    }`}
+                  >
+                    📤 Partenza dal Plant (Spedizione / Carico / Container)
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Select
+                  label="Cliente Committente *"
+                  options={clients.map(c => ({ value: c.id, label: c.name }))}
+                  value={clients.find(c => c.id === shipmentFormClient)?.name || (clients[0]?.name || '')}
+                  onChange={(e) => {
+                    const found = clients.find(c => c.name === e.target.value || c.id === e.target.value);
+                    if (found) setShipmentFormClient(found.id);
+                  }}
+                  required
+                />
+                <Select
+                  label="Vettore Assegnato *"
+                  options={carriers.filter(c => c.status === 'APPROVATO').map(c => ({ value: c.id, label: c.name }))}
+                  value={carriers.find(c => c.id === shipmentFormCarrier)?.name || (carriers.filter(c => c.status === 'APPROVATO')[0]?.name || '')}
+                  onChange={(e) => {
+                    const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
+                    if (found) setShipmentFormCarrier(found.id);
+                  }}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-black/5 pt-4">
+                <Input
+                  label="Nome (Mittente o Destinatario) *"
+                  placeholder="Inserisci ragione sociale"
+                  value={shipmentFormSubjectName}
+                  onChange={(e) => setShipmentFormSubjectName(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Indirizzo (facoltativo)"
+                  placeholder="Es. Via Roma 12"
+                  value={shipmentFormAddress}
+                  onChange={(e) => setShipmentFormAddress(e.target.value)}
+                />
+                <Input
+                  label="Località (Comune) *"
+                  placeholder="Es. Milano"
+                  value={shipmentFormCity}
+                  onChange={(e) => setShipmentFormCity(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
+                  label="CAP (facoltativo)"
+                  placeholder="Es. 20121"
+                  value={shipmentFormCap}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setShipmentFormCap(val);
+                    if (val.length >= 2) {
+                      const geo = getGeoDetailsByCap(val);
+                      if (geo) {
+                        setShipmentFormProvince(geo.province);
+                        setShipmentFormRegion(geo.region);
+                        setShipmentFormCountry(geo.country);
+                      }
+                    }
+                  }}
+                />
+                <Input
+                  label="Provincia (obbligatorio per IT) *"
+                  placeholder="Es. MI"
+                  value={shipmentFormProvince}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setShipmentFormProvince(val.toUpperCase());
+                    if (val.length >= 2) {
+                      const geo = getGeoDetailsByProv(val);
+                      if (geo) {
+                        setShipmentFormRegion(geo.region);
+                        setShipmentFormCountry(geo.country);
+                      }
+                    }
+                  }}
+                  required={shipmentFormCountry.toLowerCase() === 'italia'}
+                />
+                <Input
+                  label="Nazione *"
+                  placeholder="Es. Italia"
+                  value={shipmentFormCountry}
+                  onChange={(e) => setShipmentFormCountry(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Input
+                  label="Regione (Autocompilata)"
+                  placeholder="Es. Lombardia"
+                  value={shipmentFormRegion}
+                  onChange={(e) => setShipmentFormRegion(e.target.value)}
+                  readOnly
+                  className="bg-gray-100 cursor-not-allowed"
+                />
+                <Input
+                  label="Data Prevista Slot *"
+                  type="date"
+                  value={shipmentFormExpectedDate}
+                  onChange={(e) => setShipmentFormExpectedDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-black/5 pt-4">
+                <Input
+                  label="Riferimento 1 *"
+                  placeholder="Ordine / Rif 1"
+                  value={shipmentFormOrder}
+                  onChange={(e) => setShipmentFormOrder(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Riferimento 2"
+                  placeholder="DDT / Rif 2"
+                  value={shipmentFormOrder2}
+                  onChange={(e) => setShipmentFormOrder2(e.target.value)}
+                />
+                <Input
+                  label="Ora Prevista"
+                  placeholder="Es. 09:30"
+                  value={shipmentFormExpectedTime}
+                  onChange={(e) => setShipmentFormExpectedTime(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
+                  label="Posti Pallet *"
+                  type="number"
+                  value={shipmentFormPallets}
+                  onChange={(e) => setShipmentFormPallets(Number(e.target.value))}
+                  required
+                />
+                <Input
+                  label="Peso Lordo (kg) *"
+                  type="number"
+                  value={shipmentFormGrossWeight}
+                  onChange={(e) => setShipmentFormGrossWeight(e.target.value)}
+                  required
+                />
+                <Input
+                  label="Tipologia Merce"
+                  placeholder="Alimentare / Secco / Fresco"
+                  value={shipmentFormGoods}
+                  onChange={(e) => setShipmentFormGoods(e.target.value)}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 border-t border-black/5 pt-4">
+                <div>
+                  <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                    Note Consegna
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={shipmentFormDeliveryNotes}
+                    onChange={(e) => setShipmentFormDeliveryNotes(e.target.value)}
+                    placeholder="Specifiche e note di consegna..."
+                    className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                    Note Interne
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={shipmentFormInternalNotes}
+                    onChange={(e) => setShipmentFormInternalNotes(e.target.value)}
+                    placeholder="Note interne di yard / guardiola..."
+                    className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50 -mx-6 -mb-6">
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  className="flex-1 cursor-pointer" 
+                  onClick={() => { resetShipmentForm(); setIsNewShipmentModalOpen(false); }}
+                >
+                  Annulla
+                </Button>
+                <Button type="submit" variant="primary" className="flex-1 font-bold cursor-pointer">
+                  {shipmentFormId ? "Salva Modifiche" : "Registra Spedizione"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE DI IMPORTAZIONE MASSIVA DA CSV/TXT */}
+      {isImportShipmentModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
+          <div className="bg-white rounded-xl shadow-xl max-w-xl w-full border border-black/10 overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 flex justify-between items-center">
+              <h3 className="font-bold text-sm uppercase tracking-wide">
+                Importazione Spedizioni da File (CSV/TXT)
+              </h3>
+              <button 
+                onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); }}
+                className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-[10px] text-blue-800 font-mono leading-relaxed">
+                <p className="font-bold mb-1">Tracciato Campi Richiesto (delimitato da virgola o punto e virgola):</p>
+                <code>Rif1;Rif2;TipoAttivita;PostiPallet;PesoLordo;Nome;Localita;CAP;Provincia;DataPrevista;OraPrevista;Merce;Indirizzo;Regione;Nazione;NoteConsegna;NoteInterne</code>
+                <p className="mt-2 text-gray-500 italic">Esempio:<br/>ORD-12345;REF-AAA;SCARICO;24;15000;Rossi Srl;Milano;20121;MI;2026-08-10;10:30;Alimentari</p>
+              </div>
+
+              {importError && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-mono">
+                  {importError}
+                </div>
+              )}
+
+              {importSuccess && (
+                <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-xs rounded-lg font-mono">
+                  {importSuccess}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
+                  Copia e Incolla Righe Dati:
+                </label>
+                <textarea
+                  rows={6}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder="Incolla qui le righe di dati del foglio Excel o file TXT..."
+                  className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none font-mono"
+                />
+              </div>
+
+              {/* OPZIONE CARICAMENTO FILE REALISTICA */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 block">
+                  Oppure seleziona un file locale:
+                </label>
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const text = event.target?.result as string;
+                        setImportText(text);
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                  className="text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-black hover:file:bg-gray-200 cursor-pointer"
+                />
+              </div>
+
+              <div className="flex gap-2 border-t border-black/5 pt-4 bg-gray-50 -mx-6 -mb-6 p-4">
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  className="flex-grow text-xs cursor-pointer" 
+                  onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); }}
+                >
+                  Annulla
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="success" 
+                  className="flex-grow text-xs font-bold cursor-pointer" 
+                  onClick={handleImportShipments}
+                  disabled={!importText.trim()}
+                >
+                  Procedi con Importazione
+                </Button>
+              </div>
             </div>
           </div>
         </div>

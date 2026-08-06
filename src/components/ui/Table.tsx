@@ -1,7 +1,7 @@
 import React from 'react';
 
 interface TableColumn<T> {
-  header: string;
+  header: React.ReactNode;
   accessor: (row: T) => React.ReactNode;
   className?: string;
 }

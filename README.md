@@ -13,7 +13,7 @@ Adotta uno stile visivo **Cyber-Industrial (Dark Mode)** ad alto contrasto con s
    - Visualizzazione HUD dello stato delle baie (Libera/In Uso/Manutenzione).
    - Accettazione e check-in dei camion al cancello d'ingresso.
    - Assegnazione baie in tempo reale per le attività di carico e scarico.
-   - Registro log delle operazioni di cantiere in tempo reale.
+   - Registro log delle operazioni di Yard in tempo reale.
 3. **Portale Vettori**:
    - Inserimento prenotazioni indicando data target, magazzino (Depot), tipo di attività (Carico/Scarico), targa e autista.
    - Storico delle proprie prenotazioni e monitoraggio dello stato in tempo reale.

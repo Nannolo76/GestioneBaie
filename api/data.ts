@@ -100,7 +100,7 @@ async function mockSql(query: string, params: any[] = []): Promise<any[]> {
     return [];
   }
 
-  // 5. UPDATE <table> SET col1=$1... WHERE id=$N
+  // 5. UPDATE <table> SET col1=$1... WHERE colKey=$N
   if (q.toUpperCase().startsWith('UPDATE')) {
     const updateMatch = q.match(/UPDATE\s+(\w+)\s+SET\s+(.+?)\s+WHERE\s+(.+)/i);
     if (updateMatch) {
@@ -108,31 +108,41 @@ async function mockSql(query: string, params: any[] = []): Promise<any[]> {
       const setClause = updateMatch[2];
       const whereClause = updateMatch[3];
 
-      const whereParamIdxMatch = whereClause.match(/\$(\d+)/);
-      if (whereParamIdxMatch) {
-        const whereVal = params[parseInt(whereParamIdxMatch[1]) - 1];
-        const list = db[table] || [];
-        
-        const rowIdx = list.findIndex((r: any) => r.id === whereVal);
-        if (rowIdx !== -1) {
-          const row = list[rowIdx];
+      const whereParts = whereClause.split('=');
+      if (whereParts.length === 2) {
+        const whereKey = whereParts[0].trim().toLowerCase();
+        const paramIdxMatch = whereParts[1].match(/\$(\d+)/);
+        if (paramIdxMatch) {
+          const whereVal = params[parseInt(paramIdxMatch[1]) - 1];
+          const list = db[table] || [];
           
-          const assignments = setClause.split(',');
-          assignments.forEach(assign => {
-            const parts = assign.split('=');
-            if (parts.length === 2) {
-              const col = parts[0].trim().toLowerCase();
-              const valMatch = parts[1].trim().match(/\$(\d+)/);
-              if (valMatch) {
-                let val = params[parseInt(valMatch[1]) - 1];
-                if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-                  try { val = JSON.parse(val); } catch (e) {}
+          list.forEach((row: any) => {
+            if (row[whereKey] === whereVal) {
+              const assignments = setClause.split(',');
+              assignments.forEach(assign => {
+                const parts = assign.split('=');
+                if (parts.length === 2) {
+                  const col = parts[0].trim().toLowerCase();
+                  const valMatch = parts[1].trim().match(/\$(\d+)/);
+                  if (valMatch) {
+                    let val = params[parseInt(valMatch[1]) - 1];
+                    if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+                      try { val = JSON.parse(val); } catch (e) {}
+                    }
+                    row[col] = val;
+                  } else {
+                    let rawVal: any = parts[1].trim();
+                    if (rawVal === 'TRUE') rawVal = true;
+                    else if (rawVal === 'FALSE') rawVal = false;
+                    else if (rawVal.startsWith("'") && rawVal.endsWith("'")) {
+                      rawVal = rawVal.substring(1, rawVal.length - 1);
+                    }
+                    row[col] = rawVal;
+                  }
                 }
-                row[col] = val;
-              }
+              });
             }
           });
-          list[rowIdx] = row;
           db[table] = list;
           writeDb(db);
         }
@@ -336,11 +346,49 @@ async function initializeDb() {
       carrier_id TEXT NOT NULL,
       depot_id TEXT NOT NULL,
       order_number TEXT NOT NULL,
+      order_number_2 TEXT,
       activity_type TEXT NOT NULL,
       pallet_places INTEGER NOT NULL,
-      status TEXT NOT NULL
+      status TEXT NOT NULL,
+      expected_date TEXT,
+      expected_time TEXT,
+      origin_or_destination TEXT,
+      goods_type TEXT,
+      license_plate TEXT,
+      expected_delivery_date TEXT,
+      booking_id TEXT,
+      subject_name TEXT,
+      address TEXT,
+      city TEXT,
+      cap TEXT,
+      province TEXT,
+      region TEXT,
+      country TEXT,
+      gross_weight DOUBLE PRECISION,
+      delivery_notes TEXT,
+      internal_notes TEXT
     )
   `);
+
+  // Migrazione per campi TMS estesi
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS order_number_2 TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS expected_date TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS expected_time TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS origin_or_destination TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS goods_type TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS license_plate TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS expected_delivery_date TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS booking_id TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS subject_name TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS address TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS city TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS cap TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS province TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS region TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS country TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS gross_weight DOUBLE PRECISION`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS delivery_notes TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT`);
 
   // Se non ci sono plant inseriti, eseguiamo il seed iniziale
   const checkDepots = await sql('SELECT count(*) as count FROM depots');
@@ -479,14 +527,21 @@ async function initializeDb() {
     // SEED SHIPMENTS
     const checkShipments = await sql('SELECT count(*) as count FROM shipments');
     if (parseInt(checkShipments[0].count) === 0) {
+      const todayDate = new Date().toISOString().split('T')[0];
       const defaultShipments = [
-        { id: 'ship-1', clientId: 'client-rossi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-9923', activityType: 'CARICO', palletPlaces: 24, status: 'PIANIFICATO' },
-        { id: 'ship-2', clientId: 'client-bianchi', carrierId: 'carrier-2', depotId: 'depot-milano', orderNumber: 'ORD-2026-8811', activityType: 'SCARICO', palletPlaces: 12, status: 'PIANIFICATO' },
-        { id: 'ship-3', clientId: 'client-verdi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-1234', activityType: 'CARICO', palletPlaces: 33, status: 'DA_PIANIFICARE' },
+        { id: 'ship-1', clientId: 'client-rossi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-9923', orderNumber2: 'REF-MIL-99', activityType: 'CARICO', palletPlaces: 24, status: 'PIANIFICATO', expectedDate: todayDate, expectedTime: '10:00', originOrDestination: 'Bari Logistics Hub', goodsType: 'Alimentare', expectedDeliveryDate: todayDate, bookingId: 'book-milano-1', licensePlate: 'AA123BB' },
+        { id: 'ship-2', clientId: 'client-bianchi', carrierId: 'carrier-2', depotId: 'depot-milano', orderNumber: 'ORD-2026-8811', orderNumber2: 'REF-MIL-88', activityType: 'SCARICO', palletPlaces: 12, status: 'PIANIFICATO', expectedDate: todayDate, expectedTime: '14:30', originOrDestination: 'Milano Sud', goodsType: 'Elettronica', bookingId: 'book-milano-2', licensePlate: 'CC456DD' },
+        { id: 'ship-3', clientId: 'client-verdi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-1234', orderNumber2: '', activityType: 'CARICO', palletPlaces: 33, status: 'DA_PIANIFICARE', expectedDate: todayDate, expectedTime: '16:00', originOrDestination: 'Roma Logistics Hub', goodsType: 'Plastica', expectedDeliveryDate: todayDate },
       ];
       for (const s of defaultShipments) {
-        await sql('INSERT INTO shipments (id, client_id, carrier_id, depot_id, order_number, activity_type, pallet_places, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
-          s.id, s.clientId, s.carrierId, s.depotId, s.orderNumber, s.activityType, s.palletPlaces, s.status
+        await sql(`
+          INSERT INTO shipments (
+            id, client_id, carrier_id, depot_id, order_number, order_number_2, activity_type, pallet_places, status,
+            expected_date, expected_time, origin_or_destination, goods_type, license_plate, expected_delivery_date, booking_id
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        `, [
+          s.id, s.clientId, s.carrierId, s.depotId, s.orderNumber, s.orderNumber2 || null, s.activityType, s.palletPlaces, s.status,
+          s.expectedDate, s.expectedTime || null, s.originOrDestination, s.goodsType || null, s.licensePlate || null, s.expectedDeliveryDate || null, s.bookingId || null
         ]);
       }
     }
@@ -754,9 +809,27 @@ export default async function handler(req: any, res: any) {
         carrierId: s.carrier_id,
         depotId: s.depot_id,
         orderNumber: s.order_number,
+        orderNumber2: s.order_number_2,
         activityType: s.activity_type,
         palletPlaces: s.pallet_places,
-        status: s.status
+        status: s.status,
+        expectedDate: s.expected_date,
+        expectedTime: s.expected_time,
+        originOrDestination: s.origin_or_destination,
+        goodsType: s.goods_type,
+        licensePlate: s.license_plate,
+        expectedDeliveryDate: s.expected_delivery_date,
+        bookingId: s.booking_id,
+        subjectName: s.subject_name,
+        address: s.address,
+        city: s.city,
+        cap: s.cap,
+        province: s.province,
+        region: s.region,
+        country: s.country,
+        grossWeight: s.gross_weight,
+        deliveryNotes: s.delivery_notes,
+        internalNotes: s.internal_notes
       }));
 
       return res.status(200).json({
@@ -1001,8 +1074,18 @@ export default async function handler(req: any, res: any) {
           break;
 
         case 'ADD_SHIPMENT':
-          await sql('INSERT INTO shipments (id, client_id, carrier_id, depot_id, order_number, activity_type, pallet_places, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)', [
-            payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.activityType, payload.palletPlaces, payload.status
+          await sql(`
+            INSERT INTO shipments (
+              id, client_id, carrier_id, depot_id, order_number, order_number_2, activity_type, pallet_places, status,
+              expected_date, expected_time, origin_or_destination, goods_type, license_plate, expected_delivery_date, booking_id,
+              subject_name, address, city, cap, province, region, country, gross_weight, delivery_notes, internal_notes
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+          `, [
+            payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
+            payload.activityType, payload.palletPlaces, payload.status, payload.expectedDate, payload.expectedTime || null,
+            payload.originOrDestination, payload.goodsType || null, payload.licensePlate || null, payload.expectedDeliveryDate || null, payload.bookingId || null,
+            payload.subjectName || null, payload.address || null, payload.city || null, payload.cap || null, payload.province || null,
+            payload.region || null, payload.country || null, payload.grossWeight || null, payload.deliveryNotes || null, payload.internalNotes || null
           ]);
           break;
 
@@ -1010,8 +1093,47 @@ export default async function handler(req: any, res: any) {
           await sql('UPDATE shipments SET status = $1 WHERE id = $2', [payload.status, payload.id]);
           break;
 
+        case 'UPDATE_SHIPMENT':
+          await sql(`
+            UPDATE shipments SET 
+              client_id = $1, carrier_id = $2, depot_id = $3, order_number = $4, order_number_2 = $5,
+              activity_type = $6, pallet_places = $7, expected_date = $8, expected_time = $9,
+              origin_or_destination = $10, goods_type = $11, expected_delivery_date = $12,
+              subject_name = $13, address = $14, city = $15, cap = $16, province = $17,
+              region = $18, country = $19, gross_weight = $20, delivery_notes = $21, internal_notes = $22
+            WHERE id = $23
+          `, [
+            payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
+            payload.activityType, payload.palletPlaces, payload.expectedDate, payload.expectedTime || null,
+            payload.originOrDestination, payload.goodsType || null, payload.expectedDeliveryDate || null,
+            payload.subjectName || null, payload.address || null, payload.city || null, payload.cap || null, payload.province || null,
+            payload.region || null, payload.country || null, payload.grossWeight || null, payload.deliveryNotes || null, payload.internalNotes || null,
+            payload.id
+          ]);
+          break;
+
         case 'DELETE_SHIPMENT':
           await sql('DELETE FROM shipments WHERE id = $1', [payload.id]);
+          break;
+
+        case 'DELETE_SHIPMENTS':
+          for (const id of payload.ids) {
+            await sql('DELETE FROM shipments WHERE id = $1', [id]);
+          }
+          break;
+
+        case 'BIND_SHIPMENTS_TO_BOOKING':
+          for (const sId of payload.shipmentIds) {
+            await sql("UPDATE shipments SET booking_id = $1, license_plate = $2, status = 'PIANIFICATO' WHERE id = $3", [
+              payload.bookingId, payload.licensePlate, sId
+            ]);
+          }
+          break;
+
+        case 'UNBIND_SHIPMENT_FROM_BOOKING':
+          await sql('UPDATE shipments SET booking_id = NULL, license_plate = NULL WHERE id = $1', [
+            payload.shipmentId
+          ]);
           break;
 
         default:

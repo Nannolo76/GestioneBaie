@@ -153,10 +153,32 @@ export interface Shipment {
   clientId: string; // Links to Client
   carrierId: string; // Links to Carrier
   depotId: string; // Links to Depot
-  orderNumber: string;
+  orderNumber: string; // Riferimento 1
+  orderNumber2?: string; // Riferimento 2
   activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER';
   palletPlaces: number;
   status: 'DA_PIANIFICARE' | 'PIANIFICATO' | 'COMPLETATO';
+
+  // Campi TMS estesi
+  expectedDate: string; // Data prevista (YYYY-MM-DD)
+  expectedTime?: string; // Ora prevista (non vincolante, es. "09:30")
+  originOrDestination: string; // Provenienza (arrivi) o Destinazione (partenze)
+  goodsType?: string; // Tipologia merce
+  licensePlate?: string; // Targa associata (se abbinata)
+  expectedDeliveryDate?: string; // Data prevista consegna (solo per partenze)
+  bookingId?: string; // ID del viaggio/booking abbinato (se associato)
+
+  // Nuovi campi per anagrafica geografica e dettagli spedizione
+  subjectName?: string; // Nome (Mittente o Destinatario)
+  address?: string; // Indirizzo (di carico o consegna)
+  city?: string; // Località (di carico o consegna)
+  cap?: string; // CAP (di carico o consegna)
+  province?: string; // Provincia (di carico o consegna)
+  region?: string; // Regione
+  country?: string; // Nazione
+  grossWeight?: number; // Peso lordo in kg
+  deliveryNotes?: string; // Note per la consegna
+  internalNotes?: string; // Note interne di gestione
 }
 
 export interface PalletReturn {

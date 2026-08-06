@@ -45,7 +45,7 @@ interface AppContextType {
     licensePlateTrailer?: string,
     driverLicenseExpiry?: string,
     orderNumber2?: string
-  ) => void;
+  ) => string;
   updateBookingStatus: (
     bookingId: string,
     status: Booking['status'],
@@ -100,9 +100,36 @@ interface AppContextType {
   addUser: (name: string, email: string, role: User['role'], depotId: string) => void;
   updateUserRole: (id: string, role: User['role']) => void;
   deleteUser: (id: string) => void;
-  addShipment: (clientId: string, carrierId: string, depotId: string, orderNumber: string, activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER', palletPlaces: number) => void;
+  addShipment: (
+    clientId: string,
+    carrierId: string,
+    depotId: string,
+    orderNumber: string,
+    orderNumber2: string,
+    activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER',
+    palletPlaces: number,
+    expectedDate: string,
+    expectedTime: string,
+    originOrDestination: string,
+    goodsType: string,
+    expectedDeliveryDate?: string,
+    subjectName?: string,
+    address?: string,
+    city?: string,
+    cap?: string,
+    province?: string,
+    region?: string,
+    country?: string,
+    grossWeight?: number,
+    deliveryNotes?: string,
+    internalNotes?: string
+  ) => void;
   updateShipmentStatus: (id: string, status: Shipment['status']) => void;
+  updateShipment: (id: string, updates: Partial<Shipment>) => void;
   deleteShipment: (id: string) => void;
+  deleteShipments: (ids: string[]) => void;
+  bindShipmentsToBooking: (shipmentIds: string[], bookingId: string) => void;
+  unbindShipmentFromBooking: (shipmentId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -762,6 +789,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cleanPlate
       );
     }
+    return id;
   };
 
   const updateBookingStatus = (
@@ -1284,12 +1312,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- GESTIONE SPEDIZIONI ---
-  const addShipment = (clientId: string, carrierId: string, depotId: string, orderNumber: string, activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER', palletPlaces: number) => {
+  const addShipment = (
+    clientId: string,
+    carrierId: string,
+    depotId: string,
+    orderNumber: string,
+    orderNumber2: string,
+    activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER',
+    palletPlaces: number,
+    expectedDate: string,
+    expectedTime: string,
+    originOrDestination: string,
+    goodsType: string,
+    expectedDeliveryDate?: string,
+    subjectName?: string,
+    address?: string,
+    city?: string,
+    cap?: string,
+    province?: string,
+    region?: string,
+    country?: string,
+    grossWeight?: number,
+    deliveryNotes?: string,
+    internalNotes?: string
+  ) => {
     const id = `ship-${Date.now()}`;
-    const newShipment: Shipment = { id, clientId, carrierId, depotId, orderNumber, activityType, palletPlaces, status: 'DA_PIANIFICARE' };
+    const newShipment: Shipment = {
+      id,
+      clientId,
+      carrierId,
+      depotId,
+      orderNumber,
+      orderNumber2: orderNumber2 || undefined,
+      activityType,
+      palletPlaces,
+      status: 'DA_PIANIFICARE',
+      expectedDate,
+      expectedTime: expectedTime || undefined,
+      originOrDestination,
+      goodsType: goodsType || undefined,
+      expectedDeliveryDate: expectedDeliveryDate || undefined,
+      subjectName,
+      address,
+      city,
+      cap,
+      province,
+      region,
+      country,
+      grossWeight,
+      deliveryNotes,
+      internalNotes
+    };
     setShipments((prev) => [...prev, newShipment]);
     saveAction('ADD_SHIPMENT', newShipment);
-    logActivity(depotId, `Creata spedizione / viaggio per ordine ${orderNumber} (${activityType})`, 'SUCCESS');
+    logActivity(depotId, `Creata spedizione per ordine ${orderNumber} (${activityType})`, 'SUCCESS');
   };
 
   const updateShipmentStatus = (id: string, status: Shipment['status']) => {
@@ -1299,9 +1375,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAction('UPDATE_SHIPMENT_STATUS', { id, status });
   };
 
+  const updateShipment = (id: string, updates: Partial<Shipment>) => {
+    setShipments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+    );
+    saveAction('UPDATE_SHIPMENT', { id, ...updates });
+    logActivity(selectedDepotId, `Modificata spedizione ${updates.orderNumber || id}`, 'INFO');
+  };
+
   const deleteShipment = (id: string) => {
     setShipments((prev) => prev.filter((s) => s.id !== id));
     saveAction('DELETE_SHIPMENT', { id });
+  };
+
+  const deleteShipments = (ids: string[]) => {
+    setShipments((prev) => prev.filter((s) => !ids.includes(s.id)));
+    saveAction('DELETE_SHIPMENTS', { ids });
+    logActivity(selectedDepotId, `Eliminate massivamente ${ids.length} spedizioni`, 'WARNING');
+  };
+
+  const bindShipmentsToBooking = (shipmentIds: string[], bookingId: string) => {
+    const booking = bookings.find(b => b.id === bookingId);
+    const plate = booking ? booking.licensePlate : '';
+    setShipments((prev) =>
+      prev.map((s) =>
+        shipmentIds.includes(s.id)
+          ? { ...s, bookingId, licensePlate: plate, status: 'PIANIFICATO' as const }
+          : s
+      )
+    );
+    saveAction('BIND_SHIPMENTS_TO_BOOKING', { shipmentIds, bookingId, licensePlate: plate });
+    logActivity(selectedDepotId, `Abbinate ${shipmentIds.length} spedizioni al viaggio ${booking?.ticketNumber || bookingId}`, 'INFO');
+  };
+
+  const unbindShipmentFromBooking = (shipmentId: string) => {
+    setShipments((prev) =>
+      prev.map((s) =>
+        s.id === shipmentId
+          ? { ...s, bookingId: undefined, licensePlate: undefined }
+          : s
+      )
+    );
+    saveAction('UNBIND_SHIPMENT_FROM_BOOKING', { shipmentId });
+    logActivity(selectedDepotId, `Scollegata spedizione ${shipmentId} dal viaggio`, 'INFO');
   };
 
   // --- RIPRISTINO STATO ---
@@ -1388,7 +1504,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteUser,
         addShipment,
         updateShipmentStatus,
+        updateShipment,
         deleteShipment,
+        deleteShipments,
+        bindShipmentsToBooking,
+        unbindShipmentFromBooking,
       }}
     >
       {children}
