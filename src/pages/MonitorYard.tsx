@@ -2899,7 +2899,7 @@ export const MonitorYard: React.FC = () => {
                   </Card>
 
                   {/* KPI 3: Dock Utilization */}
-                  <Card title="Avg Dock Utilization" accent="blue">
+                  <Card title="Avg Dock Utilization" accent="yellow">
                     <div className="flex flex-col items-center py-4 space-y-3">
                       <div className="relative w-32 h-32">
                         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
