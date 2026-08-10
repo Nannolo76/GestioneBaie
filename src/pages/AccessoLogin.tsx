@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Input';
@@ -177,45 +176,53 @@ export const AccessoLogin: React.FC = () => {
 
       <div className="w-full max-w-md relative z-10">
         {!showRegForm ? (
-          <Card title="Autenticazione Portale" className="shadow-lg border-black/10">
+          <div className="bg-slate-950/85 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-[#11BCEC]/5 transition-all duration-300 hover:border-white/15">
+            {/* Titolo */}
+            <div className="flex justify-between items-center mb-6 pb-3 border-b border-white/10 font-mono">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[#11BCEC] flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-[#11BCEC] animate-pulse"></span>
+                [ AUTENTICAZIONE PORTALE ]
+              </h3>
+            </div>
+
             {/* Tabs per tipologia d'accesso */}
-            <div className="flex space-x-1 border-b border-black/10 pb-px mb-6 font-mono text-[9px] overflow-x-auto whitespace-nowrap">
+            <div className="flex p-1 bg-slate-900/90 rounded-xl border border-white/5 mb-6 font-mono text-[10px] overflow-x-auto whitespace-nowrap gap-1">
               <button
                 onClick={() => setActiveTab('guardiola')}
-                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
+                className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'guardiola'
-                    ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
-                    : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
+                    ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
               >
                 🎥 Guardiola
               </button>
               <button
                 onClick={() => setActiveTab('preposto')}
-                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
+                className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'preposto'
-                    ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
-                    : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
+                    ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
               >
                 📋 Preposto
               </button>
               <button
                 onClick={() => setActiveTab('vettore')}
-                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
+                className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'vettore'
-                    ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
-                    : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
+                    ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
               >
                 🚛 Vettore
               </button>
               <button
                 onClick={() => setActiveTab('admin')}
-                className={`flex-1 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer text-center px-2 ${
+                className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'admin'
-                    ? 'border-[#11BCEC] text-[#11BCEC] bg-gray-50'
-                    : 'border-transparent text-gray-400 hover:text-black hover:bg-gray-50/50'
+                    ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5 border-transparent'
                 }`}
               >
                 ⚙️ Admin
@@ -225,11 +232,12 @@ export const AccessoLogin: React.FC = () => {
             {/* CONTENUTO TAB: GUARDIOLA */}
             {activeTab === 'guardiola' && (
               <div className="space-y-4 animate-fade-in">
-                <p className="text-xs text-gray-500 font-sans leading-relaxed">
+                <p className="text-xs text-slate-300 font-sans leading-relaxed">
                   Seleziona la tua utenza operatore Guardiola registrata nel database per monitorare il piazzale ed effettuare i check-in dei camion.
                 </p>
                 <Select
                   label="Seleziona Operatore Reale *"
+                  className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                   options={users.filter(u => u.role === 'GUARDIA_CANCELLO').map(u => ({ value: u.id, label: `${u.name} (Presidio: ${depots.find(d => d.id === u.depotId)?.name || 'Tutti'})` }))}
                   value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
@@ -240,7 +248,7 @@ export const AccessoLogin: React.FC = () => {
                     }
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-2">
+                <Button onClick={handleLogin} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white">
                   Accedi come Guardiola
                 </Button>
               </div>
@@ -249,11 +257,12 @@ export const AccessoLogin: React.FC = () => {
             {/* CONTENUTO TAB: PREPOSTO */}
             {activeTab === 'preposto' && (
               <div className="space-y-4 animate-fade-in">
-                <p className="text-xs text-gray-500 font-sans leading-relaxed">
+                <p className="text-xs text-slate-300 font-sans leading-relaxed">
                   Seleziona la tua utenza operatore Preposto registrata nel database per compilare le check-list di conformità ed autorizzare le baie.
                 </p>
                 <Select
                   label="Seleziona Operatore Reale *"
+                  className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                   options={users.filter(u => u.role === 'PREPOSTO' || u.role === 'OPERATORE_YARD').map(u => ({ value: u.id, label: `${u.name} (Presidio: ${depots.find(d => d.id === u.depotId)?.name || 'Tutti'})` }))}
                   value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
@@ -264,7 +273,7 @@ export const AccessoLogin: React.FC = () => {
                     }
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-2">
+                <Button onClick={handleLogin} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white">
                   Accedi come Preposto
                 </Button>
               </div>
@@ -273,17 +282,18 @@ export const AccessoLogin: React.FC = () => {
             {/* CONTENUTO TAB: VETTORE */}
             {activeTab === 'vettore' && (
               <div className="space-y-4">
-                <p className="text-xs text-gray-500 font-sans leading-relaxed">
+                <p className="text-xs text-slate-300 font-sans leading-relaxed">
                   Accedi per pianificare i tuoi slot di carico/scarico merci presso i Plant di Logistica Uno.
                 </p>
 
                 {carriers.filter(c => c.status === 'APPROVATO').length === 0 ? (
-                  <div className="p-3 text-xs text-amber-600 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="p-3 text-xs text-amber-400 bg-amber-950/40 rounded-lg border border-amber-500/20">
                     Nessun vettore abilitato nel sistema. Registrati o contatta l'amministratore.
                   </div>
                 ) : (
                   <Select
                     label="Seleziona il tuo Vettore"
+                    className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                     options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
                     value={carrierIdToLabel(selectedCarrierId)}
                     onChange={(e) => {
@@ -293,17 +303,17 @@ export const AccessoLogin: React.FC = () => {
                   />
                 )}
 
-                <Button onClick={handleLogin} disabled={!selectedCarrierId} className="w-full mt-2">
+                <Button onClick={handleLogin} disabled={!selectedCarrierId} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white">
                   Accedi all'Area Riservata
                 </Button>
 
-                <div className="pt-4 border-t border-black/5 text-center">
+                <div className="pt-4 border-t border-white/10 text-center">
                   <button
                     onClick={() => {
                       setShowRegForm(true);
                       setRegSuccess(false);
                     }}
-                    className="text-xs font-bold text-[#11BCEC] hover:text-[#004B97] uppercase tracking-wider cursor-pointer"
+                    className="text-xs font-bold text-[#11BCEC] hover:text-white uppercase tracking-wider cursor-pointer transition-colors"
                   >
                     Registra Nuovo Vettore ➔
                   </button>
@@ -314,11 +324,12 @@ export const AccessoLogin: React.FC = () => {
             {/* CONTENUTO TAB: ADMIN */}
             {activeTab === 'admin' && (
               <div className="space-y-4 animate-fade-in">
-                <p className="text-xs text-gray-500 font-sans leading-relaxed">
+                <p className="text-xs text-slate-300 font-sans leading-relaxed">
                   Console di amministrazione di sistema per la configurazione dei Plant, dei moduli magazzino, abilitazione utenze e approvazione dei vettori.
                 </p>
                 <Select
                   label="Seleziona Utenza Admin *"
+                  className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                   options={users.filter(u => u.role === 'ADMIN').map(u => ({ value: u.id, label: u.name }))}
                   value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
@@ -326,33 +337,39 @@ export const AccessoLogin: React.FC = () => {
                     if (found) setSelectedUserId(found.id);
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-2" variant="warning">
+                <Button onClick={handleLogin} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white" variant="warning">
                   Accedi come Amministratore
                 </Button>
               </div>
             )}
-          </Card>
+          </div>
         ) : (
           /* SCHEDA REGISTRAZIONE VETTORE */
-          <Card title="Registrazione Nuovo Vettore" className="shadow-lg border-black/10">
+          <div className="bg-slate-950/85 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-[#11BCEC]/5 transition-all duration-300 hover:border-white/15">
+            <div className="flex justify-between items-center mb-6 pb-3 border-b border-white/10 font-mono">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-[#11BCEC] flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-[#11BCEC] animate-pulse"></span>
+                [ REGISTRAZIONE NUOVO VETTORE ]
+              </h3>
+            </div>
             {regSuccess ? (
               <div className="space-y-4 py-2">
-                <div className="p-3 border border-emerald-200 bg-emerald-50 text-emerald-700 font-sans text-xs rounded-xl space-y-1">
+                <div className="p-4 border border-emerald-500/25 bg-emerald-950/40 text-emerald-400 font-sans text-xs rounded-xl space-y-1">
                   <div className="font-bold text-[13px]">Richiesta Inviata!</div>
                   <p>L'anagrafica è stata registrata con successo in stato di attesa. Un operatore di Logistica Uno verificherà i dati e approverà l'accesso.</p>
                 </div>
-                <Button onClick={() => setShowRegForm(false)} className="w-full">
+                <Button onClick={() => setShowRegForm(false)} className="w-full !text-slate-950 font-extrabold hover:!text-white">
                   Torna al Login
                 </Button>
               </div>
             ) : (
               <form onSubmit={handleRegister} className="space-y-3">
-                <p className="text-xs text-gray-500 font-sans">
+                <p className="text-xs text-slate-300 font-sans mb-4">
                   Compila i dati aziendali per richiedere l'abilitazione al portale prenotazione baie.
                 </p>
 
                 {regError && (
-                  <div className="p-2 text-xs border border-red-200 bg-red-50 text-red-600 rounded-lg">
+                  <div className="p-3 text-xs border border-red-500/25 bg-red-950/40 text-red-400 rounded-lg">
                     {regError}
                   </div>
                 )}
@@ -360,6 +377,7 @@ export const AccessoLogin: React.FC = () => {
                 <Input
                   label="Ragione Sociale Vettore *"
                   placeholder="es. Trasporti Veloci Spa"
+                  className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                   value={regName}
                   onChange={(e) => setRegName(e.target.value)}
                   required
@@ -368,6 +386,7 @@ export const AccessoLogin: React.FC = () => {
                 <Input
                   label="Partita IVA / VAT Number *"
                   placeholder="es. IT01234567890"
+                  className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                   value={regVat}
                   onChange={(e) => setRegVat(e.target.value)}
                   required
@@ -377,6 +396,7 @@ export const AccessoLogin: React.FC = () => {
                   label="Email di Contatto *"
                   type="email"
                   placeholder="es. logistica@azienda.it"
+                  className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
                   required
@@ -385,6 +405,7 @@ export const AccessoLogin: React.FC = () => {
                 <Input
                   label="Targa Trattore Stradale (Opzionale)"
                   placeholder="es. AA123BB"
+                  className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
                   value={regPlate}
                   onChange={(e) => setRegPlate(e.target.value)}
                 />
@@ -393,43 +414,43 @@ export const AccessoLogin: React.FC = () => {
                   <Button
                     type="button"
                     variant="secondary"
-                    className="flex-1"
+                    className="flex-1 !bg-slate-800 hover:!bg-slate-700 !text-slate-200 !border-white/20"
                     onClick={() => setShowRegForm(false)}
                   >
                     Annulla
                   </Button>
-                  <Button type="submit" className="flex-1">
+                  <Button type="submit" className="flex-1 !text-slate-950 font-extrabold hover:!text-white">
                     Invia Richiesta
                   </Button>
                 </div>
               </form>
             )}
-          </Card>
+          </div>
         )}
       
       {/* Credenziali di test in calce */}
       {!showRegForm && (
-        <div className="w-full max-w-md mt-6 p-4 rounded-xl bg-black/75 border border-white/10 backdrop-blur-xs text-gray-300 space-y-3 font-mono text-[9px] shadow-lg animate-fade-in relative z-10">
+        <div className="w-full max-w-md mt-6 p-4 rounded-2xl bg-slate-950/80 border border-white/10 backdrop-blur-md text-slate-300 space-y-3 font-mono text-[9px] shadow-lg animate-fade-in relative z-10">
           <span className="block text-white font-bold text-center border-b border-white/10 pb-2 uppercase tracking-wider">// Credenziali di Test Reali (Postgres)</span>
           <div className="space-y-2">
             <div>
               <span className="text-[#11BCEC] font-bold">⚙️ ADMIN:</span>
               <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
-                <li>Alessandro Neri (<span className="text-gray-400">Ruolo: ADMIN</span>)</li>
+                <li>Alessandro Neri (<span className="text-slate-400">Ruolo: ADMIN</span>)</li>
               </ul>
             </div>
             <div>
               <span className="text-[#11BCEC] font-bold">🎥 GUARDIOLA:</span>
               <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
-                <li>Fabio Gialli (<span className="text-gray-400">Milano Logistics Plant</span>)</li>
-                <li>Sara Rossi (<span className="text-gray-400">Bari Logistics Plant</span>)</li>
+                <li>Fabio Gialli (<span className="text-slate-400">Milano Logistics Plant</span>)</li>
+                <li>Sara Rossi (<span className="text-slate-400">Bari Logistics Plant</span>)</li>
               </ul>
             </div>
             <div>
               <span className="text-[#11BCEC] font-bold">📋 PREPOSTO:</span>
               <ul className="list-disc pl-4 mt-0.5 space-y-0.5">
-                <li>Filippo Marroni (<span className="text-gray-400">Milano Logistics Plant</span>)</li>
-                <li>Roberto Verdi (<span className="text-gray-400">Roma Logistics Plant</span>)</li>
+                <li>Filippo Marroni (<span className="text-slate-400">Milano Logistics Plant</span>)</li>
+                <li>Roberto Verdi (<span className="text-slate-400">Roma Logistics Plant</span>)</li>
               </ul>
             </div>
             <div>
@@ -439,7 +460,7 @@ export const AccessoLogin: React.FC = () => {
               </ul>
             </div>
           </div>
-          <p className="text-[8px] text-gray-500 text-center italic border-t border-white/5 pt-2">
+          <p className="text-[8px] text-slate-500 text-center italic border-t border-white/5 pt-2">
             Usa i menu a tendina sopra per selezionare queste anagrafiche reali caricate dal database. Le modifiche effettuate nel pannello Admin si rifletteranno qui all'istante.
           </p>
         </div>
