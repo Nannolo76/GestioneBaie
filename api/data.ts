@@ -173,7 +173,7 @@ const isLocalFallback = !process.env.DATABASE_URL ||
                         process.env.DATABASE_URL === '[SENSITIVE]' || 
                         !process.env.DATABASE_URL.startsWith('postgres');
 
-const sql = isLocalFallback ? mockSql : neon(process.env.DATABASE_URL!);
+const sql: any = isLocalFallback ? mockSql : neon(process.env.DATABASE_URL!);
 
 // Funzione helper per verificare ed inizializzare il DB
 async function initializeDb() {
@@ -634,7 +634,7 @@ async function initializeDb() {
         palletVoucherNumber: null
       }
     ];
-    for (const b of defaultBookings) {
+    for (const b of defaultBookings as any[]) {
       await sql(`
         INSERT INTO bookings (
           id, carrier_id, depot_id, date, activity_type, status, bay_id, license_plate, license_plate_trailer,
