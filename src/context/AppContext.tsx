@@ -289,27 +289,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     },
   ];
 
+  const defaultUsers: User[] = [
+    { id: 'user-1', name: 'Alessandro Neri', username: 'admin', email: 'a.neri@logisticauno.it', role: 'ADMIN', depotId: 'depot-milano', depotIds: ['depot-milano', 'depot-roma', 'depot-bari'], password: 'Password123!', status: 'ACTIVE' },
+    { id: 'user-2', name: 'Fabio Gialli', username: 'f.gialli', email: 'f.gialli@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-milano', depotIds: ['depot-milano'], password: 'Password123!', status: 'ACTIVE' },
+    { id: 'user-3', name: 'Roberto Verdi', username: 'r.verdi', email: 'r.verdi@logisticauno.it', role: 'OPERATORE_YARD', depotId: 'depot-roma', depotIds: ['depot-roma'], password: 'Password123!', status: 'ACTIVE' },
+    { id: 'user-4', name: 'Sara Rossi', username: 's.rossi', email: 's.rossi@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-bari', depotIds: ['depot-bari'], password: 'Password123!', status: 'ACTIVE' },
+    { id: 'user-5', name: 'Filippo Marroni', username: 'f.marroni', email: 'f.marroni@logisticauno.it', role: 'PREPOSTO', depotId: 'depot-milano', depotIds: ['depot-milano'], password: 'Password123!', status: 'ACTIVE' },
+  ];
+
+  const defaultClients: Client[] = [
+    { id: 'client-rossi', name: 'Rossi SpA', vatNumber: 'IT01234567890', email: 'logistica@rossi.it' },
+    { id: 'client-bianchi', name: 'Bianchi Srl', vatNumber: 'IT09876543210', email: 'ordini@bianchi.it' },
+    { id: 'client-verdi', name: 'Verdi Group', vatNumber: 'IT05554443322', email: 'shipments@verdigroup.it' },
+  ];
+
+  const defaultPalletTypes: PalletType[] = [
+    { id: 'plt-epal', name: 'EPAL', description: 'Pallet standard europeo (80x120)' },
+    { id: 'plt-chep', name: 'CHEP', description: 'Pallet blu a noleggio (80x120)' },
+    { id: 'plt-duss', name: 'DUSSELDORF', description: 'Mezzo pallet (60x80)' },
+    { id: 'plt-miniduss', name: 'MINI-DUSS', description: 'Mini pallet plastificato o legno' },
+    { id: 'plt-altro', name: 'ALTRO', description: 'Altre tipologie di legni' },
+  ];
+
   const defaultLogs: ActivityLog[] = [
     { id: 'log-1', timestamp: new Date(new Date().setHours(new Date().getHours() - 5)).toISOString(), depotId: 'depot-milano', message: 'Sistema caricato con successo.', type: 'INFO' }
   ];
 
-  // --- STATO INIZIALIZZATO ---
-  const [depots, setDepots] = useState<Depot[]>([]);
-  const [warehouseModules, setWarehouseModules] = useState<WarehouseModule[]>([]);
-  const [bays, setBays] = useState<Bay[]>([]);
-  const [carriers, setCarriers] = useState<Carrier[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
-  const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>([]);
+  // --- STATO INIZIALIZZATO CON FALLBACK DEFAULT ---
+  const [depots, setDepots] = useState<Depot[]>(defaultDepots);
+  const [warehouseModules, setWarehouseModules] = useState<WarehouseModule[]>(defaultWarehouseModules);
+  const [bays, setBays] = useState<Bay[]>(defaultBays);
+  const [carriers, setCarriers] = useState<Carrier[]>(defaultCarriers);
+  const [bookings, setBookings] = useState<Booking[]>(defaultBookings);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(defaultLogs);
+  const [activityTypes, setActivityTypes] = useState<ActivityType[]>(defaultActivityTypes);
+  const [reportSchedules, setReportSchedules] = useState<ReportSchedule[]>(defaultReportSchedules);
   const [checklistAlerts, setChecklistAlerts] = useState<ChecklistFailureAlert[]>([]);
-  const [bayUsages, setBayUsages] = useState<BayUsage[]>([]);
+  const [bayUsages, setBayUsages] = useState<BayUsage[]>(defaultBayUsages);
   
   // Anomalie
   const [anomalies, setAnomalies] = useState<AnomalyLog[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [palletTypes, setPalletTypes] = useState<PalletType[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [clients, setClients] = useState<Client[]>(defaultClients);
+  const [palletTypes, setPalletTypes] = useState<PalletType[]>(defaultPalletTypes);
+  const [users, setUsers] = useState<User[]>(defaultUsers);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [simulatedEmails, setSimulatedEmails] = useState<{ userId: string; userName: string; userEmail: string; confirmLink: string }[]>([]);
 
@@ -343,19 +365,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const res = await fetch('/api/data');
         if (!res.ok) throw new Error('Database request failed');
         const data = await res.json();
-        if (data.depots) setDepots(data.depots);
-        if (data.warehouseModules) setWarehouseModules(data.warehouseModules);
-        if (data.bayUsages) setBayUsages(data.bayUsages);
-        if (data.bays) setBays(data.bays);
-        if (data.carriers) setCarriers(data.carriers);
-        if (data.bookings) setBookings(data.bookings);
+        if (data.depots && data.depots.length > 0) setDepots(data.depots);
+        if (data.warehouseModules && data.warehouseModules.length > 0) setWarehouseModules(data.warehouseModules);
+        if (data.bayUsages && data.bayUsages.length > 0) setBayUsages(data.bayUsages);
+        if (data.bays && data.bays.length > 0) setBays(data.bays);
+        if (data.carriers && data.carriers.length > 0) setCarriers(data.carriers);
+        if (data.bookings && data.bookings.length > 0) setBookings(data.bookings);
         if (data.anomalies) setAnomalies(data.anomalies);
-        if (data.activityLogs) setActivityLogs(data.activityLogs);
-        if (data.activityTypes) setActivityTypes(data.activityTypes);
-        if (data.reportSchedules) setReportSchedules(data.reportSchedules);
-        if (data.clients) setClients(data.clients);
-        if (data.palletTypes) setPalletTypes(data.palletTypes);
-        if (data.users) setUsers(data.users);
+        if (data.activityLogs && data.activityLogs.length > 0) setActivityLogs(data.activityLogs);
+        if (data.activityTypes && data.activityTypes.length > 0) setActivityTypes(data.activityTypes);
+        if (data.reportSchedules && data.reportSchedules.length > 0) setReportSchedules(data.reportSchedules);
+        if (data.clients && data.clients.length > 0) setClients(data.clients);
+        if (data.palletTypes && data.palletTypes.length > 0) setPalletTypes(data.palletTypes);
+        if (data.users && data.users.length > 0) setUsers(data.users);
         if (data.shipments) setShipments(data.shipments);
       } catch (err) {
         console.error('Errore durante il caricamento dal database:', err);
