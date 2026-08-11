@@ -19,16 +19,28 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     bayUsages,
     anomalies,
     addDepot,
+    updateDepot,
+    deleteDepot,
     addWarehouseModule,
+    updateWarehouseModule,
+    deleteWarehouseModule,
     addBay,
+    updateBay,
+    deleteBay,
     updateBayStatus,
     updateBayUsage,
     addBayUsage,
     deleteBayUsage,
     approveCarrier,
     rejectCarrier,
+    updateCarrier,
+    deleteCarrier,
     addActivityType,
+    updateActivityType,
+    deleteActivityType,
     addReportSchedule,
+    updateReportSchedule,
+    deleteReportSchedule,
     toggleReportSchedule,
     resolveAnomaly,
     bookings,
@@ -37,11 +49,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     users,
     shipments,
     addClient,
+    updateClient,
     deleteClient,
     addPalletType,
+    updatePalletType,
     deletePalletType,
     addUser,
-    updateUserRole,
+    updateUser,
     deleteUser,
     addShipment,
     updateShipmentStatus,
@@ -49,6 +63,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   } = useApp();
 
   const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments'>(defaultTab);
+
+  // Stato Modifica Generale (Edit Modal)
+  const [editingItem, setEditingItem] = useState<{
+    type: 'depot' | 'warehouseModule' | 'bay' | 'carrier' | 'activityType' | 'reportSchedule' | 'client' | 'palletType' | 'user';
+    id: string;
+    fields: any;
+  } | null>(null);
 
   // Stati Hub
   const [newHubName, setNewHubName] = useState('');
@@ -187,8 +208,107 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     setNewUserDepotIds([]);
   };
 
-  const handleChangeUserRole = (userId: string, role: any) => {
-    updateUserRole(userId, role);
+
+
+  const handleDelete = (type: string, id: string, name: string) => {
+    // 1. Hub
+    if (type === 'depot') {
+      const hasBays = bays.some(b => b.depotId === id);
+      const hasModules = warehouseModules.some(m => m.depotId === id);
+      const hasBookings = bookings.some(b => b.depotId === id);
+      const hasShipments = shipments.some(s => s.depotId === id);
+      if (hasBays || hasModules || hasBookings || hasShipments) {
+        alert(`Impossibile eliminare lo stabilimento "${name}". Ci sono baie, moduli magazzino, prenotazioni o spedizioni collegate.`);
+        return;
+      }
+      if (confirm(`Sei sicuro di voler eliminare lo stabilimento "${name}"?`)) {
+        deleteDepot(id);
+      }
+    }
+    // 2. Modulo Magazzino
+    if (type === 'warehouseModule') {
+      const hasBays = bays.some(b => b.moduleId === id);
+      if (hasBays) {
+        alert(`Impossibile eliminare il modulo "${name}". Ci sono baie associate.`);
+        return;
+      }
+      if (confirm(`Sei sicuro di voler eliminare il modulo magazzino "${name}"?`)) {
+        deleteWarehouseModule(id);
+      }
+    }
+    // 3. Baia
+    if (type === 'bay') {
+      const hasBookings = bookings.some(b => b.bayId === id);
+      if (hasBookings) {
+        alert(`Impossibile eliminare la baia "${name}". Ci sono prenotazioni collegate.`);
+        return;
+      }
+      if (confirm(`Sei sicuro di voler eliminare la baia "${name}"?`)) {
+        deleteBay(id);
+      }
+    }
+    // 4. Vettore
+    if (type === 'carrier') {
+      const hasBookings = bookings.some(b => b.carrierId === id);
+      const hasShipments = shipments.some(s => s.carrierId === id);
+      if (hasBookings || hasShipments) {
+        alert(`Impossibile eliminare il vettore "${name}". Ci sono prenotazioni o spedizioni associate.`);
+        return;
+      }
+      if (confirm(`Sei sicuro di voler eliminare il vettore "${name}"?`)) {
+        deleteCarrier(id);
+      }
+    }
+    // 5. Tipo Attività
+    if (type === 'activityType') {
+      const isUsedInBooking = bookings.some(b => b.activityType === name || b.activityType === id);
+      const isUsedInShipment = shipments.some(s => s.activityType === name || s.activityType === id);
+      if (isUsedInBooking || isUsedInShipment) {
+        alert(`Impossibile eliminare l'attività "${name}". È utilizzata in prenotazioni o spedizioni.`);
+        return;
+      }
+      if (confirm(`Sei sicuro di voler eliminare l'attività "${name}"?`)) {
+        deleteActivityType(id);
+      }
+    }
+    // 6. Report Schedulatore
+    if (type === 'reportSchedule') {
+      if (confirm(`Sei sicuro di voler eliminare la pianificazione report "${name}"?`)) {
+        deleteReportSchedule(id);
+      }
+    }
+    // 7. Cliente
+    if (type === 'client') {
+      const hasBookings = bookings.some(b => b.clientId === id);
+      const hasShipments = shipments.some(s => s.clientId === id);
+      if (hasBookings || hasShipments) {
+        alert(`Impossibile eliminare il cliente "${name}". Ci sono prenotazioni o spedizioni associate.`);
+        return;
+      }
+      if (confirm(`Sei sicuro di voler eliminare il cliente "${name}"?`)) {
+        deleteClient(id);
+      }
+    }
+    // 8. Tipo Pallet
+    if (type === 'palletType') {
+      const hasReturns = bookings.some(b => b.palletReturns && b.palletReturns.some(r => r.palletType === name));
+      if (hasReturns) {
+        alert(`Impossibile eliminare il tipo pallet "${name}". È utilizzato in resi pallet di prenotazioni registrate.`);
+        return;
+      }
+      if (confirm(`Sei sicuro di voler eliminare il tipo pallet "${name}"?`)) {
+        deletePalletType(id);
+      }
+    }
+    // 9. Utente
+    if (type === 'user') {
+      if (id === 'user-1' || id === 'user-2' || id === 'user-3') {
+        // Prevenzione cancellazione utente sessione corrente se implementato
+      }
+      if (confirm(`Sei sicuro di voler eliminare l'utente "${name}"?`)) {
+        deleteUser(id);
+      }
+    }
   };
 
   const handleAddClient = (e: React.FormEvent) => {
@@ -450,10 +570,34 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                       </Badge>
                     ),
                   },
+                  {
+                    header: 'Azioni',
+                    accessor: (d) => (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'depot',
+                            id: d.id,
+                            fields: { name: d.name, city: d.city }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('depot', d.id, d.name)}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
+                    )
+                  }
                 ]}
               />
             </Card>
-
+ 
             <Card title="Layout e Uso Baie del Yard (Gestione Rampa)">
               <p className="text-xs text-ticket-muted mb-4 font-mono uppercase">
                 // Modifica al volo la destinazione d'uso o assegna le baie delle rampe a clienti specifici.
@@ -485,9 +629,9 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     accessor: (b) => {
                       return (
                         <select
-                          value={b.bayUsageId || ''}
-                          onChange={(e) => updateBayUsage(b.id, e.target.value || undefined)}
-                          className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer"
+                           value={b.bayUsageId || ''}
+                           onChange={(e) => updateBayUsage(b.id, e.target.value || undefined)}
+                           className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer"
                         >
                           <option value="">Generico (Nessuno)</option>
                           {bayUsages.map((u) => (
@@ -522,6 +666,30 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                         </Button>
                       );
                     }
+                  },
+                  {
+                    header: 'Azioni',
+                    accessor: (b) => (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'bay',
+                            id: b.id,
+                            fields: { name: b.name, moduleId: b.moduleId || '', bayUsageId: b.bayUsageId || '' }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('bay', b.id, b.name)}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
+                    )
                   }
                 ]}
               />
@@ -592,6 +760,30 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                       <Badge variant="primary">
                         {bays.filter(b => b.moduleId === m.id).length} Baie Associate
                       </Badge>
+                    )
+                  },
+                  {
+                    header: 'Azioni',
+                    accessor: (m) => (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'warehouseModule',
+                            id: m.id,
+                            fields: { depotId: m.depotId, name: m.name, description: m.description || '' }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('warehouseModule', m.id, m.name)}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
                     )
                   }
                 ]}
@@ -754,6 +946,30 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   header: 'Stato Abilitazione',
                   accessor: () => <Badge variant="success">ACCEDITATO</Badge>,
                 },
+                {
+                  header: 'Azioni',
+                  accessor: (c) => (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => setEditingItem({
+                          type: 'carrier',
+                          id: c.id,
+                          fields: { name: c.name, email: c.email, vatNumber: c.vatNumber || '', licensePlate: c.licensePlate || '' }
+                        })}
+                      >
+                        Modifica
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => handleDelete('carrier', c.id, c.name)}
+                      >
+                        Elimina
+                      </Button>
+                    </div>
+                  )
+                }
               ]}
             />
           </Card>
@@ -825,6 +1041,30 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   {
                     header: 'Tempo per Pallet',
                     accessor: (a) => <span className="font-mono text-xs">{a.minutesPerPallet} min</span>
+                  },
+                  {
+                    header: 'Azioni',
+                    accessor: (a) => (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'activityType',
+                            id: a.id,
+                            fields: { name: a.name, code: a.code, baseDurationMinutes: a.baseDurationMinutes, minutesPerPallet: a.minutesPerPallet }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('activityType', a.id, a.name)}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
+                    )
                   }
                 ]}
               />
@@ -986,15 +1226,34 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     accessor: (r) => <Badge variant={r.active ? 'success' : 'danger'}>{r.active ? 'ATTIVO' : 'DISATTIVATO'}</Badge>
                   },
                   {
-                    header: 'Cambia Stato',
+                    header: 'Azioni',
                     accessor: (r) => (
-                      <Button
-                        size="sm"
-                        variant={r.active ? 'warning' : 'success'}
-                        onClick={() => toggleReportSchedule(r.id)}
-                      >
-                        {r.active ? 'Disattiva' : 'Attiva'}
-                      </Button>
+                      <div className="flex gap-1.5">
+                        <Button
+                          size="sm"
+                          variant={r.active ? 'warning' : 'success'}
+                          onClick={() => toggleReportSchedule(r.id)}
+                        >
+                          {r.active ? 'Disattiva' : 'Attiva'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'reportSchedule',
+                            id: r.id,
+                            fields: { name: r.name, frequency: r.frequency, recipients: r.recipients, reportType: r.reportType }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('reportSchedule', r.id, r.name)}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
                     )
                   }
                 ]}
@@ -1138,24 +1397,34 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     }
                   },
                   {
-                    header: 'Azioni Cambio Ruolo',
+                    header: 'Azioni',
                     accessor: (u) => (
-                      <select
-                        value={u.role}
-                        onChange={(e) => handleChangeUserRole(u.id, e.target.value as any)}
-                        className="bg-white border border-black/10 text-xs text-black font-mono p-1 rounded-md focus:ring-0 focus:outline-none cursor-pointer"
-                      >
-                        <option value="ADMIN">Amministratore</option>
-                        <option value="OPERATORE_YARD">Operatore Yard</option>
-                        <option value="GUARDIA_CANCELLO">Guardia Cancello</option>
-                        <option value="PREPOSTO">Preposto Magazzino</option>
-                      </select>
-                    ),
-                  },
-                  {
-                    header: 'Elimina',
-                    accessor: (u) => (
-                      <Button size="sm" variant="danger" onClick={() => deleteUser(u.id)}>Rimuovi</Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'user',
+                            id: u.id,
+                            fields: {
+                              name: u.name,
+                              username: u.username || '',
+                              email: u.email,
+                              role: u.role,
+                              depotIds: u.depotIds || (u.depotId ? [u.depotId] : [])
+                            }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('user', u.id, u.name)}
+                          disabled={u.id === useApp().currentUser?.id}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
                     ),
                   },
                 ]}
@@ -1219,9 +1488,25 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   {
                     header: 'Azioni',
                     accessor: (c) => (
-                      <Button size="sm" variant="danger" onClick={() => deleteClient(c.id)}>
-                        Elimina
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'client',
+                            id: c.id,
+                            fields: { name: c.name, vatNumber: c.vatNumber || '', email: c.email || '' }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('client', c.id, c.name)}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
                     )
                   }
                 ]}
@@ -1274,9 +1559,25 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   {
                     header: 'Azioni',
                     accessor: (p) => (
-                      <Button size="sm" variant="danger" onClick={() => deletePalletType(p.id)}>
-                        Rimuovi
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => setEditingItem({
+                            type: 'palletType',
+                            id: p.id,
+                            fields: { name: p.name, description: p.description || '' }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => handleDelete('palletType', p.id, p.name)}
+                        >
+                          Rimuovi
+                        </Button>
+                      </div>
                     )
                   }
                 ]}
@@ -1532,6 +1833,522 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                 setResolveNotes('');
               }} disabled={!resolveNotes.trim()}>Conferma Risoluzione</Button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DI MODIFICA RECORD */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in font-sans">
+          <div className="bg-slate-950 border border-white/10 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden text-white">
+            <div className="bg-slate-900 border-b border-white/5 p-4 flex justify-between items-center">
+              <h3 className="font-bold text-xs uppercase tracking-widest text-[#11BCEC] flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-[#11BCEC] animate-pulse"></span>
+                [ MODIFICA ELEMENTO ]
+              </h3>
+              <button 
+                onClick={() => setEditingItem(null)}
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer text-sm font-bold bg-transparent border-none"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const { type, id, fields } = editingItem;
+              if (type === 'depot') {
+                updateDepot(id, fields.name, fields.city);
+              } else if (type === 'warehouseModule') {
+                updateWarehouseModule(id, fields.depotId, fields.name, fields.description);
+              } else if (type === 'bay') {
+                updateBay(id, fields.name, fields.moduleId || undefined, fields.bayUsageId || undefined);
+              } else if (type === 'carrier') {
+                updateCarrier(id, fields.name, fields.email, fields.vatNumber || undefined, fields.licensePlate || undefined);
+              } else if (type === 'activityType') {
+                updateActivityType(id, fields.name, fields.code, fields.baseDurationMinutes, fields.minutesPerPallet);
+              } else if (type === 'reportSchedule') {
+                updateReportSchedule(id, fields.name, fields.frequency, fields.recipients, fields.reportType);
+              } else if (type === 'client') {
+                updateClient(id, fields.name, fields.vatNumber || undefined, fields.email || undefined);
+              } else if (type === 'palletType') {
+                updatePalletType(id, fields.name, fields.description || undefined);
+              } else if (type === 'user') {
+                updateUser(id, fields.name, fields.email, fields.role, fields.depotIds, fields.username);
+              }
+              setEditingItem(null);
+            }} className="p-5 space-y-4 text-xs">
+              
+              {editingItem.type === 'depot' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Plant *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Città / Provincia *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.city}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, city: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'warehouseModule' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Plant Stabilimento *</label>
+                    <select
+                      value={editingItem.fields.depotId}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, depotId: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 text-xs rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    >
+                      {depots.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Modulo *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Descrizione Modulo</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.description || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, description: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    />
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'bay' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Identificativo Baia *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Modulo Magazzino</label>
+                    <select
+                      value={editingItem.fields.moduleId || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, moduleId: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 text-xs rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    >
+                      <option value="">Nessuno modulo specifico</option>
+                      {warehouseModules.filter(m => m.depotId === bays.find(x => x.id === editingItem.id)?.depotId).map(m => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Uso Baia / Cliente Ass.</label>
+                    <select
+                      value={editingItem.fields.bayUsageId || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, bayUsageId: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 text-xs rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    >
+                      <option value="">Generico (Nessuno)</option>
+                      {bayUsages.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'carrier' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Ragione Sociale Vettore *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">E-mail Contatto *</label>
+                    <input
+                      type="email"
+                      value={editingItem.fields.email}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, email: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Partita IVA</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.vatNumber || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, vatNumber: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Targa Default</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.licensePlate || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, licensePlate: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    />
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'activityType' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Attività *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Codice Identificativo *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.code}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, code: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Tempo Base (min) *</label>
+                      <input
+                        type="number"
+                        value={editingItem.fields.baseDurationMinutes}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          fields: { ...editingItem.fields, baseDurationMinutes: Number(e.target.value) }
+                        })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Tempo/Pallet (min) *</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={editingItem.fields.minutesPerPallet}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          fields: { ...editingItem.fields, minutesPerPallet: Number(e.target.value) }
+                        })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                        required
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'reportSchedule' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Pianificazione *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Frequenza Invio *</label>
+                    <select
+                      value={editingItem.fields.frequency}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, frequency: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 text-xs rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    >
+                      <option value="GIORNALIERO">Ogni Giorno alle 22:00</option>
+                      <option value="SETTIMANALE">Ogni Lunedì alle 06:00</option>
+                      <option value="MENSILE">Il 1° giorno del Mese alle 06:00</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Destinatari Email *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.recipients}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, recipients: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Tipo di Report *</label>
+                    <select
+                      value={editingItem.fields.reportType}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, reportType: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 text-xs rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    >
+                      <option value="Saturazione Baie">Report di Saturazione Rampa</option>
+                      <option value="Tempi Turnaround">Report Tempi di Permanenza Camion</option>
+                      <option value="Esiti Checklist">Report Anomalie & Checklist Fallite</option>
+                    </select>
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'client' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Ragione Sociale Cliente *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Partita IVA</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.vatNumber || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, vatNumber: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Email Referente</label>
+                    <input
+                      type="email"
+                      value={editingItem.fields.email || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, email: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    />
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'palletType' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Sigla / Codice Pallet *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Descrizione</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.description || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, description: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    />
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'user' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Completo *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.name}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, name: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Username *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.username}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, username: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">E-mail *</label>
+                    <input
+                      type="email"
+                      value={editingItem.fields.email}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, email: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Ruolo *</label>
+                    <select
+                      value={editingItem.fields.role}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, role: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 text-xs rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    >
+                      <option value="ADMIN">Amministratore</option>
+                      <option value="OPERATORE_YARD">Operatore Yard</option>
+                      <option value="GUARDIA_CANCELLO">Guardia Cancello</option>
+                      <option value="PREPOSTO">Preposto Magazzino</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Stabilimenti Attivi *</label>
+                    <div className="bg-slate-900 border border-white/20 rounded-lg p-3 space-y-2 max-h-[120px] overflow-y-auto">
+                      {depots.map((d) => {
+                        const checked = editingItem.fields.depotIds.includes(d.id);
+                        return (
+                          <label key={d.id} className="flex items-center space-x-2 text-xs text-white cursor-pointer font-medium">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                const newDepotIds = checked
+                                  ? editingItem.fields.depotIds.filter((id: string) => id !== d.id)
+                                  : [...editingItem.fields.depotIds, d.id];
+                                setEditingItem({
+                                  ...editingItem,
+                                  fields: { ...editingItem.fields, depotIds: newDepotIds }
+                                });
+                              }}
+                              className="rounded border-white/20 text-[#11BCEC] focus:ring-[#11BCEC] cursor-pointer"
+                            />
+                            <span>{d.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2 pt-2 bg-slate-950">
+                <Button type="button" variant="secondary" className="flex-1 !bg-slate-800 hover:!bg-slate-700 !text-slate-200 !border-white/20" onClick={() => setEditingItem(null)}>Annulla</Button>
+                <Button type="submit" className="flex-1 !text-slate-950 font-extrabold hover:!text-white">Salva Modifiche</Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

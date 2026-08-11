@@ -18,8 +18,14 @@ interface AppContextType {
   currentCarrierId: string;
   selectedDepotId: string;
   addDepot: (name: string, city: string) => void;
+  updateDepot: (id: string, name: string, city: string) => void;
+  deleteDepot: (id: string) => void;
   addWarehouseModule: (depotId: string, name: string, description?: string) => void;
+  updateWarehouseModule: (id: string, depotId: string, name: string, description?: string) => void;
+  deleteWarehouseModule: (id: string) => void;
   addBay: (depotId: string, name: string, moduleId?: string, bayUsageId?: string) => void;
+  updateBay: (id: string, name: string, moduleId?: string, bayUsageId?: string) => void;
+  deleteBay: (id: string) => void;
   updateBayStatus: (bayId: string, status: 'DISPONIBILE' | 'OCCUPATA' | 'MANUTENZIONE') => void;
   updateBayUsage: (bayId: string, bayUsageId?: string) => void;
   addBayUsage: (name: string, description?: string) => void;
@@ -28,6 +34,8 @@ interface AppContextType {
   registerCarrier: (name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
   approveCarrier: (carrierId: string) => void;
   rejectCarrier: (carrierId: string) => void;
+  updateCarrier: (id: string, name: string, email: string, vatNumber?: string, licensePlate?: string) => void;
+  deleteCarrier: (id: string) => void;
   updateCarrierProfile: (id: string, email: string, licensePlate?: string, phone?: string, licensePlateTrailer?: string) => void;
   addBooking: (
     depotId: string,
@@ -77,7 +85,11 @@ interface AppContextType {
   ) => void;
   resolveChecklistAlert: (alertId: string, action: 'PROCEDI' | 'RESPINTO', reason?: string) => void;
   addActivityType: (name: string, code: string, baseDurationMinutes: number, minutesPerPallet: number) => void;
+  updateActivityType: (id: string, name: string, code: string, baseDurationMinutes: number, minutesPerPallet: number) => void;
+  deleteActivityType: (id: string) => void;
   addReportSchedule: (name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => void;
+  updateReportSchedule: (id: string, name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => void;
+  deleteReportSchedule: (id: string) => void;
   toggleReportSchedule: (id: string) => void;
   addAnomaly: (depotId: string, type: AnomalyLog['type'], message: string, bookingId?: string, ticketNumber?: string, licensePlate?: string) => void;
   resolveAnomaly: (anomalyId: string, notes: string) => void;
@@ -94,10 +106,13 @@ interface AppContextType {
   users: User[];
   shipments: Shipment[];
   addClient: (name: string, vatNumber?: string, email?: string) => void;
+  updateClient: (id: string, name: string, vatNumber?: string, email?: string) => void;
   deleteClient: (id: string) => void;
   addPalletType: (name: string, description?: string) => void;
+  updatePalletType: (id: string, name: string, description?: string) => void;
   deletePalletType: (id: string) => void;
   addUser: (name: string, email: string, role: User['role'], depotIds: string[], username: string) => void;
+  updateUser: (id: string, name: string, email: string, role: User['role'], depotIds: string[], username: string) => void;
   updateUserRole: (id: string, role: User['role']) => void;
   deleteUser: (id: string) => void;
   confirmUserEmail: (userId: string) => void;
@@ -552,6 +567,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAction('ADD_DEPOT', newDepot);
   };
 
+  const updateDepot = (id: string, name: string, city: string) => {
+    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city } : d)));
+    logActivity(selectedDepotId, `Aggiornato stabilimento: ${name} (${city})`, 'INFO');
+    saveAction('UPDATE_DEPOT', { id, name, city });
+  };
+
+  const deleteDepot = (id: string) => {
+    setDepots((prev) => prev.filter((d) => d.id !== id));
+    logActivity(selectedDepotId, `Eliminato stabilimento con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_DEPOT', { id });
+  };
+
   const addWarehouseModule = (depotId: string, name: string, description?: string) => {
     const id = `module-${Date.now()}`;
     const newModule: WarehouseModule = { id, depotId, name, description };
@@ -560,12 +587,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveAction('ADD_WAREHOUSE_MODULE', newModule);
   };
 
+  const updateWarehouseModule = (id: string, depotId: string, name: string, description?: string) => {
+    setWarehouseModules((prev) => prev.map((m) => (m.id === id ? { ...m, depotId, name, description } : m)));
+    logActivity(depotId, `Aggiornato modulo magazzino: ${name}`, 'INFO');
+    saveAction('UPDATE_WAREHOUSE_MODULE', { id, depotId, name, description });
+  };
+
+  const deleteWarehouseModule = (id: string) => {
+    setWarehouseModules((prev) => prev.filter((m) => m.id !== id));
+    logActivity(selectedDepotId, `Eliminato modulo magazzino con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_WAREHOUSE_MODULE', { id });
+  };
+
   const addBay = (depotId: string, name: string, moduleId?: string, bayUsageId?: string) => {
     const id = `bay-${Date.now()}`;
     const newBay: Bay = { id, depotId, moduleId, name, status: 'DISPONIBILE', bayUsageId };
     setBays((prev) => [...prev, newBay]);
     logActivity(depotId, `Aggiunta nuova baia: ${name}`, 'SUCCESS');
     saveAction('ADD_BAY', newBay);
+  };
+
+  const updateBay = (id: string, name: string, moduleId?: string, bayUsageId?: string) => {
+    setBays((prev) => prev.map((b) => (b.id === id ? { ...b, name, moduleId, bayUsageId } : b)));
+    logActivity(selectedDepotId, `Aggiornata baia: ${name}`, 'INFO');
+    saveAction('UPDATE_BAY', { id, name, moduleId, bayUsageId });
+  };
+
+  const deleteBay = (id: string) => {
+    setBays((prev) => prev.filter((b) => b.id !== id));
+    logActivity(selectedDepotId, `Eliminata baia con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_BAY', { id });
   };
 
   const updateBayStatus = (bayId: string, status: Bay['status']) => {
@@ -692,6 +743,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       saveAction('UPDATE_CARRIER_PROFILE', { id, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer });
     }
+  };
+
+  const updateCarrier = (id: string, name: string, email: string, vatNumber?: string, licensePlate?: string) => {
+    const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
+    setCarriers((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, name, email, vatNumber, licensePlate: cleanPlate } : c))
+    );
+    logActivity(selectedDepotId, `Aggiornata anagrafica vettore da Admin: ${name}`, 'INFO');
+    saveAction('UPDATE_CARRIER', { id, name, email, vatNumber, licensePlate: cleanPlate });
+  };
+
+  const deleteCarrier = (id: string) => {
+    setCarriers((prev) => prev.filter((c) => c.id !== id));
+    logActivity(selectedDepotId, `Eliminato vettore con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_CARRIER', { id });
   };
 
   // --- AZIONI PRENOTAZIONI ---
@@ -1253,18 +1319,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = `act-${Date.now()}`;
     const newAct: ActivityType = { id, name, code: code.toUpperCase(), baseDurationMinutes, minutesPerPallet };
     setActivityTypes((prev) => [...prev, newAct]);
+    saveAction('ADD_ACTIVITY_TYPE', newAct);
+  };
+
+  const updateActivityType = (id: string, name: string, code: string, baseDurationMinutes: number, minutesPerPallet: number) => {
+    setActivityTypes((prev) => prev.map((a) => (a.id === id ? { ...a, name, code: code.toUpperCase(), baseDurationMinutes, minutesPerPallet } : a)));
+    logActivity(selectedDepotId, `Aggiornato tipo attività: ${name}`, 'INFO');
+    saveAction('UPDATE_ACTIVITY_TYPE', { id, name, code, baseDurationMinutes, minutesPerPallet });
+  };
+
+  const deleteActivityType = (id: string) => {
+    setActivityTypes((prev) => prev.filter((a) => a.id !== id));
+    logActivity(selectedDepotId, `Eliminato tipo attività con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_ACTIVITY_TYPE', { id });
   };
 
   const addReportSchedule = (name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => {
     const id = `rep-${Date.now()}`;
     const newRep: ReportSchedule = { id, name, frequency, recipients, reportType, active: true };
     setReportSchedules((prev) => [...prev, newRep]);
+    saveAction('ADD_REPORT_SCHEDULE', newRep);
+  };
+
+  const updateReportSchedule = (id: string, name: string, frequency: ReportSchedule['frequency'], recipients: string, reportType: string) => {
+    setReportSchedules((prev) => prev.map((r) => (r.id === id ? { ...r, name, frequency, recipients, reportType } : r)));
+    logActivity(selectedDepotId, `Aggiornata pianificazione report: ${name}`, 'INFO');
+    saveAction('UPDATE_REPORT_SCHEDULE', { id, name, frequency, recipients, reportType });
+  };
+
+  const deleteReportSchedule = (id: string) => {
+    setReportSchedules((prev) => prev.filter((r) => r.id !== id));
+    logActivity(selectedDepotId, `Eliminata pianificazione report con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_REPORT_SCHEDULE', { id });
   };
 
   const toggleReportSchedule = (id: string) => {
     setReportSchedules((prev) =>
       prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r))
     );
+    const rs = reportSchedules.find(r => r.id === id);
+    if (rs) {
+      saveAction('TOGGLE_REPORT_SCHEDULE', { id, active: !rs.active });
+    }
   };
 
   // --- GESTIONE CLIENTI ---
@@ -1274,6 +1370,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setClients((prev) => [...prev, newClient]);
     saveAction('ADD_CLIENT', newClient);
     logActivity(selectedDepotId, `Aggiunto cliente: ${name}`, 'SUCCESS');
+  };
+
+  const updateClient = (id: string, name: string, vatNumber?: string, email?: string) => {
+    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, name, vatNumber, email } : c)));
+    logActivity(selectedDepotId, `Aggiornato cliente: ${name}`, 'INFO');
+    saveAction('UPDATE_CLIENT', { id, name, vatNumber, email });
   };
 
   const deleteClient = (id: string) => {
@@ -1289,6 +1391,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setPalletTypes((prev) => [...prev, newPallet]);
     saveAction('ADD_PALLET_TYPE', newPallet);
     logActivity(selectedDepotId, `Configurato tipo pallet: ${name}`, 'SUCCESS');
+  };
+
+  const updatePalletType = (id: string, name: string, description?: string) => {
+    setPalletTypes((prev) => prev.map((p) => (p.id === id ? { ...p, name, description } : p)));
+    logActivity(selectedDepotId, `Aggiornato tipo pallet: ${name}`, 'INFO');
+    saveAction('UPDATE_PALLET_TYPE', { id, name, description });
   };
 
   const deletePalletType = (id: string) => {
@@ -1320,6 +1428,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...prev,
       { userId: id, userName: name, userEmail: email, confirmLink }
     ]);
+  };
+
+  const updateUser = (id: string, name: string, email: string, role: User['role'], depotIds: string[], username: string) => {
+    setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, name, email, role, depotIds, username, depotId: depotIds[0] || '' } : u)));
+    logActivity(selectedDepotId, `Aggiornata utenza interna: ${name} (${username})`, 'INFO');
+    saveAction('UPDATE_USER', { id, name, email, role, depotIds, username });
+    
+    // Aggiorna anche l'utente di sessione se si sta auto-modificando
+    setCurrentUser((prev) =>
+      prev && prev.id === id ? { ...prev, name, email, role, depotIds, username, depotId: depotIds[0] || '' } : prev
+    );
   };
 
   const confirmUserEmail = (userId: string) => {
@@ -1519,8 +1638,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentCarrierId,
         selectedDepotId,
         addDepot,
+        updateDepot,
+        deleteDepot,
         addWarehouseModule,
+        updateWarehouseModule,
+        deleteWarehouseModule,
         addBay,
+        updateBay,
+        deleteBay,
         updateBayStatus,
         updateBayUsage,
         addBayUsage,
@@ -1529,6 +1654,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         registerCarrier,
         approveCarrier,
         rejectCarrier,
+        updateCarrier,
+        deleteCarrier,
         updateCarrierProfile,
         addBooking,
         updateBookingStatus,
@@ -1538,7 +1665,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveQualityChecklist,
         resolveChecklistAlert,
         addActivityType,
+        updateActivityType,
+        deleteActivityType,
         addReportSchedule,
+        updateReportSchedule,
+        deleteReportSchedule,
         toggleReportSchedule,
         addAnomaly,
         resolveAnomaly,
@@ -1555,10 +1686,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         shipments,
         addClient,
+        updateClient,
         deleteClient,
         addPalletType,
+        updatePalletType,
         deletePalletType,
         addUser,
+        updateUser,
         updateUserRole,
         deleteUser,
         confirmUserEmail,

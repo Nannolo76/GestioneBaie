@@ -884,15 +884,33 @@ export default async function handler(req: any, res: any) {
         case 'ADD_DEPOT':
           await sql('INSERT INTO depots (id, name, city) VALUES ($1, $2, $3)', [payload.id, payload.name, payload.city]);
           break;
+        case 'UPDATE_DEPOT':
+          await sql('UPDATE depots SET name = $1, city = $2 WHERE id = $3', [payload.name, payload.city, payload.id]);
+          break;
+        case 'DELETE_DEPOT':
+          await sql('DELETE FROM depots WHERE id = $1', [payload.id]);
+          break;
 
         case 'ADD_WAREHOUSE_MODULE':
           await sql('INSERT INTO warehouse_modules (id, depot_id, name, description) VALUES ($1, $2, $3, $4)', [payload.id, payload.depotId, payload.name, payload.description || null]);
+          break;
+        case 'UPDATE_WAREHOUSE_MODULE':
+          await sql('UPDATE warehouse_modules SET name = $1, description = $2, depot_id = $3 WHERE id = $4', [payload.name, payload.description || null, payload.depotId, payload.id]);
+          break;
+        case 'DELETE_WAREHOUSE_MODULE':
+          await sql('DELETE FROM warehouse_modules WHERE id = $1', [payload.id]);
           break;
 
         case 'ADD_BAY':
           await sql('INSERT INTO bays (id, depot_id, module_id, name, status, bay_usage_id) VALUES ($1, $2, $3, $4, $5, $6)', [
             payload.id, payload.depotId, payload.moduleId || null, payload.name, payload.status, payload.bayUsageId || null
           ]);
+          break;
+        case 'UPDATE_BAY':
+          await sql('UPDATE bays SET name = $1, module_id = $2, bay_usage_id = $3 WHERE id = $4', [payload.name, payload.moduleId || null, payload.bayUsageId || null, payload.id]);
+          break;
+        case 'DELETE_BAY':
+          await sql('DELETE FROM bays WHERE id = $1', [payload.id]);
           break;
 
         case 'UPDATE_BAY_STATUS':
@@ -931,6 +949,14 @@ export default async function handler(req: any, res: any) {
           await sql('UPDATE carriers SET name = $1, email = $2, license_plate = $3, license_plate_trailer = $4, phone = $5, vat_number = $6 WHERE id = $7', [
             payload.name, payload.email, payload.licensePlate || null, payload.licensePlateTrailer || null, payload.phone || null, payload.vatNumber || null, payload.id
           ]);
+          break;
+        case 'UPDATE_CARRIER':
+          await sql('UPDATE carriers SET name = $1, email = $2, vat_number = $3, license_plate = $4 WHERE id = $5', [
+            payload.name, payload.email, payload.vatNumber || null, payload.licensePlate || null, payload.id
+          ]);
+          break;
+        case 'DELETE_CARRIER':
+          await sql('DELETE FROM carriers WHERE id = $1', [payload.id]);
           break;
 
         case 'ADD_BOOKING':
@@ -1045,17 +1071,32 @@ export default async function handler(req: any, res: any) {
             payload.id, payload.timestamp, payload.depotId, payload.message, payload.type
           ]);
           break;
-
         case 'ADD_ACTIVITY_TYPE':
           await sql('INSERT INTO activity_types (id, code, name, base_duration_minutes, minutes_per_pallet) VALUES ($1, $2, $3, $4, $5)', [
             payload.id, payload.code, payload.name, payload.baseDurationMinutes, payload.minutesPerPallet
           ]);
+          break;
+        case 'UPDATE_ACTIVITY_TYPE':
+          await sql('UPDATE activity_types SET name = $1, code = $2, base_duration_minutes = $3, minutes_per_pallet = $4 WHERE id = $5', [
+            payload.name, payload.code, payload.baseDurationMinutes, payload.minutesPerPallet, payload.id
+          ]);
+          break;
+        case 'DELETE_ACTIVITY_TYPE':
+          await sql('DELETE FROM activity_types WHERE id = $1', [payload.id]);
           break;
 
         case 'ADD_REPORT_SCHEDULE':
           await sql('INSERT INTO report_schedules (id, name, frequency, recipients, report_type, active, depot_id) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
             payload.id, payload.name, payload.frequency, payload.recipients, payload.reportType, payload.active, payload.depotId
           ]);
+          break;
+        case 'UPDATE_REPORT_SCHEDULE':
+          await sql('UPDATE report_schedules SET name = $1, frequency = $2, recipients = $3, report_type = $4 WHERE id = $5', [
+            payload.name, payload.frequency, payload.recipients, payload.reportType, payload.id
+          ]);
+          break;
+        case 'DELETE_REPORT_SCHEDULE':
+          await sql('DELETE FROM report_schedules WHERE id = $1', [payload.id]);
           break;
 
         case 'TOGGLE_REPORT_SCHEDULE':
@@ -1067,7 +1108,11 @@ export default async function handler(req: any, res: any) {
             payload.id, payload.name, payload.vatNumber || null, payload.email || null
           ]);
           break;
-
+        case 'UPDATE_CLIENT':
+          await sql('UPDATE clients SET name = $1, vat_number = $2, email = $3 WHERE id = $4', [
+            payload.name, payload.vatNumber || null, payload.email || null, payload.id
+          ]);
+          break;
         case 'DELETE_CLIENT':
           await sql('DELETE FROM clients WHERE id = $1', [payload.id]);
           break;
@@ -1077,7 +1122,11 @@ export default async function handler(req: any, res: any) {
             payload.id, payload.name, payload.description || null
           ]);
           break;
-
+        case 'UPDATE_PALLET_TYPE':
+          await sql('UPDATE pallet_types SET name = $1, description = $2 WHERE id = $3', [
+            payload.name, payload.description || null, payload.id
+          ]);
+          break;
         case 'DELETE_PALLET_TYPE':
           await sql('DELETE FROM pallet_types WHERE id = $1', [payload.id]);
           break;
@@ -1087,19 +1136,20 @@ export default async function handler(req: any, res: any) {
             payload.id, payload.name, payload.username, payload.email, payload.role, payload.depotIds[0] || '', JSON.stringify(payload.depotIds), payload.password || null, payload.status
           ]);
           break;
-
+        case 'UPDATE_USER':
+          await sql('UPDATE users SET name = $1, username = $2, email = $3, role = $4, depot_id = $5, depot_ids = $6 WHERE id = $7', [
+            payload.name, payload.username, payload.email, payload.role, payload.depotIds[0] || '', JSON.stringify(payload.depotIds), payload.id
+          ]);
+          break;
         case 'CONFIRM_USER_EMAIL':
           await sql("UPDATE users SET status = 'FIRST_ACCESS' WHERE id = $1", [payload.id]);
           break;
-
         case 'SET_USER_PASSWORD':
           await sql("UPDATE users SET password = $1, status = 'ACTIVE' WHERE id = $2", [payload.password, payload.id]);
           break;
-
         case 'UPDATE_USER_ROLE':
           await sql('UPDATE users SET role = $1 WHERE id = $2', [payload.role, payload.id]);
           break;
-
         case 'DELETE_USER':
           await sql('DELETE FROM users WHERE id = $1', [payload.id]);
           break;
