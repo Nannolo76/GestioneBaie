@@ -216,7 +216,11 @@ export interface ReportSchedule {
 export interface User {
   id: string;
   name: string;
+  username: string;
   email: string;
   role: 'ADMIN' | 'GUARDIA_CANCELLO' | 'OPERATORE_YARD' | 'PREPOSTO';
-  depotId?: string; // Optional: assigned to a specific Plant (Hub) for guardiola or preposto
+  depotId?: string; // Optional: legacy single plant id
+  depotIds: string[]; // Active and visible warehouses (can select multiple)
+  password?: string;
+  status: 'PENDING_CONFIRMATION' | 'FIRST_ACCESS' | 'ACTIVE';
 }

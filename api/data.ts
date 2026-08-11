@@ -339,6 +339,11 @@ async function initializeDb() {
     )
   `);
 
+  await sql(`ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT`);
+  await sql(`ALTER TABLE users ADD COLUMN IF NOT EXISTS depot_ids JSONB`);
+  await sql(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password TEXT`);
+  await sql(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT`);
+
   await sql(`
     CREATE TABLE IF NOT EXISTS shipments (
       id TEXT PRIMARY KEY,
@@ -513,14 +518,16 @@ async function initializeDb() {
     const checkUsers = await sql('SELECT count(*) as count FROM users');
     if (parseInt(checkUsers[0].count) === 0) {
       const defaultUsers = [
-        { id: 'user-1', name: 'Alessandro Neri', email: 'a.neri@logisticauno.it', role: 'ADMIN', depotId: 'depot-milano' },
-        { id: 'user-2', name: 'Fabio Gialli', email: 'f.gialli@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-milano' },
-        { id: 'user-3', name: 'Roberto Verdi', email: 'r.verdi@logisticauno.it', role: 'OPERATORE_YARD', depotId: 'depot-roma' },
-        { id: 'user-4', name: 'Sara Rossi', email: 's.rossi@logisticauno.it', role: 'GUARDIA_CANCELLO', depotId: 'depot-bari' },
-        { id: 'user-5', name: 'Filippo Marroni', email: 'f.marroni@logisticauno.it', role: 'PREPOSTO', depotId: 'depot-milano' },
+        { id: 'user-1', name: 'Alessandro Neri', username: 'admin', email: 'a.neri@logisticauno.it', role: 'ADMIN', depotIds: ['depot-milano', 'depot-roma', 'depot-bari'], password: 'Password123!', status: 'ACTIVE' },
+        { id: 'user-2', name: 'Fabio Gialli', username: 'f.gialli', email: 'f.gialli@logisticauno.it', role: 'GUARDIA_CANCELLO', depotIds: ['depot-milano'], password: 'Password123!', status: 'ACTIVE' },
+        { id: 'user-3', name: 'Roberto Verdi', username: 'r.verdi', email: 'r.verdi@logisticauno.it', role: 'OPERATORE_YARD', depotIds: ['depot-roma'], password: 'Password123!', status: 'ACTIVE' },
+        { id: 'user-4', name: 'Sara Rossi', username: 's.rossi', email: 's.rossi@logisticauno.it', role: 'GUARDIA_CANCELLO', depotIds: ['depot-bari'], password: 'Password123!', status: 'ACTIVE' },
+        { id: 'user-5', name: 'Filippo Marroni', username: 'f.marroni', email: 'f.marroni@logisticauno.it', role: 'PREPOSTO', depotIds: ['depot-milano'], password: 'Password123!', status: 'ACTIVE' },
       ];
       for (const u of defaultUsers) {
-        await sql('INSERT INTO users (id, name, email, role, depot_id) VALUES ($1, $2, $3, $4, $5)', [u.id, u.name, u.email, u.role, u.depotId]);
+        await sql('INSERT INTO users (id, name, username, email, role, depot_id, depot_ids, password, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [
+          u.id, u.name, u.username, u.email, u.role, u.depotIds[0], JSON.stringify(u.depotIds), u.password, u.status
+        ]);
       }
     }
 
@@ -795,13 +802,29 @@ export default async function handler(req: any, res: any) {
         depotId: s.depot_id
       }));
 
-      const parsedUsers = users.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        role: u.role,
-        depotId: u.depot_id
-      }));
+      const parsedUsers = users.map((u: any) => {
+        let depotIds: string[] = [];
+        if (u.depot_ids) {
+          try {
+            depotIds = typeof u.depot_ids === 'string' ? JSON.parse(u.depot_ids) : u.depot_ids;
+          } catch (e) {
+            depotIds = [u.depot_id];
+          }
+        } else {
+          depotIds = u.depot_id ? [u.depot_id] : [];
+        }
+        return {
+          id: u.id,
+          name: u.name,
+          username: u.username || '',
+          email: u.email,
+          role: u.role,
+          depotId: u.depot_id || '',
+          depotIds: depotIds,
+          password: u.password || '',
+          status: u.status || 'ACTIVE'
+        };
+      });
 
       const parsedShipments = shipments.map((s: any) => ({
         id: s.id,
@@ -1060,9 +1083,17 @@ export default async function handler(req: any, res: any) {
           break;
 
         case 'ADD_USER':
-          await sql('INSERT INTO users (id, name, email, role, depot_id) VALUES ($1, $2, $3, $4, $5)', [
-            payload.id, payload.name, payload.email, payload.role, payload.depotId
+          await sql('INSERT INTO users (id, name, username, email, role, depot_id, depot_ids, password, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [
+            payload.id, payload.name, payload.username, payload.email, payload.role, payload.depotIds[0] || '', JSON.stringify(payload.depotIds), payload.password || null, payload.status
           ]);
+          break;
+
+        case 'CONFIRM_USER_EMAIL':
+          await sql("UPDATE users SET status = 'FIRST_ACCESS' WHERE id = $1", [payload.id]);
+          break;
+
+        case 'SET_USER_PASSWORD':
+          await sql("UPDATE users SET password = $1, status = 'ACTIVE' WHERE id = $2", [payload.password, payload.id]);
           break;
 
         case 'UPDATE_USER_ROLE':

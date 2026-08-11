@@ -109,18 +109,18 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newShipExpectedDeliveryDate, setNewShipExpectedDeliveryDate] = useState('');
 
   const [newUserName, setNewUserName] = useState('');
+  const [newUserUsername, setNewUserUsername] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'ADMIN' | 'OPERATORE_YARD' | 'GUARDIA_CANCELLO' | 'PREPOSTO'>('GUARDIA_CANCELLO');
-  const [newUserDepot, setNewUserDepot] = useState(depots[0]?.id || '');
+  const [newUserDepotIds, setNewUserDepotIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (depots.length > 0) {
       if (!selectedHubForBay) setSelectedHubForBay(depots[0].id);
       if (!newModHubId) setNewModHubId(depots[0].id);
       if (!newShipDepotId) setNewShipDepotId(depots[0].id);
-      if (!newUserDepot) setNewUserDepot(depots[0].id);
     }
-  }, [depots, selectedHubForBay, newModHubId, newShipDepotId, newUserDepot]);
+  }, [depots, selectedHubForBay, newModHubId, newShipDepotId]);
 
   // Form Submits
   const handleAddHub = (e: React.FormEvent) => {
@@ -176,10 +176,15 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
 
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserName || !newUserEmail) return;
-    addUser(newUserName, newUserEmail, newUserRole, newUserDepot);
+    if (!newUserName || !newUserEmail || !newUserUsername || newUserDepotIds.length === 0) {
+      alert("Si prega di inserire Username, Nome, Email e selezionare almeno un impianto logistico.");
+      return;
+    }
+    addUser(newUserName, newUserEmail, newUserRole, newUserDepotIds, newUserUsername);
     setNewUserName('');
+    setNewUserUsername('');
     setNewUserEmail('');
+    setNewUserDepotIds([]);
   };
 
   const handleChangeUserRole = (userId: string, role: any) => {
@@ -1013,6 +1018,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   required
                 />
                 <Input
+                  label="Username di Accesso *"
+                  placeholder="Es. f.neri"
+                  value={newUserUsername}
+                  onChange={(e) => setNewUserUsername(e.target.value)}
+                  required
+                />
+                <Input
                   label="E-mail Aziendale *"
                   type="email"
                   placeholder="f.neri@logisticauno.it"
@@ -1031,15 +1043,31 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   value={newUserRole}
                   onChange={(e) => setNewUserRole(e.target.value as any)}
                 />
-                <Select
-                  label="Stabilimento di Presidio (Plant)"
-                  options={depots.map(d => ({ value: d.id, label: d.name }))}
-                  value={depots.find(d => d.id === newUserDepot)?.name || newUserDepot}
-                  onChange={(e) => {
-                    const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
-                    if (found) setNewUserDepot(found.id);
-                  }}
-                />
+                <div className="space-y-1">
+                  <label className="block text-xs font-bold text-black uppercase">Stabilimenti Attivi e Visibili *</label>
+                  <div className="bg-white border border-black/10 rounded-md p-3 space-y-2 max-h-[150px] overflow-y-auto">
+                    {depots.map((d) => {
+                      const checked = newUserDepotIds.includes(d.id);
+                      return (
+                        <label key={d.id} className="flex items-center space-x-2 text-xs font-medium text-black cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              if (checked) {
+                                setNewUserDepotIds((prev) => prev.filter((id) => id !== d.id));
+                              } else {
+                                setNewUserDepotIds((prev) => [...prev, d.id]);
+                              }
+                            }}
+                            className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
+                          />
+                          <span>{d.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
                 <Button type="submit" className="w-full">
                   Crea Utente
                 </Button>
@@ -1057,15 +1085,18 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     accessor: (u) => (
                       <div className="font-bold text-black">
                         {u.name}
+                        <div className="text-[10px] text-ticket-muted font-mono uppercase">User: {u.username}</div>
                         <div className="text-[10px] text-ticket-muted font-normal lowercase">{u.email}</div>
                       </div>
                     ),
                   },
                   {
-                    header: 'Magazzino Assegnato',
+                    header: 'Stabilimenti Assegnati',
                     accessor: (u) => {
-                      const depotName = depots.find((d) => d.id === u.depotId)?.name || 'Tutti';
-                      return <span className="text-xs uppercase">{depotName}</span>;
+                      const depotNames = u.depotIds && u.depotIds.length > 0 
+                        ? u.depotIds.map((id: string) => depots.find((d) => d.id === id)?.name || id).join(', ') 
+                        : (depots.find((d) => d.id === u.depotId)?.name || 'Nessuno');
+                      return <span className="text-xs uppercase break-words block max-w-[180px]">{depotNames}</span>;
                     },
                   },
                   {
@@ -1085,6 +1116,26 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                         {u.role.replace('_', ' ')}
                       </Badge>
                     ),
+                  },
+                  {
+                    header: 'Stato Attivazione',
+                    accessor: (u) => {
+                      const statusColors = {
+                        PENDING_CONFIRMATION: 'danger' as const,
+                        FIRST_ACCESS: 'warning' as const,
+                        ACTIVE: 'success' as const
+                      };
+                      const statusLabels = {
+                        PENDING_CONFIRMATION: 'In attesa conferma mail',
+                        FIRST_ACCESS: 'Primo accesso (creazione password)',
+                        ACTIVE: 'Attivo / Pronto'
+                      };
+                      return (
+                        <Badge variant={statusColors[u.status] || 'info'}>
+                          {statusLabels[u.status] || u.status || 'ATTIVO'}
+                        </Badge>
+                      );
+                    }
                   },
                   {
                     header: 'Azioni Cambio Ruolo',

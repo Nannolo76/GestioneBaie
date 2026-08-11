@@ -14,6 +14,9 @@ export const AccessoLogin: React.FC = () => {
     setCurrentCarrierId,
     setSelectedDepotId,
     users,
+    simulatedEmails,
+    confirmUserEmail,
+    setUserPassword,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'admin' | 'guardiola' | 'vettore' | 'preposto'>('guardiola');
@@ -46,6 +49,12 @@ export const AccessoLogin: React.FC = () => {
   const [regError, setRegError] = useState('');
 
   const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [showPasswordSetup, setShowPasswordSetup] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordSetupError, setPasswordSetupError] = useState('');
 
   useEffect(() => {
     if (!users || users.length === 0) return;
@@ -68,56 +77,8 @@ export const AccessoLogin: React.FC = () => {
   }, [activeTab, users]);
 
   const handleLogin = () => {
-    if (activeTab === 'admin') {
-      const userObj = users.find(u => u.id === selectedUserId) || {
-        id: 'usr-admin-1',
-        name: 'Alessandro Neri',
-        email: 'a.neri@logisticauno.it',
-        role: 'ADMIN',
-      };
-      setCurrentRole('ADMIN');
-      setCurrentUser({
-        id: userObj.id,
-        name: userObj.name,
-        email: userObj.email,
-        role: 'ADMIN',
-        depotId: userObj.depotId,
-      });
-    } else if (activeTab === 'guardiola') {
-      const userObj = users.find(u => u.id === selectedUserId) || {
-        id: `usr-guard-${selectedPlantId}`,
-        name: `Guardiola di Presidio`,
-        email: `guardiola.${selectedPlantId}@logisticauno.it`,
-        role: 'GUARDIA_CANCELLO',
-        depotId: selectedPlantId,
-      };
-      setCurrentRole('GUARDIA');
-      setSelectedDepotId(userObj.depotId || selectedPlantId);
-      setCurrentUser({
-        id: userObj.id,
-        name: userObj.name,
-        email: userObj.email,
-        role: 'GUARDIA_CANCELLO',
-        depotId: userObj.depotId || selectedPlantId,
-      });
-    } else if (activeTab === 'preposto') {
-      const userObj = users.find(u => u.id === selectedUserId) || {
-        id: `usr-preposto-${selectedPlantId}`,
-        name: `Preposto di Presidio`,
-        email: `preposto.${selectedPlantId}@logisticauno.it`,
-        role: 'PREPOSTO',
-        depotId: selectedPlantId,
-      };
-      setCurrentRole('PREPOSTO');
-      setSelectedDepotId(userObj.depotId || selectedPlantId);
-      setCurrentUser({
-        id: userObj.id,
-        name: userObj.name,
-        email: userObj.email,
-        role: 'PREPOSTO',
-        depotId: userObj.depotId || selectedPlantId,
-      });
-    } else if (activeTab === 'vettore') {
+    setLoginError('');
+    if (activeTab === 'vettore') {
       if (!selectedCarrierId) {
         alert('Seleziona un vettore abilitato per accedere.');
         return;
@@ -128,9 +89,98 @@ export const AccessoLogin: React.FC = () => {
       setCurrentUser({
         id: `usr-carrier-${selectedCarrierId}`,
         name: carrierName,
+        username: `carrier.${selectedCarrierId}`,
         email: carriers.find(c => c.id === selectedCarrierId)?.email || 'carrier@info.it',
         role: 'OPERATORE_YARD',
+        depotIds: [],
+        status: 'ACTIVE'
       });
+      return;
+    }
+
+    const userObj = users.find(u => u.id === selectedUserId);
+    if (!userObj) {
+      setLoginError('Seleziona un utente valido.');
+      return;
+    }
+
+    if (userObj.status === 'PENDING_CONFIRMATION') {
+      setLoginError("L'utenza è in attesa di conferma e-mail. Clicca su 'Conferma Registrazione' nel simulatore e-mail a destra/alto per procedere.");
+      return;
+    }
+
+    if (userObj.status === 'FIRST_ACCESS') {
+      setShowPasswordSetup(true);
+      setPasswordSetupError('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      return;
+    }
+
+    if (userObj.status === 'ACTIVE') {
+      if (!loginPassword) {
+        setLoginError('Inserisci la password di accesso.');
+        return;
+      }
+      if (loginPassword !== userObj.password) {
+        setLoginError("Password errata. Per le utenze predefinite, la password è 'Password123!'. Per le nuove utenze, inserisci la password creata al primo accesso.");
+        return;
+      }
+    }
+
+    // Success login!
+    if (activeTab === 'admin') {
+      setCurrentRole('ADMIN');
+      setCurrentUser(userObj);
+    } else if (activeTab === 'guardiola') {
+      setCurrentRole('GUARDIA');
+      setSelectedDepotId(userObj.depotIds && userObj.depotIds.length > 0 ? userObj.depotIds[0] : selectedPlantId);
+      setCurrentUser(userObj);
+    } else if (activeTab === 'preposto') {
+      setCurrentRole('PREPOSTO');
+      setSelectedDepotId(userObj.depotIds && userObj.depotIds.length > 0 ? userObj.depotIds[0] : selectedPlantId);
+      setCurrentUser(userObj);
+    }
+  };
+
+  const handleSetupPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordSetupError('');
+    if (!newPassword || !confirmNewPassword) {
+      setPasswordSetupError('Compila tutti i campi.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordSetupError('Le password non coincidono.');
+      return;
+    }
+
+    const userObj = users.find(u => u.id === selectedUserId);
+    if (!userObj) {
+      setPasswordSetupError('Utente non trovato.');
+      return;
+    }
+
+    const res = await setUserPassword(userObj.id, newPassword);
+    if (!res.success) {
+      setPasswordSetupError(res.error || 'Errore di validazione requisiti.');
+      return;
+    }
+
+    setShowPasswordSetup(false);
+    
+    // Login automatico
+    if (userObj.role === 'ADMIN') {
+      setCurrentRole('ADMIN');
+      setCurrentUser({ ...userObj, password: newPassword, status: 'ACTIVE' });
+    } else if (userObj.role === 'GUARDIA_CANCELLO') {
+      setCurrentRole('GUARDIA');
+      setSelectedDepotId(userObj.depotIds[0] || selectedPlantId);
+      setCurrentUser({ ...userObj, password: newPassword, status: 'ACTIVE' });
+    } else if (userObj.role === 'PREPOSTO') {
+      setCurrentRole('PREPOSTO');
+      setSelectedDepotId(userObj.depotIds[0] || selectedPlantId);
+      setCurrentUser({ ...userObj, password: newPassword, status: 'ACTIVE' });
     }
   };
 
@@ -175,7 +225,105 @@ export const AccessoLogin: React.FC = () => {
       </div>
 
       <div className="w-full max-w-md relative z-10">
-        {!showRegForm ? (
+        {showPasswordSetup ? (
+          /* SCHEDA IMPOSTAZIONE PASSWORD PRIMO ACCESSO */
+          <div className="bg-slate-950/85 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-[#11BCEC]/5 transition-all duration-300">
+            <div className="flex justify-between items-center mb-6 pb-3 border-b border-white/10 font-mono">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-amber-500 flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                [ CONFIGURAZIONE PRIMO ACCESSO ]
+              </h3>
+            </div>
+            
+            <form onSubmit={handleSetupPassword} className="space-y-4">
+              <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                Ciao <strong className="text-white">{users.find(u => u.id === selectedUserId)?.name}</strong>! Imposta una nuova password sicura per il tuo account.
+              </p>
+
+              {passwordSetupError && (
+                <div className="p-3 text-xs border border-rose-500/25 bg-rose-950/40 text-rose-400 rounded-lg">
+                  {passwordSetupError}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-300 uppercase font-mono">Nuova Password *</label>
+                <input
+                  type="password"
+                  placeholder="Inserisci nuova password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-900 text-white rounded-lg border border-white/20 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none transition-colors font-mono"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-slate-300 uppercase font-mono">Conferma Password *</label>
+                <input
+                  type="password"
+                  placeholder="Reinserisci nuova password"
+                  value={confirmNewPassword}
+                  onChange={(e) => setConfirmNewPassword(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-slate-900 text-white rounded-lg border border-white/20 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 focus:outline-none transition-colors font-mono"
+                  required
+                />
+              </div>
+
+              {/* Checklist Requisiti di Complessità */}
+              <div className="p-3 rounded-lg bg-slate-900/60 border border-white/5 space-y-2 text-[10px] font-mono">
+                <span className="text-slate-400 font-bold block uppercase tracking-wider text-[9px] mb-1">// Requisiti Password:</span>
+                <div className="flex items-center gap-2">
+                  <span className={newPassword.length >= 8 ? "text-emerald-400 font-bold" : "text-rose-500 font-bold"}>
+                    {newPassword.length >= 8 ? "✓" : "✗"}
+                  </span>
+                  <span className={newPassword.length >= 8 ? "text-slate-300" : "text-slate-500"}>Almeno 8 caratteri</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={/[A-Z]/.test(newPassword) ? "text-emerald-400 font-bold" : "text-rose-500 font-bold"}>
+                    {/[A-Z]/.test(newPassword) ? "✓" : "✗"}
+                  </span>
+                  <span className={/[A-Z]/.test(newPassword) ? "text-slate-300" : "text-slate-500"}>Almeno 1 lettera Maiuscola</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={/[0-9]/.test(newPassword) ? "text-emerald-400 font-bold" : "text-rose-500 font-bold"}>
+                    {/[0-9]/.test(newPassword) ? "✓" : "✗"}
+                  </span>
+                  <span className={/[0-9]/.test(newPassword) ? "text-slate-300" : "text-slate-500"}>Almeno 1 cifra / numero</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={/[!@#$%^&*(),.?":{}|<>]/.test(newPassword) ? "text-emerald-400 font-bold" : "text-rose-500 font-bold"}>
+                    {/[!@#$%^&*(),.?":{}|<>]/.test(newPassword) ? "✓" : "✗"}
+                  </span>
+                  <span className={/[!@#$%^&*(),.?":{}|<>]/.test(newPassword) ? "text-slate-300" : "text-slate-500"}>Almeno 1 carattere speciale (es. !, @, #, $, %)</span>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="flex-1 !bg-slate-800 hover:!bg-slate-700 !text-slate-200 !border-white/20"
+                  onClick={() => {
+                    setShowPasswordSetup(false);
+                    setNewPassword('');
+                    setConfirmNewPassword('');
+                    setPasswordSetupError('');
+                  }}
+                >
+                  Annulla
+                </Button>
+                <Button 
+                  type="submit" 
+                  variant="warning"
+                  className="flex-1 !text-slate-950 font-extrabold hover:!text-white"
+                >
+                  Salva e Accedi
+                </Button>
+              </div>
+            </form>
+          </div>
+        ) : !showRegForm ? (
           <div className="bg-slate-950/85 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl shadow-[#11BCEC]/5 transition-all duration-300 hover:border-white/15">
             {/* Titolo */}
             <div className="flex justify-between items-center mb-6 pb-3 border-b border-white/10 font-mono">
@@ -188,7 +336,7 @@ export const AccessoLogin: React.FC = () => {
             {/* Tabs per tipologia d'accesso */}
             <div className="flex p-1 bg-slate-900/90 rounded-xl border border-white/5 mb-6 font-mono text-[10px] overflow-x-auto whitespace-nowrap gap-1">
               <button
-                onClick={() => setActiveTab('guardiola')}
+                onClick={() => { setActiveTab('guardiola'); setLoginError(''); setLoginPassword(''); }}
                 className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'guardiola'
                     ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
@@ -198,7 +346,7 @@ export const AccessoLogin: React.FC = () => {
                 🎥 Guardiola
               </button>
               <button
-                onClick={() => setActiveTab('preposto')}
+                onClick={() => { setActiveTab('preposto'); setLoginError(''); setLoginPassword(''); }}
                 className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'preposto'
                     ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
@@ -208,7 +356,7 @@ export const AccessoLogin: React.FC = () => {
                 📋 Preposto
               </button>
               <button
-                onClick={() => setActiveTab('vettore')}
+                onClick={() => { setActiveTab('vettore'); setLoginError(''); setLoginPassword(''); }}
                 className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'vettore'
                     ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
@@ -218,7 +366,7 @@ export const AccessoLogin: React.FC = () => {
                 🚛 Vettore
               </button>
               <button
-                onClick={() => setActiveTab('admin')}
+                onClick={() => { setActiveTab('admin'); setLoginError(''); setLoginPassword(''); }}
                 className={`flex-1 py-2.5 px-3 font-bold uppercase transition-all rounded-lg cursor-pointer text-center border ${
                   activeTab === 'admin'
                     ? 'bg-slate-800 text-[#11BCEC] border-[#11BCEC]/30 shadow-md shadow-[#11BCEC]/5'
@@ -238,18 +386,60 @@ export const AccessoLogin: React.FC = () => {
                 <Select
                   label="Seleziona Operatore Reale *"
                   className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
-                  options={users.filter(u => u.role === 'GUARDIA_CANCELLO').map(u => ({ value: u.id, label: `${u.name} (Presidio: ${depots.find(d => d.id === u.depotId)?.name || 'Tutti'})` }))}
+                  options={users.filter(u => u.role === 'GUARDIA_CANCELLO').map(u => ({ 
+                    value: u.id, 
+                    label: `${u.name} (Presidio: ${u.depotIds ? u.depotIds.map(id => depots.find(d => d.id === id)?.name || id).join(', ') : (depots.find(d => d.id === u.depotId)?.name || 'Tutti')})` 
+                  }))}
                   value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
                     const found = users.find(u => u.name === e.target.value || u.id === e.target.value);
                     if (found) {
                       setSelectedUserId(found.id);
-                      if (found.depotId) setSelectedPlantId(found.depotId);
+                      setLoginError('');
+                      setLoginPassword('');
+                      if (found.depotIds && found.depotIds.length > 0) setSelectedPlantId(found.depotIds[0]);
                     }
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white">
-                  Accedi come Guardiola
+
+                {users.find(u => u.id === selectedUserId)?.status === 'PENDING_CONFIRMATION' && (
+                  <div className="p-3 text-xs text-rose-400 bg-rose-950/40 rounded-lg border border-rose-500/20 leading-relaxed font-sans">
+                    ⚠️ Utenza in attesa di conferma e-mail. Clicca su <strong>"Conferma Registrazione"</strong> nel simulatore e-mail in alto a destra per procedere.
+                  </div>
+                )}
+
+                {users.find(u => u.id === selectedUserId)?.status === 'FIRST_ACCESS' && (
+                  <div className="p-3 text-xs text-amber-400 bg-amber-950/40 rounded-lg border border-amber-500/20 leading-relaxed font-sans animate-pulse">
+                    ℹ️ Primo accesso rilevato. Verrà richiesto di configurare una nuova password di sicurezza.
+                  </div>
+                )}
+
+                {users.find(u => u.id === selectedUserId)?.status === 'ACTIVE' && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-300 uppercase font-mono">Password di Accesso *</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-900/90 text-white rounded-lg border border-white/20 focus:border-[#11BCEC] focus:ring-1 focus:ring-[#11BCEC] focus:outline-none placeholder-slate-600 transition-colors font-mono"
+                      required
+                    />
+                  </div>
+                )}
+
+                {loginError && (
+                  <div className="p-3 text-xs text-rose-400 bg-rose-950/40 rounded-lg border border-rose-500/20 font-sans">
+                    {loginError}
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleLogin} 
+                  disabled={users.find(u => u.id === selectedUserId)?.status === 'PENDING_CONFIRMATION'}
+                  className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white"
+                >
+                  {users.find(u => u.id === selectedUserId)?.status === 'FIRST_ACCESS' ? 'Configura Password ➔' : 'Accedi come Guardiola'}
                 </Button>
               </div>
             )}
@@ -263,18 +453,60 @@ export const AccessoLogin: React.FC = () => {
                 <Select
                   label="Seleziona Operatore Reale *"
                   className="!bg-slate-900 !border-white/20 !text-white focus:!border-[#11BCEC] focus:!ring-[#11BCEC]"
-                  options={users.filter(u => u.role === 'PREPOSTO' || u.role === 'OPERATORE_YARD').map(u => ({ value: u.id, label: `${u.name} (Presidio: ${depots.find(d => d.id === u.depotId)?.name || 'Tutti'})` }))}
+                  options={users.filter(u => u.role === 'PREPOSTO' || u.role === 'OPERATORE_YARD').map(u => ({ 
+                    value: u.id, 
+                    label: `${u.name} (Presidio: ${u.depotIds ? u.depotIds.map(id => depots.find(d => d.id === id)?.name || id).join(', ') : (depots.find(d => d.id === u.depotId)?.name || 'Tutti')})` 
+                  }))}
                   value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
                     const found = users.find(u => u.name === e.target.value || u.id === e.target.value);
                     if (found) {
                       setSelectedUserId(found.id);
-                      if (found.depotId) setSelectedPlantId(found.depotId);
+                      setLoginError('');
+                      setLoginPassword('');
+                      if (found.depotIds && found.depotIds.length > 0) setSelectedPlantId(found.depotIds[0]);
                     }
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white">
-                  Accedi come Preposto
+
+                {users.find(u => u.id === selectedUserId)?.status === 'PENDING_CONFIRMATION' && (
+                  <div className="p-3 text-xs text-rose-400 bg-rose-950/40 rounded-lg border border-rose-500/20 leading-relaxed font-sans">
+                    ⚠️ Utenza in attesa di conferma e-mail. Clicca su <strong>"Conferma Registrazione"</strong> nel simulatore e-mail in alto a destra per procedere.
+                  </div>
+                )}
+
+                {users.find(u => u.id === selectedUserId)?.status === 'FIRST_ACCESS' && (
+                  <div className="p-3 text-xs text-amber-400 bg-amber-950/40 rounded-lg border border-amber-500/20 leading-relaxed font-sans animate-pulse">
+                    ℹ️ Primo accesso rilevato. Verrà richiesto di configurare una nuova password di sicurezza.
+                  </div>
+                )}
+
+                {users.find(u => u.id === selectedUserId)?.status === 'ACTIVE' && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-300 uppercase font-mono">Password di Accesso *</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-900/90 text-white rounded-lg border border-white/20 focus:border-[#11BCEC] focus:ring-1 focus:ring-[#11BCEC] focus:outline-none placeholder-slate-600 transition-colors font-mono"
+                      required
+                    />
+                  </div>
+                )}
+
+                {loginError && (
+                  <div className="p-3 text-xs text-rose-400 bg-rose-950/40 rounded-lg border border-rose-500/20 font-sans">
+                    {loginError}
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleLogin} 
+                  disabled={users.find(u => u.id === selectedUserId)?.status === 'PENDING_CONFIRMATION'}
+                  className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white"
+                >
+                  {users.find(u => u.id === selectedUserId)?.status === 'FIRST_ACCESS' ? 'Configura Password ➔' : 'Accedi come Preposto'}
                 </Button>
               </div>
             )}
@@ -298,9 +530,18 @@ export const AccessoLogin: React.FC = () => {
                     value={carrierIdToLabel(selectedCarrierId)}
                     onChange={(e) => {
                       const opt = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
-                      if (opt) setSelectedCarrierId(opt.id);
+                      if (opt) {
+                        setSelectedCarrierId(opt.id);
+                        setLoginError('');
+                      }
                     }}
                   />
+                )}
+
+                {loginError && (
+                  <div className="p-3 text-xs text-rose-400 bg-rose-950/40 rounded-lg border border-rose-500/20">
+                    {loginError}
+                  </div>
                 )}
 
                 <Button onClick={handleLogin} disabled={!selectedCarrierId} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white">
@@ -334,11 +575,53 @@ export const AccessoLogin: React.FC = () => {
                   value={users.find(u => u.id === selectedUserId)?.name || ''}
                   onChange={(e) => {
                     const found = users.find(u => u.name === e.target.value || u.id === e.target.value);
-                    if (found) setSelectedUserId(found.id);
+                    if (found) {
+                      setSelectedUserId(found.id);
+                      setLoginError('');
+                      setLoginPassword('');
+                    }
                   }}
                 />
-                <Button onClick={handleLogin} className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white" variant="warning">
-                  Accedi come Amministratore
+
+                {users.find(u => u.id === selectedUserId)?.status === 'PENDING_CONFIRMATION' && (
+                  <div className="p-3 text-xs text-rose-400 bg-rose-950/40 rounded-lg border border-rose-500/20 leading-relaxed font-sans">
+                    ⚠️ Utenza in attesa di conferma e-mail. Clicca su <strong>"Conferma Registrazione"</strong> nel simulatore e-mail in alto a destra per procedere.
+                  </div>
+                )}
+
+                {users.find(u => u.id === selectedUserId)?.status === 'FIRST_ACCESS' && (
+                  <div className="p-3 text-xs text-amber-400 bg-amber-950/40 rounded-lg border border-amber-500/20 leading-relaxed font-sans animate-pulse">
+                    ℹ️ Primo accesso rilevato. Verrà richiesto di configurare una nuova password di sicurezza.
+                  </div>
+                )}
+
+                {users.find(u => u.id === selectedUserId)?.status === 'ACTIVE' && (
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-300 uppercase font-mono">Password di Accesso *</label>
+                    <input
+                      type="password"
+                      placeholder="••••••••"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full px-3 py-2 text-xs bg-slate-900/90 text-white rounded-lg border border-white/20 focus:border-[#11BCEC] focus:ring-1 focus:ring-[#11BCEC] focus:outline-none placeholder-slate-600 transition-colors font-mono"
+                      required
+                    />
+                  </div>
+                )}
+
+                {loginError && (
+                  <div className="p-3 text-xs text-rose-400 bg-rose-950/40 rounded-lg border border-rose-500/20 font-sans">
+                    {loginError}
+                  </div>
+                )}
+
+                <Button 
+                  onClick={handleLogin} 
+                  disabled={users.find(u => u.id === selectedUserId)?.status === 'PENDING_CONFIRMATION'}
+                  className="w-full mt-2 !text-slate-950 font-extrabold hover:!text-white" 
+                  variant="warning"
+                >
+                  {users.find(u => u.id === selectedUserId)?.status === 'FIRST_ACCESS' ? 'Configura Password ➔' : 'Accedi come Amministratore'}
                 </Button>
               </div>
             )}
@@ -465,10 +748,42 @@ export const AccessoLogin: React.FC = () => {
           </p>
         </div>
       )}
+      {/* SIMULATORE E-MAIL FLOATING */}
+      {simulatedEmails && simulatedEmails.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 w-80 bg-slate-950/90 backdrop-blur-xl border border-[#11BCEC]/30 rounded-2xl p-4 shadow-2xl font-mono text-[10px] animate-fade-in space-y-3">
+          <div className="flex justify-between items-center border-b border-[#11BCEC]/25 pb-2">
+            <span className="text-[#11BCEC] font-bold uppercase tracking-wider flex items-center gap-1.5 animate-pulse">
+              <span className="w-1.5 h-1.5 bg-[#11BCEC] rounded-full"></span>
+              [ SMTP SIMULATOR ]
+            </span>
+            <span className="text-[8px] text-slate-500">Notifiche: {simulatedEmails.length}</span>
+          </div>
+          <div className="space-y-3 max-h-[250px] overflow-y-auto">
+            {simulatedEmails.map((email) => (
+              <div key={email.userId} className="p-2.5 rounded-lg bg-slate-900 border border-white/5 space-y-2">
+                <div className="text-[9px] text-slate-400 space-y-0.5">
+                  <div><strong className="text-slate-200">Dest:</strong> {email.userName} ({email.userEmail})</div>
+                  <div><strong className="text-slate-200">Ogg:</strong> Conferma Attivazione Account Yard</div>
+                </div>
+                <p className="text-[9px] text-slate-300 leading-normal bg-slate-950 p-2 rounded border border-white/5">
+                  Gentile {email.userName}, per completare l'attivazione della tua utenza interna, clicca sul link di conferma qui sotto.
+                </p>
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => confirmUserEmail(email.userId)}
+                    className="px-2 py-1 rounded bg-[#11BCEC] hover:bg-[#11BCEC]/85 text-slate-950 font-bold cursor-pointer text-[9px] uppercase tracking-wider transition-colors"
+                  >
+                    Conferma Registrazione ➔
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
-
 
   function carrierIdToLabel(id: string) {
     const c = carriers.find(x => x.id === id);

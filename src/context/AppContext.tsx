@@ -97,9 +97,13 @@ interface AppContextType {
   deleteClient: (id: string) => void;
   addPalletType: (name: string, description?: string) => void;
   deletePalletType: (id: string) => void;
-  addUser: (name: string, email: string, role: User['role'], depotId: string) => void;
+  addUser: (name: string, email: string, role: User['role'], depotIds: string[], username: string) => void;
   updateUserRole: (id: string, role: User['role']) => void;
   deleteUser: (id: string) => void;
+  confirmUserEmail: (userId: string) => void;
+  setUserPassword: (userId: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  simulatedEmails: { userId: string; userName: string; userEmail: string; confirmLink: string }[];
+  clearSimulatedEmail: (userId: string) => void;
   addShipment: (
     clientId: string,
     carrierId: string,
@@ -292,6 +296,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [palletTypes, setPalletTypes] = useState<PalletType[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [simulatedEmails, setSimulatedEmails] = useState<{ userId: string; userName: string; userEmail: string; confirmLink: string }[]>([]);
+
+  const clearSimulatedEmail = (userId: string) => {
+    setSimulatedEmails((prev) => prev.filter((e) => e.userId !== userId));
+  };
 
   // Stati di sessione
   const [currentRole, setCurrentRole] = useState<'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null>(null);
@@ -1289,12 +1298,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- GESTIONE UTENZE ---
-  const addUser = (name: string, email: string, role: User['role'], depotId: string) => {
+  const addUser = (name: string, email: string, role: User['role'], depotIds: string[], username: string) => {
     const id = `user-${Date.now()}`;
-    const newUser: User = { id, name, email, role, depotId };
+    const newUser: User = {
+      id,
+      name,
+      username,
+      email,
+      role,
+      depotId: depotIds[0] || '',
+      depotIds,
+      status: 'PENDING_CONFIRMATION'
+    };
     setUsers((prev) => [...prev, newUser]);
     saveAction('ADD_USER', newUser);
-    logActivity(depotId, `Creata utenza interna per: ${name} (${role})`, 'SUCCESS');
+    logActivity(depotIds[0] || selectedDepotId, `Creata utenza interna per: ${name} (${role}) in attesa di conferma email`, 'SUCCESS');
+
+    // Aggiungi e-mail simulata in coda per la conferma
+    const confirmLink = `http://localhost:5173/conferma-email?id=${id}`;
+    setSimulatedEmails((prev) => [
+      ...prev,
+      { userId: id, userName: name, userEmail: email, confirmLink }
+    ]);
+  };
+
+  const confirmUserEmail = (userId: string) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, status: 'FIRST_ACCESS' as const } : u))
+    );
+    saveAction('CONFIRM_USER_EMAIL', { id: userId });
+    logActivity(selectedDepotId, `Email confermata per l'utente ${userId}. Stato aggiornato a: Primo Accesso`, 'SUCCESS');
+    clearSimulatedEmail(userId);
+  };
+
+  const setUserPassword = async (userId: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const hasMinLength = password.length >= 8;
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (!hasMinLength) return { success: false, error: 'La password deve avere almeno 8 caratteri.' };
+    if (!hasUppercase) return { success: false, error: 'La password deve contenere almeno una lettera maiuscola.' };
+    if (!hasNumber) return { success: false, error: 'La password deve contenere almeno un numero.' };
+    if (!hasSpecial) return { success: false, error: 'La password deve contenere almeno un carattere speciale (es. !, @, #, $, %).' };
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === userId ? { ...u, password, status: 'ACTIVE' as const } : u))
+    );
+    logActivity(selectedDepotId, `Nuova password impostata con successo per l'utente ${userId}.`, 'SUCCESS');
+    await saveAction('SET_USER_PASSWORD', { id: userId, password });
+
+    // Aggiorna anche l'utente di sessione se si sta auto-impostando
+    setCurrentUser((prev) =>
+      prev && prev.id === userId ? { ...prev, password, status: 'ACTIVE' as const } : prev
+    );
+
+    return { success: true };
   };
 
   const updateUserRole = (id: string, role: User['role']) => {
@@ -1502,6 +1561,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addUser,
         updateUserRole,
         deleteUser,
+        confirmUserEmail,
+        setUserPassword,
+        simulatedEmails,
+        clearSimulatedEmail,
         addShipment,
         updateShipmentStatus,
         updateShipment,

@@ -17,6 +17,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     setCurrentRole,
     setCurrentUser,
     setCurrentCarrierId,
+    setSelectedDepotId,
   } = useApp();
 
   const handleLogout = () => {
@@ -45,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </h2>
               <span className="text-[9px] font-mono text-white/50 tracking-widest uppercase mt-0.5 block">
                 YARD & DOCK SYSTEM
-              </span>
+                </span>
             </div>
           </div>
         </div>
@@ -66,9 +67,25 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </span>
             </div>
             {(currentRole === 'GUARDIA' || currentRole === 'PREPOSTO') && (
-              <div className="flex justify-between">
-                <span className="text-white/60">Plant:</span>
-                <span className="font-bold truncate max-w-[150px] text-right font-mono">{currentDepotName}</span>
+              <div className="flex flex-col gap-1 mt-1 border-t border-white/5 pt-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-white/60">Plant:</span>
+                  {currentUser?.depotIds && currentUser.depotIds.length > 1 ? (
+                    <select
+                      value={selectedDepotId}
+                      onChange={(e) => setSelectedDepotId(e.target.value)}
+                      className="bg-slate-900 border border-white/20 text-[10px] text-white font-mono rounded p-1 max-w-[160px] outline-none cursor-pointer focus:border-[#11BCEC]"
+                    >
+                      {currentUser.depotIds.map((id: string) => (
+                        <option key={id} value={id}>
+                          {depots.find((d) => d.id === id)?.name || id}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="font-bold truncate max-w-[150px] text-right font-mono">{currentDepotName}</span>
+                  )}
+                </div>
               </div>
             )}
             {currentRole === 'VETTORE' && (
