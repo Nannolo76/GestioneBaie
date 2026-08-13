@@ -144,6 +144,7 @@ export interface Client {
   name: string;
   vatNumber?: string;
   email?: string;
+  defaultDepotId?: string;
 }
 
 export interface PalletType {

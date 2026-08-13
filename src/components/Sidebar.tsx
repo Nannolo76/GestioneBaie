@@ -70,7 +70,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               <div className="flex flex-col gap-1 mt-1 border-t border-white/5 pt-1.5">
                 <div className="flex justify-between items-center">
                   <span className="text-white/60">Plant:</span>
-                  {currentUser?.depotIds && currentUser.depotIds.length > 1 ? (
+                  {currentUser?.role === 'ADMIN' ? (
+                    <select
+                      value={selectedDepotId}
+                      onChange={(e) => setSelectedDepotId(e.target.value)}
+                      className="bg-slate-900 border border-white/20 text-[10px] text-white font-mono rounded p-1 max-w-[160px] outline-none cursor-pointer focus:border-[#11BCEC]"
+                    >
+                      {depots.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : currentUser?.depotIds && currentUser.depotIds.length > 1 ? (
                     <select
                       value={selectedDepotId}
                       onChange={(e) => setSelectedDepotId(e.target.value)}

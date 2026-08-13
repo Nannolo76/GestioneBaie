@@ -317,7 +317,8 @@ async function initializeDb() {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       vat_number TEXT,
-      email TEXT
+      email TEXT,
+      default_depot_id TEXT
     )
   `);
 
@@ -419,34 +420,13 @@ async function initializeDb() {
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS cap TEXT`);
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS province TEXT`);
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS country TEXT`);
+  await sql(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS default_depot_id TEXT`);
 
-  // Assicura la presenza dei nuovi stabilimenti di Oppeano e Monticelli (seeding incrementale)
+  // Aggiorna depotIds dell'admin affinché abbia accesso di default ai 3 principali
   try {
-    const opp1Exists = await sql("SELECT id FROM depots WHERE id = 'depot-oppeano1'");
-    if (opp1Exists.length === 0) {
-      await sql("INSERT INTO depots (id, name, city) VALUES ('depot-oppeano1', 'Oppeano Plant 1', 'Oppeano (VR)')");
-      await sql("INSERT INTO warehouse_modules (id, depot_id, name) VALUES ('module-o1-1', 'depot-oppeano1', 'Modulo O1-A')");
-      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o1-01', 'depot-oppeano1', 'module-o1-1', 'Baia O1-01', 'DISPONIBILE')");
-      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o1-02', 'depot-oppeano1', 'module-o1-1', 'Baia O1-02', 'DISPONIBILE')");
-    }
-    const opp2Exists = await sql("SELECT id FROM depots WHERE id = 'depot-oppeano2'");
-    if (opp2Exists.length === 0) {
-      await sql("INSERT INTO depots (id, name, city) VALUES ('depot-oppeano2', 'Oppeano Plant 2', 'Oppeano (VR)')");
-      await sql("INSERT INTO warehouse_modules (id, depot_id, name) VALUES ('module-o2-1', 'depot-oppeano2', 'Modulo O2-A')");
-      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o2-01', 'depot-oppeano2', 'module-o2-1', 'Baia O2-01', 'DISPONIBILE')");
-      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o2-02', 'depot-oppeano2', 'module-o2-1', 'Baia O2-02', 'DISPONIBILE')");
-    }
-    const montExists = await sql("SELECT id FROM depots WHERE id = 'depot-monticelli'");
-    if (montExists.length === 0) {
-      await sql("INSERT INTO depots (id, name, city) VALUES ('depot-monticelli', 'Monticelli Logistics Plant', 'Monticelli d\'Ongina (PC)')");
-      await sql("INSERT INTO warehouse_modules (id, depot_id, name) VALUES ('module-mon-1', 'depot-monticelli', 'Modulo M1')");
-      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-mon-01', 'depot-monticelli', 'module-mon-1', 'Baia MON-01', 'DISPONIBILE')");
-      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-mon-02', 'depot-monticelli', 'module-mon-1', 'Baia MON-02', 'DISPONIBILE')");
-    }
-    // Aggiorna anche depotIds dell'admin
-    await sql("UPDATE users SET depot_ids = '[\"depot-milano\",\"depot-roma\",\"depot-bari\",\"depot-oppeano1\",\"depot-oppeano2\",\"depot-monticelli\"]' WHERE id = 'user-1'");
+    await sql("UPDATE users SET depot_ids = '[\"depot-milano\",\"depot-roma\",\"depot-bari\"]' WHERE id = 'user-1'");
   } catch (err) {
-    console.error("Errore durante inserimento incrementale Oppeano/Monticelli:", err);
+    console.error("Errore durante aggiornamento depotIds admin:", err);
   }
 
   // Se non ci sono plant inseriti, eseguiamo il seed iniziale
@@ -1008,6 +988,14 @@ export default async function handler(req: any, res: any) {
         internalNotes: s.internal_notes
       }));
 
+      const parsedClients = clients.map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        vatNumber: c.vat_number,
+        email: c.email,
+        defaultDepotId: c.default_depot_id
+      }));
+
       return res.status(200).json({
         depots,
         warehouseModules: parsedModules,
@@ -1019,7 +1007,7 @@ export default async function handler(req: any, res: any) {
         activityLogs: parsedLogs,
         activityTypes: parsedActivityTypes,
         reportSchedules: parsedSchedules,
-        clients,
+        clients: parsedClients,
         palletTypes,
         users: parsedUsers,
         shipments: parsedShipments
@@ -1261,13 +1249,13 @@ export default async function handler(req: any, res: any) {
           break;
 
         case 'ADD_CLIENT':
-          await sql('INSERT INTO clients (id, name, vat_number, email) VALUES ($1, $2, $3, $4)', [
-            payload.id, payload.name, payload.vatNumber || null, payload.email || null
+          await sql('INSERT INTO clients (id, name, vat_number, email, default_depot_id) VALUES ($1, $2, $3, $4, $5)', [
+            payload.id, payload.name, payload.vatNumber || null, payload.email || null, payload.defaultDepotId || null
           ]);
           break;
         case 'UPDATE_CLIENT':
-          await sql('UPDATE clients SET name = $1, vat_number = $2, email = $3 WHERE id = $4', [
-            payload.name, payload.vatNumber || null, payload.email || null, payload.id
+          await sql('UPDATE clients SET name = $1, vat_number = $2, email = $3, default_depot_id = $4 WHERE id = $5', [
+            payload.name, payload.vatNumber || null, payload.email || null, payload.defaultDepotId || null, payload.id
           ]);
           break;
         case 'DELETE_CLIENT':

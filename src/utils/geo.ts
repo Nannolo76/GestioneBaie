@@ -1,3 +1,5 @@
+import type { Depot, Client } from '../types';
+
 // Mapping province -> regione in Italia
 export const PROV_TO_REGION: Record<string, string> = {
   AO: 'Valle d\'Aosta',
@@ -148,20 +150,234 @@ export function getHubForLocation(loc: { city?: string; cap?: string; province?:
   return { hubId: null, isAmbiguous: true };
 }
 
+export function getHubForLocationDynamic(
+  loc: { city?: string; cap?: string; province?: string; name?: string },
+  depots: Depot[]
+): { hubId: string | null; isAmbiguous: boolean } {
+  if (!depots || depots.length === 0) return { hubId: null, isAmbiguous: true };
+
+  // Determina la provincia cercata
+  let targetProvince: string | null = null;
+  if (loc.cap) {
+    const geo = getGeoDetailsByCap(loc.cap);
+    if (geo?.province) targetProvince = geo.province.toUpperCase();
+  }
+  if (!targetProvince && loc.province) {
+    targetProvince = loc.province.trim().toUpperCase();
+  }
+  
+  // Se non abbiamo una provincia, proviamo a cercarla nel nome del comune
+  if (!targetProvince && loc.city) {
+    const cityUpper = loc.city.toUpperCase();
+    for (const [prov] of Object.entries(PROV_TO_REGION)) {
+      if (cityUpper.includes(prov)) {
+        targetProvince = prov;
+        break;
+      }
+    }
+  }
+
+  // Se abbiamo trovato la provincia
+  if (targetProvince) {
+    // Match Livello 1: Stessa Provincia
+    const sameProvDepots = depots.filter(d => {
+      const dProv = d.province ? d.province.trim().toUpperCase() : '';
+      if (dProv === targetProvince) return true;
+      
+      const dCityUpper = d.city.toUpperCase();
+      if (dCityUpper.includes(`(${targetProvince})`)) return true;
+      
+      return false;
+    });
+
+    if (sameProvDepots.length === 1) {
+      return { hubId: sameProvDepots[0].id, isAmbiguous: false };
+    }
+    if (sameProvDepots.length > 1) {
+      return { hubId: sameProvDepots[0].id, isAmbiguous: true };
+    }
+
+    // Match Livello 2: Stessa Regione
+    const targetRegion = PROV_TO_REGION[targetProvince];
+    if (targetRegion) {
+      const sameRegionDepots = depots.filter(d => {
+        const dProv = d.province ? d.province.trim().toUpperCase() : '';
+        const dRegion = dProv ? PROV_TO_REGION[dProv] : '';
+        if (dRegion === targetRegion) return true;
+        
+        if (d.city) {
+          const match = d.city.match(/\(([A-Z]{2})\)/);
+          if (match) {
+            const extractedProv = match[1];
+            if (PROV_TO_REGION[extractedProv] === targetRegion) return true;
+          }
+        }
+        return false;
+      });
+
+      if (sameRegionDepots.length === 1) {
+        return { hubId: sameRegionDepots[0].id, isAmbiguous: false };
+      }
+      if (sameRegionDepots.length > 1) {
+        return { hubId: sameRegionDepots[0].id, isAmbiguous: true };
+      }
+    }
+  }
+
+  // Match Livello 3: Macro-regione (Nord, Centro, Sud)
+  let targetMacro: 'NORTH' | 'CENTER' | 'SOUTH' | null = null;
+  if (targetProvince) {
+    const targetRegion = PROV_TO_REGION[targetProvince];
+    if (targetRegion) {
+      const northRegions = [
+        'Valle d\'Aosta', 'Piemonte', 'Liguria', 'Lombardia',
+        'Trentino-Alto Adige', 'Veneto', 'Friuli-Venezia Giulia', 'Emilia-Romagna'
+      ];
+      const centerRegions = [
+        'Toscana', 'Umbria', 'Marche', 'Lazio', 'Abruzzo', 'Sardegna'
+      ];
+      
+      if (northRegions.includes(targetRegion)) targetMacro = 'NORTH';
+      else if (centerRegions.includes(targetRegion)) targetMacro = 'CENTER';
+      else targetMacro = 'SOUTH';
+    }
+  }
+
+  if (targetMacro) {
+    const northRegions = [
+      'Valle d\'Aosta', 'Piemonte', 'Liguria', 'Lombardia',
+      'Trentino-Alto Adige', 'Veneto', 'Friuli-Venezia Giulia', 'Emilia-Romagna'
+    ];
+    const centerRegions = [
+      'Toscana', 'Umbria', 'Marche', 'Lazio', 'Abruzzo', 'Sardegna'
+    ];
+
+    const sameMacroDepots = depots.filter(d => {
+      const dProv = d.province ? d.province.trim().toUpperCase() : '';
+      let dRegion = dProv ? PROV_TO_REGION[dProv] : '';
+      if (!dRegion && d.city) {
+        const match = d.city.match(/\(([A-Z]{2})\)/);
+        if (match) dRegion = PROV_TO_REGION[match[1]] || '';
+      }
+      if (!dRegion) return false;
+
+      let dMacro: 'NORTH' | 'CENTER' | 'SOUTH' = 'SOUTH';
+      if (northRegions.includes(dRegion)) dMacro = 'NORTH';
+      else if (centerRegions.includes(dRegion)) dMacro = 'CENTER';
+      
+      return dMacro === targetMacro;
+    });
+
+    if (sameMacroDepots.length === 1) {
+      return { hubId: sameMacroDepots[0].id, isAmbiguous: false };
+    }
+    if (sameMacroDepots.length > 1) {
+      const keywordMatch = sameMacroDepots.find(d => {
+        const nameUpper = d.name.toUpperCase();
+        if (targetMacro === 'NORTH' && (nameUpper.includes('MILANO') || nameUpper.includes('MILAN'))) return true;
+        if (targetMacro === 'CENTER' && (nameUpper.includes('ROMA') || nameUpper.includes('ROME'))) return true;
+        if (targetMacro === 'SOUTH' && (nameUpper.includes('BARI'))) return true;
+        return false;
+      });
+      if (keywordMatch) return { hubId: keywordMatch.id, isAmbiguous: false };
+
+      return { hubId: sameMacroDepots[0].id, isAmbiguous: true };
+    }
+  }
+
+  return { hubId: depots[0]?.id || null, isAmbiguous: true };
+}
+
 export function getHubByClientAndLocation(
   clientId: string,
-  loc: { city?: string; cap?: string; province?: string; name?: string }
+  loc: { city?: string; cap?: string; province?: string; name?: string },
+  depots?: Depot[],
+  clients?: Client[]
 ): { hubId: string | null; isAmbiguous: boolean; routingNotes?: string } {
   const cleanClient = (clientId || '').toLowerCase();
   
-  const isVeronaOppeano = (
+  // 1. Controlla regole client su database
+  if (clients && clientId) {
+    const matchedClient = clients.find(c => c.id === clientId || c.name.toLowerCase() === cleanClient);
+    if (matchedClient?.defaultDepotId) {
+      const depotName = depots?.find(d => d.id === matchedClient.defaultDepotId)?.name || matchedClient.defaultDepotId;
+      return {
+        hubId: matchedClient.defaultDepotId,
+        isAmbiguous: false,
+        routingNotes: `Regola Cliente: Assegnato ${depotName}`
+      };
+    }
+  }
+
+  // 2. Se abbiamo i plant a database, usa l'auto-routing dinamico
+  if (depots && depots.length > 0) {
+    // Gestione regole di esempio specifiche per Verona se inseriti plant nel database
+    const isVeronaOppeano = (
+      (loc.province && loc.province.toUpperCase() === 'VR') ||
+      (loc.cap && loc.cap.startsWith('37')) ||
+      (loc.city && (loc.city.toUpperCase().includes('OPPEANO') || loc.city.toUpperCase().includes('VERONA'))) ||
+      (loc.name && (loc.name.toUpperCase().includes('OPPEANO') || loc.name.toUpperCase().includes('VERONA')))
+    );
+
+    if (isVeronaOppeano) {
+      const vrDepots = depots.filter(d => {
+        const dProv = d.province ? d.province.toUpperCase() : '';
+        return dProv === 'VR' || d.city.toUpperCase().includes('OPPEANO') || d.city.toUpperCase().includes('VERONA') || d.name.toUpperCase().includes('OPPEANO');
+      });
+
+      if (vrDepots.length > 0) {
+        if (cleanClient.includes('rossi') || cleanClient.includes('bauli')) {
+          const d1 = vrDepots.find(d => d.name.includes('1') || d.id.includes('1'));
+          if (d1) return { hubId: d1.id, isAmbiguous: false, routingNotes: `Oppeano 1 (Regola ${cleanClient.includes('rossi') ? 'Rossi SpA' : 'Bauli'})` };
+        }
+        if (cleanClient.includes('bianchi')) {
+          const d2 = vrDepots.find(d => d.name.includes('2') || d.id.includes('2'));
+          if (d2) return { hubId: d2.id, isAmbiguous: false, routingNotes: 'Oppeano 2 (Regola Bianchi Srl)' };
+        }
+        
+        if (vrDepots.length > 1) {
+          return {
+            hubId: vrDepots[0].id,
+            isAmbiguous: true,
+            routingNotes: 'Ambivalenza Hub Verona: Rilevati più plant nel cluster (Da confermare)'
+          };
+        }
+        return { hubId: vrDepots[0].id, isAmbiguous: false };
+      }
+    }
+
+    const dynamicResult = getHubForLocationDynamic(loc, depots);
+    let routingNotes = undefined;
+
+    if (dynamicResult.isAmbiguous && dynamicResult.hubId) {
+      const matchedDepot = depots.find(d => d.id === dynamicResult.hubId);
+      if (matchedDepot) {
+        const prov = matchedDepot.province || '';
+        const sameProvCount = depots.filter(d => d.province === prov).length;
+        if (sameProvCount > 1) {
+          routingNotes = `Ambivalenza Hub: Rilevati più stabilimenti in provincia di ${prov} (Da confermare)`;
+        } else {
+          routingNotes = 'Instradamento provvisorio per macro-area (Da confermare)';
+        }
+      }
+    }
+
+    return {
+      hubId: dynamicResult.hubId,
+      isAmbiguous: dynamicResult.isAmbiguous,
+      routingNotes
+    };
+  }
+
+  // 3. Fallback statico per compatibilità retroattiva
+  const isVeronaOppeanoStatic = (
     (loc.province && loc.province.toUpperCase() === 'VR') ||
     (loc.cap && loc.cap.startsWith('37')) ||
     (loc.city && (loc.city.toUpperCase().includes('OPPEANO') || loc.city.toUpperCase().includes('VERONA'))) ||
     (loc.name && (loc.name.toUpperCase().includes('OPPEANO') || loc.name.toUpperCase().includes('VERONA')))
   );
 
-  if (isVeronaOppeano) {
+  if (isVeronaOppeanoStatic) {
     if (cleanClient === 'client-rossi' || cleanClient.includes('rossi')) {
       return { hubId: 'depot-oppeano1', isAmbiguous: false, routingNotes: 'Oppeano 1 (Regola Rossi SpA)' };
     }
@@ -201,13 +417,17 @@ export function calculateSmartRouting(
   origin: { city?: string; cap?: string; province?: string; name?: string },
   destination: { city?: string; cap?: string; province?: string; name?: string },
   activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER' = 'SCARICO',
-  clientId: string = ''
+  clientId: string = '',
+  depots?: Depot[],
+  clients?: Client[]
 ): SmartRoutingResult & { routingNotes: string } {
-  const origResult = getHubByClientAndLocation(clientId, origin);
-  const destResult = getHubByClientAndLocation(clientId, destination);
+  const origResult = getHubByClientAndLocation(clientId, origin, depots, clients);
+  const destResult = getHubByClientAndLocation(clientId, destination, depots, clients);
 
-  const hubOrigineOperativo = origResult.hubId || 'depot-milano';
-  const hubDestinazioneOperativo = destResult.hubId || 'depot-milano';
+  const defaultHub = depots && depots.length > 0 ? depots[0].id : 'depot-milano';
+
+  const hubOrigineOperativo = origResult.hubId || defaultHub;
+  const hubDestinazioneOperativo = destResult.hubId || defaultHub;
   const isAmbiguous = origResult.isAmbiguous || destResult.isAmbiguous;
   
   const routingNotes = origResult.routingNotes || destResult.routingNotes || 'Instradamento calcolato';

@@ -105,8 +105,8 @@ interface AppContextType {
   palletTypes: PalletType[];
   users: User[];
   shipments: Shipment[];
-  addClient: (name: string, vatNumber?: string, email?: string) => void;
-  updateClient: (id: string, name: string, vatNumber?: string, email?: string) => void;
+  addClient: (name: string, vatNumber?: string, email?: string, defaultDepotId?: string) => void;
+  updateClient: (id: string, name: string, vatNumber?: string, email?: string, defaultDepotId?: string) => void;
   deleteClient: (id: string) => void;
   addPalletType: (name: string, description?: string) => void;
   updatePalletType: (id: string, name: string, description?: string) => void;
@@ -1363,18 +1363,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- GESTIONE CLIENTI ---
-  const addClient = (name: string, vatNumber?: string, email?: string) => {
+  const addClient = (name: string, vatNumber?: string, email?: string, defaultDepotId?: string) => {
     const id = `client-${Date.now()}`;
-    const newClient: Client = { id, name, vatNumber, email };
+    const newClient: Client = { id, name, vatNumber, email, defaultDepotId };
     setClients((prev) => [...prev, newClient]);
     saveAction('ADD_CLIENT', newClient);
     logActivity(selectedDepotId, `Aggiunto cliente: ${name}`, 'SUCCESS');
   };
 
-  const updateClient = (id: string, name: string, vatNumber?: string, email?: string) => {
-    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, name, vatNumber, email } : c)));
+  const updateClient = (id: string, name: string, vatNumber?: string, email?: string, defaultDepotId?: string) => {
+    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, name, vatNumber, email, defaultDepotId } : c)));
     logActivity(selectedDepotId, `Aggiornato cliente: ${name}`, 'INFO');
-    saveAction('UPDATE_CLIENT', { id, name, vatNumber, email });
+    saveAction('UPDATE_CLIENT', { id, name, vatNumber, email, defaultDepotId });
   };
 
   const deleteClient = (id: string) => {

@@ -114,6 +114,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newClientName, setNewClientName] = useState('');
   const [newClientVat, setNewClientVat] = useState('');
   const [newClientEmail, setNewClientEmail] = useState('');
+  const [newClientDefaultDepotId, setNewClientDefaultDepotId] = useState('');
 
   // Stati Tipi Pallet
   const [newPalletName, setNewPalletName] = useState('');
@@ -322,10 +323,11 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const handleAddClient = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newClientName) return;
-    addClient(newClientName, newClientVat || undefined, newClientEmail || undefined);
+    addClient(newClientName, newClientVat || undefined, newClientEmail || undefined, newClientDefaultDepotId || undefined);
     setNewClientName('');
     setNewClientVat('');
     setNewClientEmail('');
+    setNewClientDefaultDepotId('');
   };
 
   const handleAddPalletType = (e: React.FormEvent) => {
@@ -1504,6 +1506,18 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   value={newClientEmail}
                   onChange={(e) => setNewClientEmail(e.target.value)}
                 />
+                <Select
+                  label="Hub di Default (Opzionale)"
+                  options={[
+                    { value: '', label: 'Nessun hub di default' },
+                    ...depots.map(d => ({ value: d.id, label: d.name }))
+                  ]}
+                  value={depots.find(d => d.id === newClientDefaultDepotId)?.name || newClientDefaultDepotId}
+                  onChange={(e) => {
+                    const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
+                    setNewClientDefaultDepotId(found ? found.id : e.target.value);
+                  }}
+                />
                 <Button type="submit" className="w-full">
                   Registra Cliente
                 </Button>
@@ -1530,6 +1544,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     accessor: (c) => <span className="font-mono text-xs lowercase">{c.email || '-'}</span>
                   },
                   {
+                    header: 'Hub di Default',
+                    accessor: (c) => {
+                      const matchedDepot = depots.find(d => d.id === c.defaultDepotId);
+                      return <span className="font-semibold text-xs text-gray-700">{matchedDepot ? matchedDepot.name : '-'}</span>;
+                    }
+                  },
+                  {
                     header: 'Azioni',
                     accessor: (c) => (
                       <div className="flex gap-2">
@@ -1538,7 +1559,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                           onClick={() => setEditingItem({
                             type: 'client',
                             id: c.id,
-                            fields: { name: c.name, vatNumber: c.vatNumber || '', email: c.email || '' }
+                            fields: { name: c.name, vatNumber: c.vatNumber || '', email: c.email || '', defaultDepotId: c.defaultDepotId || '' }
                           })}
                         >
                           Modifica
@@ -1914,7 +1935,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
               } else if (type === 'reportSchedule') {
                 updateReportSchedule(id, fields.name, fields.frequency, fields.recipients, fields.reportType);
               } else if (type === 'client') {
-                updateClient(id, fields.name, fields.vatNumber || undefined, fields.email || undefined);
+                updateClient(id, fields.name, fields.vatNumber || undefined, fields.email || undefined, fields.defaultDepotId || undefined);
               } else if (type === 'palletType') {
                 updatePalletType(id, fields.name, fields.description || undefined);
               } else if (type === 'user') {
@@ -2316,6 +2337,22 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                       })}
                       className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Hub di Default</label>
+                    <select
+                      value={editingItem.fields.defaultDepotId || ''}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, defaultDepotId: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                    >
+                      <option value="">Nessun hub di default</option>
+                      {depots.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </>
               )}

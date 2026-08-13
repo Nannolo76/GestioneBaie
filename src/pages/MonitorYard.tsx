@@ -767,7 +767,9 @@ export const MonitorYard: React.FC = () => {
           name: shipmentFormRealDestinationName
         },
         shipmentFormType,
-        shipmentFormClient
+        shipmentFormClient,
+        depots,
+        clients
       );
 
       setShipmentFormHubOrigineOperativo(routing.hubOrigineOperativo);
@@ -941,7 +943,9 @@ export const MonitorYard: React.FC = () => {
             name: realDestinationName
           },
           activityType as any,
-          defaultClient
+          defaultClient,
+          depots,
+          clients
         );
 
         if (!hubOrigineOperativo) hubOrigineOperativo = routing.hubOrigineOperativo;
