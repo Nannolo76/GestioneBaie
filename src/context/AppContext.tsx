@@ -17,8 +17,8 @@ interface AppContextType {
   currentUser: User | null;
   currentCarrierId: string;
   selectedDepotId: string;
-  addDepot: (name: string, city: string) => void;
-  updateDepot: (id: string, name: string, city: string) => void;
+  addDepot: (name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => void;
+  updateDepot: (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => void;
   deleteDepot: (id: string) => void;
   addWarehouseModule: (depotId: string, name: string, description?: string) => void;
   updateWarehouseModule: (id: string, depotId: string, name: string, description?: string) => void;
@@ -558,18 +558,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- AZIONI CONFIGURAZIONE / ADMIN ---
-  const addDepot = (name: string, city: string) => {
+  const addDepot = (name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => {
     const id = `depot-${Date.now()}`;
-    const newDepot: Depot = { id, name, city };
+    const newDepot: Depot = { id, name, city, address, cap, province, country };
     setDepots((prev) => [...prev, newDepot]);
     logActivity(id, `Creato nuovo stabilimento Plant: ${name} (${city})`, 'SUCCESS');
     saveAction('ADD_DEPOT', newDepot);
   };
 
-  const updateDepot = (id: string, name: string, city: string) => {
-    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city } : d)));
+  const updateDepot = (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => {
+    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city, address, cap, province, country } : d)));
     logActivity(selectedDepotId, `Aggiornato stabilimento: ${name} (${city})`, 'INFO');
-    saveAction('UPDATE_DEPOT', { id, name, city });
+    saveAction('UPDATE_DEPOT', { id, name, city, address, cap, province, country });
   };
 
   const deleteDepot = (id: string) => {

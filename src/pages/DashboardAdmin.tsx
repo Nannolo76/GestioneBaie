@@ -73,7 +73,11 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
 
   // Stati Hub
   const [newHubName, setNewHubName] = useState('');
-  const [newHubCity, setNewHubCity] = useState('');
+  const [newHubCity, setNewHubCity] = useState(''); // Località
+  const [newHubAddress, setNewHubAddress] = useState('');
+  const [newHubCap, setNewHubCap] = useState('');
+  const [newHubProvince, setNewHubProvince] = useState('');
+  const [newHubCountry, setNewHubCountry] = useState('Italia');
 
   // Stati Baia
   const [selectedHubForBay, setSelectedHubForBay] = useState(depots[0]?.id || '');
@@ -147,9 +151,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const handleAddHub = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHubName || !newHubCity) return;
-    addDepot(newHubName, newHubCity);
+    addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry);
     setNewHubName('');
     setNewHubCity('');
+    setNewHubAddress('');
+    setNewHubCap('');
+    setNewHubProvince('');
+    setNewHubCountry('Italia');
   };
 
   const handleAddBay = (e: React.FormEvent) => {
@@ -482,11 +490,37 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   required
                 />
                 <Input
-                  label="Città / Provincia"
-                  placeholder="Es. Lainate (MI)"
+                  label="Indirizzo"
+                  placeholder="Es. Via dell'Artigianato, 10"
+                  value={newHubAddress}
+                  onChange={(e) => setNewHubAddress(e.target.value)}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="CAP"
+                    placeholder="Es. 20020"
+                    value={newHubCap}
+                    onChange={(e) => setNewHubCap(e.target.value)}
+                  />
+                  <Input
+                    label="Provincia"
+                    placeholder="Es. MI"
+                    value={newHubProvince}
+                    onChange={(e) => setNewHubProvince(e.target.value)}
+                  />
+                </div>
+                <Input
+                  label="Località"
+                  placeholder="Es. Lainate"
                   value={newHubCity}
                   onChange={(e) => setNewHubCity(e.target.value)}
                   required
+                />
+                <Input
+                  label="Nazione"
+                  placeholder="Es. Italia"
+                  value={newHubCountry}
+                  onChange={(e) => setNewHubCountry(e.target.value)}
                 />
                 <Button type="submit" className="w-full">
                   Crea Stabilimento
@@ -562,8 +596,15 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     accessor: (d) => <span className="font-bold">{d.name}</span>,
                   },
                   {
-                    header: 'Provincia',
-                    accessor: (d) => <span>{d.city}</span>,
+                    header: 'Indirizzo e Località',
+                    accessor: (d) => (
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-gray-700">{d.address || '-'}</span>
+                        <span className="text-[10px] text-gray-400 font-mono">
+                          {d.cap || ''} {d.city || ''} {d.province ? `(${d.province.toUpperCase()})` : ''} {d.country ? `- ${d.country}` : ''}
+                        </span>
+                      </div>
+                    ),
                   },
                   {
                     header: 'Conteggio Baie',
@@ -582,7 +623,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                           onClick={() => setEditingItem({
                             type: 'depot',
                             id: d.id,
-                            fields: { name: d.name, city: d.city }
+                            fields: { name: d.name, city: d.city, address: d.address || '', cap: d.cap || '', province: d.province || '', country: d.country || 'Italia' }
                           })}
                         >
                           Modifica
@@ -1861,7 +1902,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
               e.preventDefault();
               const { type, id, fields } = editingItem;
               if (type === 'depot') {
-                updateDepot(id, fields.name, fields.city);
+                updateDepot(id, fields.name, fields.city, fields.address, fields.cap, fields.province, fields.country);
               } else if (type === 'warehouseModule') {
                 updateWarehouseModule(id, fields.depotId, fields.name, fields.description);
               } else if (type === 'bay') {
@@ -1898,16 +1939,66 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Città / Provincia *</label>
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Indirizzo</label>
                     <input
                       type="text"
-                      value={editingItem.fields.city}
+                      value={editingItem.fields.address || ''}
                       onChange={(e) => setEditingItem({
                         ...editingItem,
-                        fields: { ...editingItem.fields, city: e.target.value }
+                        fields: { ...editingItem.fields, address: e.target.value }
                       })}
                       className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
-                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">CAP</label>
+                      <input
+                        type="text"
+                        value={editingItem.fields.cap || ''}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          fields: { ...editingItem.fields, cap: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Località *</label>
+                      <input
+                        type="text"
+                        value={editingItem.fields.city}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          fields: { ...editingItem.fields, city: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Provincia</label>
+                      <input
+                        type="text"
+                        value={editingItem.fields.province || ''}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          fields: { ...editingItem.fields, province: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nazione</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.country || 'Italia'}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, country: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
                     />
                   </div>
                 </>

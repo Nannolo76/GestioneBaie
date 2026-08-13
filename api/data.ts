@@ -414,6 +414,12 @@ async function initializeDb() {
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_status TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_notes TEXT`);
 
+  // Nuovi campi geografici strutturati per i plant/depots
+  await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS address TEXT`);
+  await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS cap TEXT`);
+  await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS province TEXT`);
+  await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS country TEXT`);
+
   // Assicura la presenza dei nuovi stabilimenti di Oppeano e Monticelli (seeding incrementale)
   try {
     const opp1Exists = await sql("SELECT id FROM depots WHERE id = 'depot-oppeano1'");
@@ -1029,10 +1035,14 @@ export default async function handler(req: any, res: any) {
 
       switch (action) {
         case 'ADD_DEPOT':
-          await sql('INSERT INTO depots (id, name, city) VALUES ($1, $2, $3)', [payload.id, payload.name, payload.city]);
+          await sql('INSERT INTO depots (id, name, city, address, cap, province, country) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
+            payload.id, payload.name, payload.city, payload.address || null, payload.cap || null, payload.province || null, payload.country || 'Italia'
+          ]);
           break;
         case 'UPDATE_DEPOT':
-          await sql('UPDATE depots SET name = $1, city = $2 WHERE id = $3', [payload.name, payload.city, payload.id]);
+          await sql('UPDATE depots SET name = $1, city = $2, address = $3, cap = $4, province = $5, country = $6 WHERE id = $7', [
+            payload.name, payload.city, payload.address || null, payload.cap || null, payload.province || null, payload.country || 'Italia', payload.id
+          ]);
           break;
         case 'DELETE_DEPOT':
           await sql('DELETE FROM depots WHERE id = $1', [payload.id]);

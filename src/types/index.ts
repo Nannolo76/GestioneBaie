@@ -2,6 +2,10 @@ export interface Depot {
   id: string;
   name: string;
   city: string;
+  address?: string;
+  cap?: string;
+  province?: string;
+  country?: string;
 }
 
 export interface WarehouseModule {
