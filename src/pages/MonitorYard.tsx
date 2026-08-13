@@ -6,6 +6,7 @@ import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import type { Booking, Bay, BookingNote, Shipment } from '../types';
+import { calculateSmartRouting } from '../utils/geo';
 
 export const MonitorYard: React.FC = () => {
   const {
@@ -95,6 +96,9 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormHubOrigineOperativo, setShipmentFormHubOrigineOperativo] = useState('');
   const [shipmentFormHubDestinazioneOperativo, setShipmentFormHubDestinazioneOperativo] = useState('');
   const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND' | 'TRANSITO'>('INBOUND');
+  const [isRoutingAutoCalculated, setIsRoutingAutoCalculated] = useState(false);
+  const [isRoutingAmbiguous, setIsRoutingAmbiguous] = useState(false);
+  const [isAutoRoutingEnabled, setIsAutoRoutingEnabled] = useState(true);
 
   // Stati Modali e Selezioni Multipli
   const [isNewShipmentModalOpen, setIsNewShipmentModalOpen] = useState(false);
@@ -685,6 +689,9 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo('');
     setShipmentFormHubDestinazioneOperativo('');
     setShipmentFormTipoOperazioneHub('INBOUND');
+    setIsRoutingAutoCalculated(false);
+    setIsRoutingAmbiguous(false);
+    setIsAutoRoutingEnabled(true);
   };
 
   const handleEditShipmentClick = (s: Shipment) => {
@@ -727,9 +734,58 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
     setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
     setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'INBOUND');
+    setIsRoutingAutoCalculated(false);
+    setIsRoutingAmbiguous(false);
+    setIsAutoRoutingEnabled(false);
 
     setIsNewShipmentModalOpen(true);
   };
+
+  // Effetto per il calcolo automatico intelligente del Routing di rete (Auto-Routing)
+  useEffect(() => {
+    if (!isAutoRoutingEnabled) return;
+
+    const hasOriginInfo = !!(shipmentFormRealOriginCity || shipmentFormRealOriginCap || shipmentFormRealOriginProvince || shipmentFormRealOriginName);
+    const hasDestInfo = !!(shipmentFormRealDestinationCity || shipmentFormRealDestinationCap || shipmentFormRealDestinationProvince || shipmentFormRealDestinationName);
+
+    if (hasOriginInfo && hasDestInfo) {
+      const routing = calculateSmartRouting(
+        {
+          city: shipmentFormRealOriginCity,
+          cap: shipmentFormRealOriginCap,
+          province: shipmentFormRealOriginProvince,
+          name: shipmentFormRealOriginName
+        },
+        {
+          city: shipmentFormRealDestinationCity,
+          cap: shipmentFormRealDestinationCap,
+          province: shipmentFormRealDestinationProvince,
+          name: shipmentFormRealDestinationName
+        },
+        shipmentFormType
+      );
+
+      setShipmentFormHubOrigineOperativo(routing.hubOrigineOperativo);
+      setShipmentFormHubDestinazioneOperativo(routing.hubDestinazioneOperativo);
+      setShipmentFormTipoOperazioneHub(routing.tipoOperazioneHub);
+      setIsRoutingAutoCalculated(true);
+      setIsRoutingAmbiguous(routing.isAmbiguous);
+    } else {
+      setIsRoutingAutoCalculated(false);
+      setIsRoutingAmbiguous(false);
+    }
+  }, [
+    shipmentFormRealOriginCity,
+    shipmentFormRealOriginCap,
+    shipmentFormRealOriginProvince,
+    shipmentFormRealOriginName,
+    shipmentFormRealDestinationCity,
+    shipmentFormRealDestinationCap,
+    shipmentFormRealDestinationProvince,
+    shipmentFormRealDestinationName,
+    shipmentFormType,
+    isAutoRoutingEnabled
+  ]);
 
   const handleSaveShipmentForm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -854,11 +910,37 @@ export const MonitorYard: React.FC = () => {
       const realDestinationProvince = parts[27] || '';
       const realDestinationCountry = parts[28] || 'Italia';
 
-      const hubOrigineOperativo = parts[29] || (activityType === 'SCARICO' ? selectedDepotId : 'depot-roma');
-      const hubDestinazioneOperativo = parts[30] || (activityType === 'CARICO' ? selectedDepotId : 'depot-bari');
-      let tipoOperazioneHub = parts[31]?.toUpperCase();
-      if (!['INBOUND', 'OUTBOUND', 'TRANSITO'].includes(tipoOperazioneHub)) {
-        tipoOperazioneHub = activityType === 'SCARICO' ? 'INBOUND' : 'OUTBOUND';
+      let hubOrigineOperativo = parts[29] || '';
+      let hubDestinazioneOperativo = parts[30] || '';
+      let tipoOperazioneHub = parts[31]?.toUpperCase() || '';
+      let finalInternalNotes = internalNotes;
+
+      if (!hubOrigineOperativo || !hubDestinazioneOperativo || !tipoOperazioneHub) {
+        const routing = calculateSmartRouting(
+          {
+            city: realOriginCity,
+            cap: realOriginCap,
+            province: realOriginProvince,
+            name: realOriginName
+          },
+          {
+            city: realDestinationCity,
+            cap: realDestinationCap,
+            province: realDestinationProvince,
+            name: realDestinationName
+          },
+          activityType as any
+        );
+
+        if (!hubOrigineOperativo) hubOrigineOperativo = routing.hubOrigineOperativo;
+        if (!hubDestinazioneOperativo) hubDestinazioneOperativo = routing.hubDestinazioneOperativo;
+        if (!tipoOperazioneHub) tipoOperazioneHub = routing.tipoOperazioneHub;
+
+        if (routing.isAmbiguous) {
+          finalInternalNotes = finalInternalNotes 
+            ? `${finalInternalNotes} | ⚠️ Hub ambiguo - verificare instradamento manuale`
+            : `⚠️ Hub ambiguo - verificare instradamento manuale`;
+        }
       }
 
       addShipment({
@@ -883,7 +965,7 @@ export const MonitorYard: React.FC = () => {
         country,
         grossWeight,
         deliveryNotes,
-        internalNotes,
+        internalNotes: finalInternalNotes,
         realOriginName,
         realOriginAddress,
         realOriginCity,
@@ -4437,44 +4519,6 @@ export const MonitorYard: React.FC = () => {
                 />
               </div>
 
-              {/* SEZIONE 1: ROUTING DI RETE */}
-              <div className="border-t border-black/5 pt-4">
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Routing di Rete (Network TMS)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Select
-                    label="Hub Origine Operativo *"
-                    options={depots.map(d => ({ value: d.id, label: d.name }))}
-                    value={shipmentFormHubOrigineOperativo}
-                    onChange={(e) => {
-                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
-                      if (found) setShipmentFormHubOrigineOperativo(found.id);
-                    }}
-                    required
-                  />
-                  <Select
-                    label="Hub Destinazione Operativo *"
-                    options={depots.map(d => ({ value: d.id, label: d.name }))}
-                    value={shipmentFormHubDestinazioneOperativo}
-                    onChange={(e) => {
-                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
-                      if (found) setShipmentFormHubDestinazioneOperativo(found.id);
-                    }}
-                    required
-                  />
-                  <Select
-                    label="Tipo Operazione Hub *"
-                    options={[
-                      { value: 'INBOUND', label: 'Inbound (Scarico)' },
-                      { value: 'OUTBOUND', label: 'Outbound (Carico)' },
-                      { value: 'TRANSITO', label: 'Transito / Cross-dock' }
-                    ]}
-                    value={shipmentFormTipoOperazioneHub}
-                    onChange={(e) => setShipmentFormTipoOperazioneHub(e.target.value as any)}
-                    required
-                  />
-                </div>
-              </div>
-
               {/* SEZIONE 2: ANAGRAFICA ORIGINE REALE */}
               <div className="border-t border-black/5 pt-4">
                 <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Carico Reale (Origine)</h4>
@@ -4565,6 +4609,81 @@ export const MonitorYard: React.FC = () => {
                     placeholder="Es. Italia"
                     value={shipmentFormRealDestinationCountry}
                     onChange={(e) => setShipmentFormRealDestinationCountry(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* SEZIONE 1: ROUTING DI RETE */}
+              <div className="border-t border-black/5 pt-4 bg-gray-50/50 p-4 rounded-xl space-y-3">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">
+                    Routing di Rete (Network TMS)
+                  </h4>
+                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={isAutoRoutingEnabled}
+                      onChange={(e) => setIsAutoRoutingEnabled(e.target.checked)}
+                      className="rounded border-black/10 text-[#004B97] focus:ring-[#004B97] h-3 w-3"
+                    />
+                    <span className="text-[9px] font-mono font-bold text-gray-500 uppercase">Auto-Routing Attivo</span>
+                  </label>
+                </div>
+
+                {isRoutingAutoCalculated && (
+                  <div className="animate-fade-in">
+                    {isRoutingAmbiguous ? (
+                      <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-md font-medium block">
+                        ⚠️ **Instradamento Ambiguo:** I dati geografici inseriti non sono sufficienti per una determinazione univoca. Verifica o seleziona gli hub corretti manualmente.
+                      </span>
+                    ) : (
+                      <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md font-medium block">
+                        ✨ **Auto-Routing Attivo:** Hub calcolati in base alla provenienza e destinazione reale.
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Select
+                    label="Hub Origine Operativo *"
+                    options={depots.map(d => ({ value: d.id, label: d.name }))}
+                    value={shipmentFormHubOrigineOperativo}
+                    onChange={(e) => {
+                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
+                      if (found) {
+                        setShipmentFormHubOrigineOperativo(found.id);
+                        setIsAutoRoutingEnabled(false);
+                      }
+                    }}
+                    required
+                  />
+                  <Select
+                    label="Hub Destinazione Operativo *"
+                    options={depots.map(d => ({ value: d.id, label: d.name }))}
+                    value={shipmentFormHubDestinazioneOperativo}
+                    onChange={(e) => {
+                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
+                      if (found) {
+                        setShipmentFormHubDestinazioneOperativo(found.id);
+                        setIsAutoRoutingEnabled(false);
+                      }
+                    }}
+                    required
+                  />
+                  <Select
+                    label="Tipo Operazione Hub *"
+                    options={[
+                      { value: 'INBOUND', label: 'Inbound (Scarico)' },
+                      { value: 'OUTBOUND', label: 'Outbound (Carico)' },
+                      { value: 'TRANSITO', label: 'Transito / Cross-dock' }
+                    ]}
+                    value={shipmentFormTipoOperazioneHub}
+                    onChange={(e) => {
+                      setShipmentFormTipoOperazioneHub(e.target.value as any);
+                      setIsAutoRoutingEnabled(false);
+                    }}
+                    required
                   />
                 </div>
               </div>

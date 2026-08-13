@@ -68,3 +68,108 @@ export function getGeoDetailsByProv(prov: string): GeoDetails | null {
     country: 'Italia'
   };
 }
+
+export interface SmartRoutingResult {
+  hubOrigineOperativo: string;
+  hubDestinazioneOperativo: string;
+  tipoOperazioneHub: 'INBOUND' | 'OUTBOUND' | 'TRANSITO';
+  isAmbiguous: boolean;
+}
+
+export function getHubByProvince(prov: string): string | null {
+  const cleanProv = prov.trim().toUpperCase();
+  const region = PROV_TO_REGION[cleanProv];
+  if (!region) return null;
+
+  const northRegions = [
+    'Valle d\'Aosta', 'Piemonte', 'Liguria', 'Lombardia',
+    'Trentino-Alto Adige', 'Veneto', 'Friuli-Venezia Giulia', 'Emilia-Romagna'
+  ];
+  const centerRegions = [
+    'Toscana', 'Umbria', 'Marche', 'Lazio', 'Abruzzo', 'Sardegna'
+  ];
+  const southRegions = [
+    'Molise', 'Campania', 'Puglia', 'Basilicata', 'Calabria', 'Sicilia'
+  ];
+
+  if (northRegions.includes(region)) return 'depot-milano';
+  if (centerRegions.includes(region)) return 'depot-roma';
+  if (southRegions.includes(region)) return 'depot-bari';
+
+  return null;
+}
+
+export function getHubForLocation(loc: { city?: string; cap?: string; province?: string; name?: string }): { hubId: string | null; isAmbiguous: boolean } {
+  // 1. Cerca per CAP
+  if (loc.cap) {
+    const geo = getGeoDetailsByCap(loc.cap);
+    if (geo?.province) {
+      const hub = getHubByProvince(geo.province);
+      if (hub) return { hubId: hub, isAmbiguous: false };
+    }
+  }
+
+  // 2. Cerca per Provincia
+  if (loc.province) {
+    const hub = getHubByProvince(loc.province);
+    if (hub) return { hubId: hub, isAmbiguous: false };
+  }
+
+  // 3. Cerca per parole chiave nel Comune (Città)
+  if (loc.city) {
+    const cityUpper = loc.city.toUpperCase();
+    if (cityUpper.includes('MILANO') || cityUpper.includes('TORINO') || cityUpper.includes('GENOVA') || cityUpper.includes('BOLOGNA') || cityUpper.includes('VENEZIA') || cityUpper.includes('BRESCIA') || cityUpper.includes('BERGAMO')) {
+      return { hubId: 'depot-milano', isAmbiguous: false };
+    }
+    if (cityUpper.includes('ROMA') || cityUpper.includes('FIRENZE') || cityUpper.includes('PERUGIA') || cityUpper.includes('ANCONA') || cityUpper.includes('SASSARI') || cityUpper.includes('CAGLIARI')) {
+      return { hubId: 'depot-roma', isAmbiguous: false };
+    }
+    if (cityUpper.includes('BARI') || cityUpper.includes('NAPOLI') || cityUpper.includes('PALERMO') || cityUpper.includes('CATANIA') || cityUpper.includes('FOGGIA') || cityUpper.includes('TARANTO') || cityUpper.includes('LECCE')) {
+      return { hubId: 'depot-bari', isAmbiguous: false };
+    }
+  }
+
+  // 4. Cerca per parole chiave nel Nome/Ragione Sociale
+  if (loc.name) {
+    const nameUpper = loc.name.toUpperCase();
+    if (nameUpper.includes('MILANO') || nameUpper.includes('NORD') || nameUpper.includes('NORTH')) {
+      return { hubId: 'depot-milano', isAmbiguous: false };
+    }
+    if (nameUpper.includes('ROMA') || nameUpper.includes('CENTRO') || nameUpper.includes('CENTER')) {
+      return { hubId: 'depot-roma', isAmbiguous: false };
+    }
+    if (nameUpper.includes('BARI') || nameUpper.includes('SUD') || nameUpper.includes('SOUTH')) {
+      return { hubId: 'depot-bari', isAmbiguous: false };
+    }
+  }
+
+  return { hubId: null, isAmbiguous: true };
+}
+
+export function calculateSmartRouting(
+  origin: { city?: string; cap?: string; province?: string; name?: string },
+  destination: { city?: string; cap?: string; province?: string; name?: string },
+  activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER' = 'SCARICO'
+): SmartRoutingResult {
+  const origResult = getHubForLocation(origin);
+  const destResult = getHubForLocation(destination);
+
+  const hubOrigineOperativo = origResult.hubId || 'depot-milano';
+  const hubDestinazioneOperativo = destResult.hubId || 'depot-milano';
+  const isAmbiguous = origResult.isAmbiguous || destResult.isAmbiguous;
+
+  let tipoOperazioneHub: 'INBOUND' | 'OUTBOUND' | 'TRANSITO' = 'TRANSITO';
+
+  if (hubOrigineOperativo === hubDestinazioneOperativo) {
+    tipoOperazioneHub = ['SCARICO', 'RESO'].includes(activityType) ? 'INBOUND' : 'OUTBOUND';
+  } else {
+    tipoOperazioneHub = 'TRANSITO';
+  }
+
+  return {
+    hubOrigineOperativo,
+    hubDestinazioneOperativo,
+    tipoOperazioneHub,
+    isAmbiguous
+  };
+}
