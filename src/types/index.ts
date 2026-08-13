@@ -184,6 +184,8 @@ export interface Shipment {
   hubOrigineOperativo?: string;
   hubDestinazioneOperativo?: string;
   tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND' | 'TRANSITO';
+  routingStatus?: 'CONFERMATO' | 'DA_CONFERMARE';
+  routingNotes?: string;
 
   // Nuovi campi per anagrafica geografica e dettagli spedizione (legacy)
   subjectName?: string; // Nome (Mittente o Destinatario)

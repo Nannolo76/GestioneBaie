@@ -146,17 +146,69 @@ export function getHubForLocation(loc: { city?: string; cap?: string; province?:
   return { hubId: null, isAmbiguous: true };
 }
 
+export function getHubByClientAndLocation(
+  clientId: string,
+  loc: { city?: string; cap?: string; province?: string; name?: string }
+): { hubId: string | null; isAmbiguous: boolean; routingNotes?: string } {
+  const cleanClient = (clientId || '').toLowerCase();
+  
+  const isVeronaOppeano = (
+    (loc.province && loc.province.toUpperCase() === 'VR') ||
+    (loc.cap && loc.cap.startsWith('37')) ||
+    (loc.city && (loc.city.toUpperCase().includes('OPPEANO') || loc.city.toUpperCase().includes('VERONA'))) ||
+    (loc.name && (loc.name.toUpperCase().includes('OPPEANO') || loc.name.toUpperCase().includes('VERONA')))
+  );
+
+  if (isVeronaOppeano) {
+    if (cleanClient === 'client-rossi' || cleanClient.includes('rossi')) {
+      return { hubId: 'depot-oppeano1', isAmbiguous: false, routingNotes: 'Oppeano 1 (Regola Rossi SpA)' };
+    }
+    if (cleanClient === 'client-bianchi' || cleanClient.includes('bianchi')) {
+      return { hubId: 'depot-oppeano2', isAmbiguous: false, routingNotes: 'Oppeano 2 (Regola Bianchi Srl)' };
+    }
+    if (cleanClient === 'client-bauli' || cleanClient.includes('bauli')) {
+      return { hubId: 'depot-oppeano1', isAmbiguous: false, routingNotes: 'Oppeano 1 (Regola Bauli)' };
+    }
+
+    return {
+      hubId: 'depot-oppeano1',
+      isAmbiguous: true,
+      routingNotes: 'Ambivalenza Hub: Oppeano 1 vs Oppeano 2 (Da confermare)'
+    };
+  }
+
+  if (cleanClient === 'client-rossi') {
+    return { hubId: 'depot-oppeano1', isAmbiguous: false, routingNotes: 'Default Rossi SpA' };
+  }
+  if (cleanClient === 'client-bianchi') {
+    return { hubId: 'depot-oppeano2', isAmbiguous: false, routingNotes: 'Default Bianchi Srl' };
+  }
+  if (cleanClient === 'client-verdi') {
+    return { hubId: 'depot-milano', isAmbiguous: false, routingNotes: 'Default Verdi Corp' };
+  }
+
+  const standardGeoResult = getHubForLocation(loc);
+  return {
+    hubId: standardGeoResult.hubId,
+    isAmbiguous: standardGeoResult.isAmbiguous,
+    routingNotes: standardGeoResult.isAmbiguous ? 'Instradamento ambiguo per dati geografici generici' : undefined
+  };
+}
+
 export function calculateSmartRouting(
   origin: { city?: string; cap?: string; province?: string; name?: string },
   destination: { city?: string; cap?: string; province?: string; name?: string },
-  activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER' = 'SCARICO'
-): SmartRoutingResult {
-  const origResult = getHubForLocation(origin);
-  const destResult = getHubForLocation(destination);
+  activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER' = 'SCARICO',
+  clientId: string = ''
+): SmartRoutingResult & { routingNotes: string } {
+  const origResult = getHubByClientAndLocation(clientId, origin);
+  const destResult = getHubByClientAndLocation(clientId, destination);
 
   const hubOrigineOperativo = origResult.hubId || 'depot-milano';
   const hubDestinazioneOperativo = destResult.hubId || 'depot-milano';
   const isAmbiguous = origResult.isAmbiguous || destResult.isAmbiguous;
+  
+  const routingNotes = origResult.routingNotes || destResult.routingNotes || 'Instradamento calcolato';
 
   let tipoOperazioneHub: 'INBOUND' | 'OUTBOUND' | 'TRANSITO' = 'TRANSITO';
 
@@ -170,6 +222,7 @@ export function calculateSmartRouting(
     hubOrigineOperativo,
     hubDestinazioneOperativo,
     tipoOperazioneHub,
-    isAmbiguous
+    isAmbiguous,
+    routingNotes
   };
 }

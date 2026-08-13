@@ -104,6 +104,8 @@ export const MonitorYard: React.FC = () => {
   const [isNewShipmentModalOpen, setIsNewShipmentModalOpen] = useState(false);
   const [isImportShipmentModalOpen, setIsImportShipmentModalOpen] = useState(false);
   const [selectedShipmentIds, setSelectedShipmentIds] = useState<string[]>([]);
+  const [isQuickResolutionModalOpen, setIsQuickResolutionModalOpen] = useState(false);
+  const [selectedResolutionIds, setSelectedResolutionIds] = useState<string[]>([]);
 
   // Stati Filtri Avanzati
   const [filterReference, setFilterReference] = useState('');
@@ -132,6 +134,10 @@ export const MonitorYard: React.FC = () => {
   // Filtro Depot
   const activeDepot = depots.find((d) => d.id === selectedDepotId);
   const activeBays = bays.filter((b) => b.depotId === selectedDepotId);
+  const ambiguousShipments = shipments.filter(s => s.routingStatus === 'DA_CONFERMARE');
+  const getFreeBaysCount = (depotId: string) => {
+    return bays.filter(b => b.depotId === depotId && b.status === 'DISPONIBILE').length;
+  };
   
   // Prenotazioni filtrate per Depot
   const activeBookings = bookings.filter((b) => b.depotId === selectedDepotId);
@@ -739,9 +745,7 @@ export const MonitorYard: React.FC = () => {
     setIsAutoRoutingEnabled(false);
 
     setIsNewShipmentModalOpen(true);
-  };
-
-  // Effetto per il calcolo automatico intelligente del Routing di rete (Auto-Routing)
+  };  // Effetto per il calcolo automatico intelligente del Routing di rete (Auto-Routing)
   useEffect(() => {
     if (!isAutoRoutingEnabled) return;
 
@@ -762,7 +766,8 @@ export const MonitorYard: React.FC = () => {
           province: shipmentFormRealDestinationProvince,
           name: shipmentFormRealDestinationName
         },
-        shipmentFormType
+        shipmentFormType,
+        shipmentFormClient
       );
 
       setShipmentFormHubOrigineOperativo(routing.hubOrigineOperativo);
@@ -784,9 +789,9 @@ export const MonitorYard: React.FC = () => {
     shipmentFormRealDestinationProvince,
     shipmentFormRealDestinationName,
     shipmentFormType,
+    shipmentFormClient,
     isAutoRoutingEnabled
   ]);
-
   const handleSaveShipmentForm = (e: React.FormEvent) => {
     e.preventDefault();
     const cId = shipmentFormClient || clients[0]?.id;
@@ -830,7 +835,11 @@ export const MonitorYard: React.FC = () => {
       realDestinationCountry: shipmentFormRealDestinationCountry || undefined,
       hubOrigineOperativo: shipmentFormHubOrigineOperativo || undefined,
       hubDestinazioneOperativo: shipmentFormHubDestinazioneOperativo || undefined,
-      tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined
+      tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
+      routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
+      routingNotes: isRoutingAmbiguous && isAutoRoutingEnabled
+        ? 'Ambivalenza Hub: Oppeano 1 vs Oppeano 2 (Da confermare)'
+        : 'Instradamento confermato'
     };
 
     if (shipmentFormId) {
@@ -914,6 +923,8 @@ export const MonitorYard: React.FC = () => {
       let hubDestinazioneOperativo = parts[30] || '';
       let tipoOperazioneHub = parts[31]?.toUpperCase() || '';
       let finalInternalNotes = internalNotes;
+      let routingStatus: 'CONFERMATO' | 'DA_CONFERMARE' = 'CONFERMATO';
+      let routingNotes = 'Instradamento confermato';
 
       if (!hubOrigineOperativo || !hubDestinazioneOperativo || !tipoOperazioneHub) {
         const routing = calculateSmartRouting(
@@ -929,18 +940,26 @@ export const MonitorYard: React.FC = () => {
             province: realDestinationProvince,
             name: realDestinationName
           },
-          activityType as any
+          activityType as any,
+          defaultClient
         );
 
         if (!hubOrigineOperativo) hubOrigineOperativo = routing.hubOrigineOperativo;
         if (!hubDestinazioneOperativo) hubDestinazioneOperativo = routing.hubDestinazioneOperativo;
         if (!tipoOperazioneHub) tipoOperazioneHub = routing.tipoOperazioneHub;
+        
+        routingStatus = routing.isAmbiguous ? 'DA_CONFERMARE' : 'CONFERMATO';
+        routingNotes = routing.routingNotes;
 
         if (routing.isAmbiguous) {
           finalInternalNotes = finalInternalNotes 
             ? `${finalInternalNotes} | ⚠️ Hub ambiguo - verificare instradamento manuale`
             : `⚠️ Hub ambiguo - verificare instradamento manuale`;
         }
+      } else {
+        // Se fornito esplicitamente, lo consideriamo confermato
+        routingStatus = 'CONFERMATO';
+        routingNotes = 'Inserito manualmente / Da file';
       }
 
       addShipment({
@@ -980,7 +999,9 @@ export const MonitorYard: React.FC = () => {
         realDestinationCountry,
         hubOrigineOperativo,
         hubDestinazioneOperativo,
-        tipoOperazioneHub: tipoOperazioneHub as any
+        tipoOperazioneHub: tipoOperazioneHub as any,
+        routingStatus,
+        routingNotes
       });
       successCount++;
     });
@@ -1388,6 +1409,32 @@ export const MonitorYard: React.FC = () => {
           </div>
         </div>
 
+        {/* Banner di risoluzione rapida per instradamenti ambigui */}
+        {ambiguousShipments.length > 0 && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-pulse-slow">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <h4 className="font-bold text-xs text-amber-800 uppercase tracking-wide">Spedizioni con instradamento ambiguo</h4>
+                <p className="text-[10.5px] text-amber-700 font-sans mt-0.5">
+                  Rilevate <strong>{ambiguousShipments.length}</strong> spedizioni con ambivalenza geografica sull'hub (es. Oppeano 1 vs Oppeano 2). È richiesta la conferma o l'instradamento manuale dell'operatore per sbloccarle nello Yard Board.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="warning"
+              onClick={() => {
+                setSelectedResolutionIds([]);
+                setIsQuickResolutionModalOpen(true);
+              }}
+              className="w-full md:w-auto font-bold uppercase tracking-wide text-xs cursor-pointer shadow-sm"
+            >
+              Risolvi Ora ({ambiguousShipments.length})
+            </Button>
+          </div>
+        )}
+
         {/* Layout responsive: Barra di Navigazione a sinistra, Contenuto a destra */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
           
@@ -1728,7 +1775,7 @@ export const MonitorYard: React.FC = () => {
                   <Card title="Spedizioni in attesa di abbinamento a camion fisici" accent="orange">
                     <div className="space-y-4 max-h-[350px] overflow-y-auto">
                       {shipments
-                        .filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO')
+                        .filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO' && s.routingStatus !== 'DA_CONFERMARE')
                         .map(s => {
                           const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
                           const isLinking = activeLinkingShipmentId === s.id;
@@ -1961,7 +2008,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
                         }`}
                       >
-                        Tutte ({shipments.filter(s => s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId).length})
+                        Tutte ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && s.routingStatus !== 'DA_CONFERMARE').length})
                       </button>
                       <button
                         onClick={() => setShipmentsFilterTab('unbound')}
@@ -1971,7 +2018,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
                         }`}
                       >
-                        Da Associare ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !s.bookingId).length})
+                        Da Associare ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length})
                       </button>
                       <button
                         onClick={() => setShipmentsFilterTab('bound')}
@@ -1981,13 +2028,14 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
                         }`}
                       >
-                        Già Associate ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !!s.bookingId).length})
+                        Già Associate ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !!s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length})
                       </button>
                     </div>
                   }
                 >
                   <Table
                     data={shipments.filter(s => {
+                      if (s.routingStatus === 'DA_CONFERMARE') return false;
                       if (s.depotId !== selectedDepotId && s.hubOrigineOperativo !== selectedDepotId && s.hubDestinazioneOperativo !== selectedDepotId) return false;
 
                       // Filtro Stato Associazione
@@ -4877,6 +4925,231 @@ export const MonitorYard: React.FC = () => {
                   Procedi con Importazione
                 </Button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODALE DI RISOLUZIONE RAPIDA DEL ROUTING */}
+      {isQuickResolutionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full border border-black/10 overflow-hidden my-8">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">⚠️</span>
+                <h3 className="font-bold text-sm uppercase tracking-wide">
+                  Risoluzione Rapida Instradamento Spedizioni
+                </h3>
+              </div>
+              <button 
+                onClick={() => { setIsQuickResolutionModalOpen(false); setSelectedResolutionIds([]); }}
+                className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs leading-relaxed">
+                Le seguenti spedizioni presentano tratte geografiche che corrispondono a più hub del cluster (es. Oppeano 1 vs Oppeano 2) senza una regola cliente predefinita.
+                Conferma l'hub suggerito o assegna manualmente l'hub corretto verificando la disponibilità delle baie in tempo reale.
+              </div>
+
+              {/* Barra delle azioni massive */}
+              {selectedResolutionIds.length > 0 && (
+                <div className="bg-gray-100 p-3 rounded-xl flex items-center justify-between animate-fade-in border border-black/5">
+                  <div className="text-xs font-mono font-bold text-gray-700">
+                    Selezionate: {selectedResolutionIds.length} spedizioni
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 uppercase font-mono font-bold font-mono">Assegna Massivamente:</span>
+                    <select
+                      className="bg-white border text-xs p-1.5 rounded-lg focus:outline-none focus:ring-0 font-mono"
+                      onChange={(e) => {
+                        const targetHub = e.target.value;
+                        if (!targetHub) return;
+                        
+                        selectedResolutionIds.forEach(id => {
+                          const s = shipments.find(item => item.id === id);
+                          if (!s) return;
+                          
+                          const finalOpType = s.activityType === 'SCARICO' ? 'INBOUND' : 'OUTBOUND';
+
+                          updateShipment(id, {
+                            hubOrigineOperativo: s.activityType === 'SCARICO' ? targetHub : s.hubOrigineOperativo,
+                            hubDestinazioneOperativo: s.activityType === 'CARICO' ? targetHub : s.hubDestinazioneOperativo,
+                            tipoOperazioneHub: finalOpType,
+                            routingStatus: 'CONFERMATO',
+                            routingNotes: `Confermato massivamente su ${depots.find(d => d.id === targetHub)?.name || targetHub}`
+                          });
+                        });
+
+                        setSelectedResolutionIds([]);
+                      }}
+                    >
+                      <option value="">Scegli Hub...</option>
+                      {depots.map(d => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({getFreeBaysCount(d.id)} baie libere)
+                        </option>
+                      ))}
+                    </select>
+
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={() => {
+                        selectedResolutionIds.forEach(id => {
+                          const s = shipments.find(item => item.id === id);
+                          if (!s) return;
+                          updateShipment(id, {
+                            routingStatus: 'CONFERMATO',
+                            routingNotes: `Accettato suggerito: ${depots.find(d => d.id === s.hubOrigineOperativo)?.name || s.hubOrigineOperativo}`
+                          });
+                        });
+                        setSelectedResolutionIds([]);
+                      }}
+                      className="font-bold text-xs cursor-pointer"
+                    >
+                      Accetta Suggeriti Selezionati
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tabella di risoluzione */}
+              {ambiguousShipments.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 font-mono text-xs uppercase">
+                  Tutte le spedizioni sono state instradate correttamente.
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-black/5 rounded-xl">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-black/5 text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 font-mono">
+                        <th className="p-3 w-10 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedResolutionIds.length === ambiguousShipments.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedResolutionIds(ambiguousShipments.map(s => s.id));
+                              } else {
+                                setSelectedResolutionIds([]);
+                              }
+                            }}
+                            className="rounded border-black/10 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 cursor-pointer"
+                          />
+                        </th>
+                        <th className="p-3">Ordine / Committente</th>
+                        <th className="p-3">Provenienza Reale ➡️ Destinazione Reale</th>
+                        <th className="p-3">Nota Calcolata</th>
+                        <th className="p-3">Hub Suggerito</th>
+                        <th className="p-3 text-right">Risoluzione Rapida</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/5 font-sans text-xs">
+                      {ambiguousShipments.map(s => {
+                        const clientName = clients.find(c => c.id === s.clientId)?.name || s.clientId || 'Generico';
+                        const suggestedHubId = s.hubOrigineOperativo || 'depot-milano';
+                        const suggestedHubName = depots.find(d => d.id === suggestedHubId)?.name || suggestedHubId;
+
+                        return (
+                          <tr key={s.id} className="hover:bg-gray-50/50 transition-all">
+                            <td className="p-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedResolutionIds.includes(s.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedResolutionIds(prev => [...prev, s.id]);
+                                  } else {
+                                    setSelectedResolutionIds(prev => prev.filter(id => id !== s.id));
+                                  }
+                                }}
+                                className="rounded border-black/10 text-amber-600 focus:ring-amber-500 h-3.5 w-3.5 cursor-pointer"
+                              />
+                            </td>
+                            <td className="p-3">
+                              <span className="font-bold font-mono text-gray-800 text-xs block">{s.orderNumber}</span>
+                              <span className="text-[10px] text-gray-400 font-medium">{clientName}</span>
+                            </td>
+                            <td className="p-3 leading-relaxed">
+                              <div className="font-medium text-gray-700">
+                                {s.realOriginCity || 'N/D'} <span className="text-[10px] text-gray-400">({s.realOriginProvince || '-'})</span>
+                                <span className="text-gray-400 mx-1.5">➡️</span>
+                                {s.realDestinationCity || 'N/D'} <span className="text-[10px] text-gray-400">({s.realDestinationProvince || '-'})</span>
+                              </div>
+                              {s.address && <span className="text-[10px] text-gray-400 block">{s.address}</span>}
+                            </td>
+                            <td className="p-3">
+                              <span className="text-[10px] bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded font-mono font-medium block w-max">
+                                {s.routingNotes || 'Ambivalenza geografica'}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="primary">{suggestedHubName}</Badge>
+                            </td>
+                            <td className="p-3">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="success"
+                                  onClick={() => {
+                                    updateShipment(s.id, {
+                                      routingStatus: 'CONFERMATO',
+                                      routingNotes: `Accettato suggerito: ${suggestedHubName}`
+                                    });
+                                  }}
+                                  className="font-bold text-[10px] cursor-pointer"
+                                >
+                                  ✓ Accetta Suggerito
+                                </Button>
+
+                                <select
+                                  className="bg-white border text-[11px] p-1.5 rounded-lg focus:outline-none font-mono"
+                                  value=""
+                                  onChange={(e) => {
+                                    const targetHub = e.target.value;
+                                    if (!targetHub) return;
+
+                                    const finalOpType = s.activityType === 'SCARICO' ? 'INBOUND' : 'OUTBOUND';
+
+                                    updateShipment(s.id, {
+                                      hubOrigineOperativo: s.activityType === 'SCARICO' ? targetHub : s.hubOrigineOperativo,
+                                      hubDestinazioneOperativo: s.activityType === 'CARICO' ? targetHub : s.hubDestinazioneOperativo,
+                                      tipoOperazioneHub: finalOpType,
+                                      routingStatus: 'CONFERMATO',
+                                      routingNotes: `Risolto manualmente su ${depots.find(d => d.id === targetHub)?.name || targetHub}`
+                                    });
+                                  }}
+                                >
+                                  <option value="">Scegli Hub...</option>
+                                  {depots.map(d => (
+                                    <option key={d.id} value={d.id}>
+                                      {d.name} ({getFreeBaysCount(d.id)} baie libere)
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end p-4 border-t border-black/5 bg-gray-50">
+              <Button
+                variant="secondary"
+                onClick={() => { setIsQuickResolutionModalOpen(false); setSelectedResolutionIds([]); }}
+                className="text-xs font-bold font-mono uppercase cursor-pointer"
+              >
+                Chiudi Risoluzione Rapida
+              </Button>
             </div>
           </div>
         </div>

@@ -411,6 +411,30 @@ async function initializeDb() {
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS hub_origine_operativo TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS hub_destinazione_operativo TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS tipo_operazione_hub TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_status TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_notes TEXT`);
+
+  // Assicura la presenza dei nuovi stabilimenti di Oppeano (seeding incrementale)
+  try {
+    const opp1Exists = await sql("SELECT id FROM depots WHERE id = 'depot-oppeano1'");
+    if (opp1Exists.length === 0) {
+      await sql("INSERT INTO depots (id, name, city) VALUES ('depot-oppeano1', 'Oppeano Plant 1', 'Oppeano (VR)')");
+      await sql("INSERT INTO warehouse_modules (id, depot_id, name) VALUES ('module-o1-1', 'depot-oppeano1', 'Modulo O1-A')");
+      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o1-01', 'depot-oppeano1', 'module-o1-1', 'Baia O1-01', 'DISPONIBILE')");
+      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o1-02', 'depot-oppeano1', 'module-o1-1', 'Baia O1-02', 'DISPONIBILE')");
+    }
+    const opp2Exists = await sql("SELECT id FROM depots WHERE id = 'depot-oppeano2'");
+    if (opp2Exists.length === 0) {
+      await sql("INSERT INTO depots (id, name, city) VALUES ('depot-oppeano2', 'Oppeano Plant 2', 'Oppeano (VR)')");
+      await sql("INSERT INTO warehouse_modules (id, depot_id, name) VALUES ('module-o2-1', 'depot-oppeano2', 'Modulo O2-A')");
+      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o2-01', 'depot-oppeano2', 'module-o2-1', 'Baia O2-01', 'DISPONIBILE')");
+      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o2-02', 'depot-oppeano2', 'module-o2-1', 'Baia O2-02', 'DISPONIBILE')");
+    }
+    // Aggiorna anche depotIds dell'admin
+    await sql("UPDATE users SET depot_ids = '[\"depot-milano\",\"depot-roma\",\"depot-bari\",\"depot-oppeano1\",\"depot-oppeano2\"]' WHERE id = 'user-1'");
+  } catch (err) {
+    console.error("Errore durante inserimento incrementale Oppeano:", err);
+  }
 
   // Se non ci sono plant inseriti, eseguiamo il seed iniziale
   const checkDepots = await sql('SELECT count(*) as count FROM depots');
@@ -1278,8 +1302,8 @@ export default async function handler(req: any, res: any) {
               subject_name, address, city, cap, province, region, country, gross_weight, delivery_notes, internal_notes,
               real_origin_name, real_origin_address, real_origin_city, real_origin_cap, real_origin_province, real_origin_country,
               real_destination_name, real_destination_address, real_destination_city, real_destination_cap, real_destination_province, real_destination_country,
-              hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41)
+              hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub, routing_status, routing_notes
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43)
           `, [
             payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
             payload.activityType, payload.palletPlaces, payload.status, payload.expectedDate, payload.expectedTime || null,
@@ -1288,7 +1312,8 @@ export default async function handler(req: any, res: any) {
             payload.region || null, payload.country || null, payload.grossWeight || null, payload.deliveryNotes || null, payload.internalNotes || null,
             payload.realOriginName || null, payload.realOriginAddress || null, payload.realOriginCity || null, payload.realOriginCap || null, payload.realOriginProvince || null, payload.realOriginCountry || null,
             payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
-            payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null
+            payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
+            payload.routingStatus || null, payload.routingNotes || null
           ]);
           break;
  
@@ -1306,8 +1331,9 @@ export default async function handler(req: any, res: any) {
                region = $18, country = $19, gross_weight = $20, delivery_notes = $21, internal_notes = $22,
                real_origin_name = $23, real_origin_address = $24, real_origin_city = $25, real_origin_cap = $26, real_origin_province = $27, real_origin_country = $28,
                real_destination_name = $29, real_destination_address = $30, real_destination_city = $31, real_destination_cap = $32, real_destination_province = $33, real_destination_country = $34,
-               hub_origine_operativo = $35, hub_destinazione_operativo = $36, tipo_operazione_hub = $37
-             WHERE id = $38
+               hub_origine_operativo = $35, hub_destinazione_operativo = $36, tipo_operazione_hub = $37,
+               routing_status = $38, routing_notes = $39
+             WHERE id = $40
            `, [
              payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
              payload.activityType, payload.palletPlaces, payload.expectedDate, payload.expectedTime || null,
@@ -1317,6 +1343,7 @@ export default async function handler(req: any, res: any) {
              payload.realOriginName || null, payload.realOriginAddress || null, payload.realOriginCity || null, payload.realOriginCap || null, payload.realOriginProvince || null, payload.realOriginCountry || null,
              payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
              payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
+             payload.routingStatus || null, payload.routingNotes || null,
              payload.id
            ]);
            break;
