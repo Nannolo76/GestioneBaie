@@ -334,20 +334,23 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     const carrId = newShipCarrierId || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
     const dId = newShipDepotId || depots[0]?.id;
     if (!cId || !carrId || !dId || !newShipOrderNum) return;
-    addShipment(
-      cId,
-      carrId,
-      dId,
-      newShipOrderNum,
-      newShipOrderNum2,
-      newShipActivityType,
-      newShipPalletPlaces,
-      newShipExpectedDate,
-      newShipExpectedTime,
-      newShipOriginOrDestination,
-      newShipGoodsType,
-      newShipExpectedDeliveryDate || undefined
-    );
+    addShipment({
+      clientId: cId,
+      carrierId: carrId,
+      depotId: dId,
+      orderNumber: newShipOrderNum,
+      orderNumber2: newShipOrderNum2 || undefined,
+      activityType: newShipActivityType,
+      palletPlaces: newShipPalletPlaces,
+      expectedDate: newShipExpectedDate,
+      expectedTime: newShipExpectedTime || undefined,
+      originOrDestination: newShipOriginOrDestination,
+      goodsType: newShipGoodsType || undefined,
+      expectedDeliveryDate: newShipExpectedDeliveryDate || undefined,
+      hubOrigineOperativo: newShipActivityType === 'SCARICO' ? dId : undefined,
+      hubDestinazioneOperativo: newShipActivityType === 'CARICO' ? dId : undefined,
+      tipoOperazioneHub: newShipActivityType === 'SCARICO' ? 'INBOUND' : 'OUTBOUND'
+    });
     setNewShipOrderNum('');
     setNewShipOrderNum2('');
     setNewShipPalletPlaces(24);

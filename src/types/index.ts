@@ -168,7 +168,24 @@ export interface Shipment {
   expectedDeliveryDate?: string; // Data prevista consegna (solo per partenze)
   bookingId?: string; // ID del viaggio/booking abbinato (se associato)
 
-  // Nuovi campi per anagrafica geografica e dettagli spedizione
+  // Nuovi campi per anagrafica geografica strutturata reale e routing del network
+  realOriginName?: string;
+  realOriginAddress?: string;
+  realOriginCity?: string;
+  realOriginCap?: string;
+  realOriginProvince?: string;
+  realOriginCountry?: string;
+  realDestinationName?: string;
+  realDestinationAddress?: string;
+  realDestinationCity?: string;
+  realDestinationCap?: string;
+  realDestinationProvince?: string;
+  realDestinationCountry?: string;
+  hubOrigineOperativo?: string;
+  hubDestinazioneOperativo?: string;
+  tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND' | 'TRANSITO';
+
+  // Nuovi campi per anagrafica geografica e dettagli spedizione (legacy)
   subjectName?: string; // Nome (Mittente o Destinatario)
   address?: string; // Indirizzo (di carico o consegna)
   city?: string; // Località (di carico o consegna)

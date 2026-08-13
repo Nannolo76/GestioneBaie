@@ -119,30 +119,7 @@ interface AppContextType {
   setUserPassword: (userId: string, password: string) => Promise<{ success: boolean; error?: string }>;
   simulatedEmails: { userId: string; userName: string; userEmail: string; confirmLink: string }[];
   clearSimulatedEmail: (userId: string) => void;
-  addShipment: (
-    clientId: string,
-    carrierId: string,
-    depotId: string,
-    orderNumber: string,
-    orderNumber2: string,
-    activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER',
-    palletPlaces: number,
-    expectedDate: string,
-    expectedTime: string,
-    originOrDestination: string,
-    goodsType: string,
-    expectedDeliveryDate?: string,
-    subjectName?: string,
-    address?: string,
-    city?: string,
-    cap?: string,
-    province?: string,
-    region?: string,
-    country?: string,
-    grossWeight?: number,
-    deliveryNotes?: string,
-    internalNotes?: string
-  ) => void;
+  addShipment: (shipment: Omit<Shipment, 'id' | 'status'>) => void;
   updateShipmentStatus: (id: string, status: Shipment['status']) => void;
   updateShipment: (id: string, updates: Partial<Shipment>) => void;
   deleteShipment: (id: string) => void;
@@ -1512,60 +1489,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- GESTIONE SPEDIZIONI ---
-  const addShipment = (
-    clientId: string,
-    carrierId: string,
-    depotId: string,
-    orderNumber: string,
-    orderNumber2: string,
-    activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER',
-    palletPlaces: number,
-    expectedDate: string,
-    expectedTime: string,
-    originOrDestination: string,
-    goodsType: string,
-    expectedDeliveryDate?: string,
-    subjectName?: string,
-    address?: string,
-    city?: string,
-    cap?: string,
-    province?: string,
-    region?: string,
-    country?: string,
-    grossWeight?: number,
-    deliveryNotes?: string,
-    internalNotes?: string
-  ) => {
+  const addShipment = (shipmentInput: Omit<Shipment, 'id' | 'status'>) => {
     const id = `ship-${Date.now()}`;
     const newShipment: Shipment = {
+      ...shipmentInput,
       id,
-      clientId,
-      carrierId,
-      depotId,
-      orderNumber,
-      orderNumber2: orderNumber2 || undefined,
-      activityType,
-      palletPlaces,
-      status: 'DA_PIANIFICARE',
-      expectedDate,
-      expectedTime: expectedTime || undefined,
-      originOrDestination,
-      goodsType: goodsType || undefined,
-      expectedDeliveryDate: expectedDeliveryDate || undefined,
-      subjectName,
-      address,
-      city,
-      cap,
-      province,
-      region,
-      country,
-      grossWeight,
-      deliveryNotes,
-      internalNotes
+      status: 'DA_PIANIFICARE'
     };
     setShipments((prev) => [...prev, newShipment]);
     saveAction('ADD_SHIPMENT', newShipment);
-    logActivity(depotId, `Creata spedizione per ordine ${orderNumber} (${activityType})`, 'SUCCESS');
+    logActivity(shipmentInput.depotId, `Creata spedizione per ordine ${shipmentInput.orderNumber} (${shipmentInput.activityType})`, 'SUCCESS');
   };
 
   const updateShipmentStatus = (id: string, status: Shipment['status']) => {

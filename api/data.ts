@@ -395,6 +395,23 @@ async function initializeDb() {
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS delivery_notes TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT`);
 
+  // Nuovi campi per anagrafica geografica strutturata reale e routing del network
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_origin_name TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_origin_address TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_origin_city TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_origin_cap TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_origin_province TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_origin_country TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_destination_name TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_destination_address TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_destination_city TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_destination_cap TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_destination_province TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_destination_country TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS hub_origine_operativo TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS hub_destinazione_operativo TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS tipo_operazione_hub TEXT`);
+
   // Se non ci sono plant inseriti, eseguiamo il seed iniziale
   const checkDepots = await sql('SELECT count(*) as count FROM depots');
   if (parseInt(checkDepots[0].count) === 0) {
@@ -536,19 +553,118 @@ async function initializeDb() {
     if (parseInt(checkShipments[0].count) === 0) {
       const todayDate = new Date().toISOString().split('T')[0];
       const defaultShipments = [
-        { id: 'ship-1', clientId: 'client-rossi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-9923', orderNumber2: 'REF-MIL-99', activityType: 'CARICO', palletPlaces: 24, status: 'PIANIFICATO', expectedDate: todayDate, expectedTime: '10:00', originOrDestination: 'Bari Logistics Hub', goodsType: 'Alimentare', expectedDeliveryDate: todayDate, bookingId: 'book-milano-1', licensePlate: 'AA123BB' },
-        { id: 'ship-2', clientId: 'client-bianchi', carrierId: 'carrier-2', depotId: 'depot-milano', orderNumber: 'ORD-2026-8811', orderNumber2: 'REF-MIL-88', activityType: 'SCARICO', palletPlaces: 12, status: 'PIANIFICATO', expectedDate: todayDate, expectedTime: '14:30', originOrDestination: 'Milano Sud', goodsType: 'Elettronica', bookingId: 'book-milano-2', licensePlate: 'CC456DD' },
-        { id: 'ship-3', clientId: 'client-verdi', carrierId: 'carrier-1', depotId: 'depot-milano', orderNumber: 'ORD-2026-1234', orderNumber2: '', activityType: 'CARICO', palletPlaces: 33, status: 'DA_PIANIFICARE', expectedDate: todayDate, expectedTime: '16:00', originOrDestination: 'Roma Logistics Hub', goodsType: 'Plastica', expectedDeliveryDate: todayDate },
+        { 
+          id: 'ship-1', 
+          clientId: 'client-rossi', 
+          carrierId: 'carrier-1', 
+          depotId: 'depot-milano', 
+          orderNumber: 'ORD-2026-9923', 
+          orderNumber2: 'REF-MIL-99', 
+          activityType: 'CARICO', 
+          palletPlaces: 24, 
+          status: 'PIANIFICATO', 
+          expectedDate: todayDate, 
+          expectedTime: '10:00', 
+          originOrDestination: 'Bari Logistics Hub', 
+          goodsType: 'Alimentare', 
+          expectedDeliveryDate: todayDate, 
+          bookingId: 'book-milano-1', 
+          licensePlate: 'AA123BB',
+          realOriginName: 'Milano Logistics Plant',
+          realOriginAddress: 'Via Ripamonti 12',
+          realOriginCity: 'Milano',
+          realOriginCap: '20141',
+          realOriginProvince: 'MI',
+          realOriginCountry: 'Italia',
+          realDestinationName: 'Bari Logistics Hub',
+          realDestinationAddress: 'Via Bari 120',
+          realDestinationCity: 'Bari',
+          realDestinationCap: '70121',
+          realDestinationProvince: 'BA',
+          realDestinationCountry: 'Italia',
+          hubOrigineOperativo: 'depot-milano',
+          hubDestinazioneOperativo: 'depot-bari',
+          tipoOperazioneHub: 'TRANSITO'
+        },
+        { 
+          id: 'ship-2', 
+          clientId: 'client-bianchi', 
+          carrierId: 'carrier-2', 
+          depotId: 'depot-milano', 
+          orderNumber: 'ORD-2026-8811', 
+          orderNumber2: 'REF-MIL-88', 
+          activityType: 'SCARICO', 
+          palletPlaces: 12, 
+          status: 'PIANIFICATO', 
+          expectedDate: todayDate, 
+          expectedTime: '14:30', 
+          originOrDestination: 'Milano Sud', 
+          goodsType: 'Elettronica', 
+          bookingId: 'book-milano-2', 
+          licensePlate: 'CC456DD',
+          realOriginName: 'Fabbrica Torino',
+          realOriginAddress: 'Corso Francia 50',
+          realOriginCity: 'Torino',
+          realOriginCap: '10100',
+          realOriginProvince: 'TO',
+          realOriginCountry: 'Italia',
+          realDestinationName: 'Milano Logistics Plant',
+          realDestinationAddress: 'Via Lambro 4',
+          realDestinationCity: 'Milano',
+          realDestinationCap: '20090',
+          realDestinationProvince: 'MI',
+          realDestinationCountry: 'Italia',
+          hubOrigineOperativo: 'depot-milano',
+          hubDestinazioneOperativo: 'depot-milano',
+          tipoOperazioneHub: 'INBOUND'
+        },
+        { 
+          id: 'ship-3', 
+          clientId: 'client-verdi', 
+          carrierId: 'carrier-1', 
+          depotId: 'depot-milano', 
+          orderNumber: 'ORD-2026-1234', 
+          orderNumber2: '', 
+          activityType: 'CARICO', 
+          palletPlaces: 33, 
+          status: 'DA_PIANIFICARE', 
+          expectedDate: todayDate, 
+          expectedTime: '16:00', 
+          originOrDestination: 'Roma Logistics Hub', 
+          goodsType: 'Plastica', 
+          expectedDeliveryDate: todayDate,
+          realOriginName: 'Milano Logistics Plant',
+          realOriginAddress: 'Via Lambro 4',
+          realOriginCity: 'Milano',
+          realOriginCap: '20090',
+          realOriginProvince: 'MI',
+          realOriginCountry: 'Italia',
+          realDestinationName: 'Roma Logistics Plant',
+          realDestinationAddress: 'Via Appia Nuova 300',
+          realDestinationCity: 'Roma',
+          realDestinationCap: '00178',
+          realDestinationProvince: 'RM',
+          realDestinationCountry: 'Italia',
+          hubOrigineOperativo: 'depot-milano',
+          hubDestinazioneOperativo: 'depot-roma',
+          tipoOperazioneHub: 'OUTBOUND'
+        },
       ];
       for (const s of defaultShipments) {
         await sql(`
           INSERT INTO shipments (
             id, client_id, carrier_id, depot_id, order_number, order_number_2, activity_type, pallet_places, status,
-            expected_date, expected_time, origin_or_destination, goods_type, license_plate, expected_delivery_date, booking_id
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+            expected_date, expected_time, origin_or_destination, goods_type, license_plate, expected_delivery_date, booking_id,
+            real_origin_name, real_origin_address, real_origin_city, real_origin_cap, real_origin_province, real_origin_country,
+            real_destination_name, real_destination_address, real_destination_city, real_destination_cap, real_destination_province, real_destination_country,
+            hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)
         `, [
           s.id, s.clientId, s.carrierId, s.depotId, s.orderNumber, s.orderNumber2 || null, s.activityType, s.palletPlaces, s.status,
-          s.expectedDate, s.expectedTime || null, s.originOrDestination, s.goodsType || null, s.licensePlate || null, s.expectedDeliveryDate || null, s.bookingId || null
+          s.expectedDate, s.expectedTime || null, s.originOrDestination, s.goodsType || null, s.licensePlate || null, s.expectedDeliveryDate || null, s.bookingId || null,
+          s.realOriginName || null, s.realOriginAddress || null, s.realOriginCity || null, s.realOriginCap || null, s.realOriginProvince || null, s.realOriginCountry || null,
+          s.realDestinationName || null, s.realDestinationAddress || null, s.realDestinationCity || null, s.realDestinationCap || null, s.realDestinationProvince || null, s.realDestinationCountry || null,
+          s.hubOrigineOperativo || null, s.hubDestinazioneOperativo || null, s.tipoOperazioneHub || null
         ]);
       }
     }
@@ -1159,39 +1275,51 @@ export default async function handler(req: any, res: any) {
             INSERT INTO shipments (
               id, client_id, carrier_id, depot_id, order_number, order_number_2, activity_type, pallet_places, status,
               expected_date, expected_time, origin_or_destination, goods_type, license_plate, expected_delivery_date, booking_id,
-              subject_name, address, city, cap, province, region, country, gross_weight, delivery_notes, internal_notes
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
+              subject_name, address, city, cap, province, region, country, gross_weight, delivery_notes, internal_notes,
+              real_origin_name, real_origin_address, real_origin_city, real_origin_cap, real_origin_province, real_origin_country,
+              real_destination_name, real_destination_address, real_destination_city, real_destination_cap, real_destination_province, real_destination_country,
+              hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41)
           `, [
             payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
             payload.activityType, payload.palletPlaces, payload.status, payload.expectedDate, payload.expectedTime || null,
             payload.originOrDestination, payload.goodsType || null, payload.licensePlate || null, payload.expectedDeliveryDate || null, payload.bookingId || null,
             payload.subjectName || null, payload.address || null, payload.city || null, payload.cap || null, payload.province || null,
-            payload.region || null, payload.country || null, payload.grossWeight || null, payload.deliveryNotes || null, payload.internalNotes || null
-          ]);
-          break;
-
-        case 'UPDATE_SHIPMENT_STATUS':
-          await sql('UPDATE shipments SET status = $1 WHERE id = $2', [payload.status, payload.id]);
-          break;
-
-        case 'UPDATE_SHIPMENT':
-          await sql(`
-            UPDATE shipments SET 
-              client_id = $1, carrier_id = $2, depot_id = $3, order_number = $4, order_number_2 = $5,
-              activity_type = $6, pallet_places = $7, expected_date = $8, expected_time = $9,
-              origin_or_destination = $10, goods_type = $11, expected_delivery_date = $12,
-              subject_name = $13, address = $14, city = $15, cap = $16, province = $17,
-              region = $18, country = $19, gross_weight = $20, delivery_notes = $21, internal_notes = $22
-            WHERE id = $23
-          `, [
-            payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
-            payload.activityType, payload.palletPlaces, payload.expectedDate, payload.expectedTime || null,
-            payload.originOrDestination, payload.goodsType || null, payload.expectedDeliveryDate || null,
-            payload.subjectName || null, payload.address || null, payload.city || null, payload.cap || null, payload.province || null,
             payload.region || null, payload.country || null, payload.grossWeight || null, payload.deliveryNotes || null, payload.internalNotes || null,
-            payload.id
+            payload.realOriginName || null, payload.realOriginAddress || null, payload.realOriginCity || null, payload.realOriginCap || null, payload.realOriginProvince || null, payload.realOriginCountry || null,
+            payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
+            payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null
           ]);
           break;
+ 
+         case 'UPDATE_SHIPMENT_STATUS':
+           await sql('UPDATE shipments SET status = $1 WHERE id = $2', [payload.status, payload.id]);
+           break;
+ 
+         case 'UPDATE_SHIPMENT':
+           await sql(`
+             UPDATE shipments SET 
+               client_id = $1, carrier_id = $2, depot_id = $3, order_number = $4, order_number_2 = $5,
+               activity_type = $6, pallet_places = $7, expected_date = $8, expected_time = $9,
+               origin_or_destination = $10, goods_type = $11, expected_delivery_date = $12,
+               subject_name = $13, address = $14, city = $15, cap = $16, province = $17,
+               region = $18, country = $19, gross_weight = $20, delivery_notes = $21, internal_notes = $22,
+               real_origin_name = $23, real_origin_address = $24, real_origin_city = $25, real_origin_cap = $26, real_origin_province = $27, real_origin_country = $28,
+               real_destination_name = $29, real_destination_address = $30, real_destination_city = $31, real_destination_cap = $32, real_destination_province = $33, real_destination_country = $34,
+               hub_origine_operativo = $35, hub_destinazione_operativo = $36, tipo_operazione_hub = $37
+             WHERE id = $38
+           `, [
+             payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
+             payload.activityType, payload.palletPlaces, payload.expectedDate, payload.expectedTime || null,
+             payload.originOrDestination, payload.goodsType || null, payload.expectedDeliveryDate || null,
+             payload.subjectName || null, payload.address || null, payload.city || null, payload.cap || null, payload.province || null,
+             payload.region || null, payload.country || null, payload.grossWeight || null, payload.deliveryNotes || null, payload.internalNotes || null,
+             payload.realOriginName || null, payload.realOriginAddress || null, payload.realOriginCity || null, payload.realOriginCap || null, payload.realOriginProvince || null, payload.realOriginCountry || null,
+             payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
+             payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
+             payload.id
+           ]);
+           break;
 
         case 'DELETE_SHIPMENT':
           await sql('DELETE FROM shipments WHERE id = $1', [payload.id]);

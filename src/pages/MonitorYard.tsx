@@ -6,7 +6,6 @@ import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 import type { Booking, Bay, BookingNote, Shipment } from '../types';
-import { getGeoDetailsByCap, getGeoDetailsByProv } from '../utils/geo';
 
 export const MonitorYard: React.FC = () => {
   const {
@@ -80,6 +79,23 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormDeliveryNotes, setShipmentFormDeliveryNotes] = useState('');
   const [shipmentFormInternalNotes, setShipmentFormInternalNotes] = useState('');
 
+  // Nuovi stati per anagrafica geografica strutturata reale e routing del network
+  const [shipmentFormRealOriginName, setShipmentFormRealOriginName] = useState('');
+  const [shipmentFormRealOriginAddress, setShipmentFormRealOriginAddress] = useState('');
+  const [shipmentFormRealOriginCity, setShipmentFormRealOriginCity] = useState('');
+  const [shipmentFormRealOriginCap, setShipmentFormRealOriginCap] = useState('');
+  const [shipmentFormRealOriginProvince, setShipmentFormRealOriginProvince] = useState('');
+  const [shipmentFormRealOriginCountry, setShipmentFormRealOriginCountry] = useState('');
+  const [shipmentFormRealDestinationName, setShipmentFormRealDestinationName] = useState('');
+  const [shipmentFormRealDestinationAddress, setShipmentFormRealDestinationAddress] = useState('');
+  const [shipmentFormRealDestinationCity, setShipmentFormRealDestinationCity] = useState('');
+  const [shipmentFormRealDestinationCap, setShipmentFormRealDestinationCap] = useState('');
+  const [shipmentFormRealDestinationProvince, setShipmentFormRealDestinationProvince] = useState('');
+  const [shipmentFormRealDestinationCountry, setShipmentFormRealDestinationCountry] = useState('');
+  const [shipmentFormHubOrigineOperativo, setShipmentFormHubOrigineOperativo] = useState('');
+  const [shipmentFormHubDestinazioneOperativo, setShipmentFormHubDestinazioneOperativo] = useState('');
+  const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND' | 'TRANSITO'>('INBOUND');
+
   // Stati Modali e Selezioni Multipli
   const [isNewShipmentModalOpen, setIsNewShipmentModalOpen] = useState(false);
   const [isImportShipmentModalOpen, setIsImportShipmentModalOpen] = useState(false);
@@ -88,6 +104,9 @@ export const MonitorYard: React.FC = () => {
   // Stati Filtri Avanzati
   const [filterReference, setFilterReference] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
+  const [smartSearchQuery, setSmartSearchQuery] = useState('');
+  const [matchedShipmentForGate, setMatchedShipmentForGate] = useState<Shipment | null>(null);
+  const [shipmentsFilterTab, setShipmentsFilterTab] = useState<'all' | 'unbound' | 'bound'>('all');
   const [filterProvince, setFilterProvince] = useState('');
   const [filterCountry, setFilterCountry] = useState('');
 
@@ -325,6 +344,86 @@ export const MonitorYard: React.FC = () => {
     'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
   ];
+
+  const handleSmartGateSearch = (query: string) => {
+    setSmartSearchQuery(query);
+    const trimmed = query.trim().toLowerCase();
+    if (!trimmed) {
+      setMatchedShipmentForGate(null);
+      return;
+    }
+
+    const match = shipments.find(s => {
+      const isForThisHub = s.depotId === selectedDepotId || 
+                           s.hubOrigineOperativo === selectedDepotId || 
+                           s.hubDestinazioneOperativo === selectedDepotId;
+      if (!isForThisHub) return false;
+
+      return s.orderNumber.toLowerCase() === trimmed ||
+             (s.orderNumber2 && s.orderNumber2.toLowerCase() === trimmed) ||
+             (s.licensePlate && s.licensePlate.toLowerCase().replace(/\s+/g, '') === trimmed.replace(/\s+/g, ''));
+    });
+
+    if (match) {
+      setMatchedShipmentForGate(match);
+      setManualCarrierId(match.carrierId);
+      if (match.licensePlate) setManualPlate(match.licensePlate);
+      setManualOrderNumber(match.orderNumber);
+      setManualOrderNumber2(match.orderNumber2 || '');
+      setManualPallets(match.palletPlaces);
+      setManualActivityCode(match.activityType);
+      
+      const clientUsage = bayUsages.find(u => u.name.toLowerCase() === match.clientId.toLowerCase() || u.id === match.clientId);
+      if (clientUsage) {
+        setManualClientUsageId(clientUsage.id);
+      }
+    } else {
+      setMatchedShipmentForGate(null);
+    }
+  };
+
+  const handleConfirmSmartCheckIn = () => {
+    if (!matchedShipmentForGate) return;
+    const s = matchedShipmentForGate;
+    
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newBId = addBooking(
+      selectedDepotId,
+      todayStr,
+      s.activityType,
+      manualPlate.toUpperCase() || s.licensePlate?.toUpperCase() || 'TARGA',
+      manualDriver || 'Autista Autocompilato',
+      manualPhone || undefined,
+      manualNotes || `Smart Check-In per ordine ${s.orderNumber}`,
+      s.palletPlaces,
+      manualDriverLicense || 'DOCUMENTO',
+      manualDriverLicenseRelease || undefined,
+      s.orderNumber,
+      manualClientUsageId || undefined,
+      manualPlateTrailer || undefined,
+      manualDriverLicenseExpiry || undefined,
+      s.orderNumber2
+    );
+
+    bindShipmentsToBooking([s.id], newBId);
+
+    setSmartSearchQuery('');
+    setMatchedShipmentForGate(null);
+    setManualPlate('');
+    setManualPlateTrailer('');
+    setManualDriver('');
+    setManualPhone('');
+    setManualPallets('');
+    setManualNotes('');
+    setManualDriverLicense('');
+    setManualDriverLicenseRelease('');
+    setManualDriverLicenseExpiry('');
+    setManualOrderNumber('');
+    setManualOrderNumber2('');
+    setManualClientUsageId('');
+    
+    setGuardiolaView('gate');
+  };
 
   const handleRegisterManualArrival = (e: React.FormEvent) => {
     e.preventDefault();
@@ -569,6 +668,23 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormGrossWeight('');
     setShipmentFormDeliveryNotes('');
     setShipmentFormInternalNotes('');
+    
+    // Nuovi campi
+    setShipmentFormRealOriginName('');
+    setShipmentFormRealOriginAddress('');
+    setShipmentFormRealOriginCity('');
+    setShipmentFormRealOriginCap('');
+    setShipmentFormRealOriginProvince('');
+    setShipmentFormRealOriginCountry('');
+    setShipmentFormRealDestinationName('');
+    setShipmentFormRealDestinationAddress('');
+    setShipmentFormRealDestinationCity('');
+    setShipmentFormRealDestinationCap('');
+    setShipmentFormRealDestinationProvince('');
+    setShipmentFormRealDestinationCountry('');
+    setShipmentFormHubOrigineOperativo('');
+    setShipmentFormHubDestinazioneOperativo('');
+    setShipmentFormTipoOperazioneHub('INBOUND');
   };
 
   const handleEditShipmentClick = (s: Shipment) => {
@@ -584,8 +700,6 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormOriginDest(s.originOrDestination || '');
     setShipmentFormGoods(s.goodsType || '');
     setShipmentFormDeliveryDate(s.expectedDeliveryDate || '');
-    
-    // nuovi campi
     setShipmentFormSubjectName(s.subjectName || '');
     setShipmentFormAddress(s.address || '');
     setShipmentFormCity(s.city || '');
@@ -596,6 +710,23 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormGrossWeight(s.grossWeight ? String(s.grossWeight) : '');
     setShipmentFormDeliveryNotes(s.deliveryNotes || '');
     setShipmentFormInternalNotes(s.internalNotes || '');
+
+    // Nuovi campi
+    setShipmentFormRealOriginName(s.realOriginName || '');
+    setShipmentFormRealOriginAddress(s.realOriginAddress || '');
+    setShipmentFormRealOriginCity(s.realOriginCity || '');
+    setShipmentFormRealOriginCap(s.realOriginCap || '');
+    setShipmentFormRealOriginProvince(s.realOriginProvince || '');
+    setShipmentFormRealOriginCountry(s.realOriginCountry || '');
+    setShipmentFormRealDestinationName(s.realDestinationName || '');
+    setShipmentFormRealDestinationAddress(s.realDestinationAddress || '');
+    setShipmentFormRealDestinationCity(s.realDestinationCity || '');
+    setShipmentFormRealDestinationCap(s.realDestinationCap || '');
+    setShipmentFormRealDestinationProvince(s.realDestinationProvince || '');
+    setShipmentFormRealDestinationCountry(s.realDestinationCountry || '');
+    setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
+    setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
+    setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'INBOUND');
 
     setIsNewShipmentModalOpen(true);
   };
@@ -609,13 +740,14 @@ export const MonitorYard: React.FC = () => {
     const payloadUpdates = {
       clientId: cId,
       carrierId: carrId,
+      depotId: selectedDepotId,
       orderNumber: shipmentFormOrder,
       orderNumber2: shipmentFormOrder2 || undefined,
       activityType: shipmentFormType,
       palletPlaces: shipmentFormPallets,
       expectedDate: shipmentFormExpectedDate,
       expectedTime: shipmentFormExpectedTime || undefined,
-      originOrDestination: shipmentFormOriginDest || undefined,
+      originOrDestination: shipmentFormOriginDest || '',
       goodsType: shipmentFormGoods || undefined,
       expectedDeliveryDate: shipmentFormDeliveryDate || undefined,
       subjectName: shipmentFormSubjectName || undefined,
@@ -628,35 +760,27 @@ export const MonitorYard: React.FC = () => {
       grossWeight: shipmentFormGrossWeight ? Number(shipmentFormGrossWeight) : undefined,
       deliveryNotes: shipmentFormDeliveryNotes || undefined,
       internalNotes: shipmentFormInternalNotes || undefined,
+      realOriginName: shipmentFormRealOriginName || undefined,
+      realOriginAddress: shipmentFormRealOriginAddress || undefined,
+      realOriginCity: shipmentFormRealOriginCity || undefined,
+      realOriginCap: shipmentFormRealOriginCap || undefined,
+      realOriginProvince: shipmentFormRealOriginProvince || undefined,
+      realOriginCountry: shipmentFormRealOriginCountry || undefined,
+      realDestinationName: shipmentFormRealDestinationName || undefined,
+      realDestinationAddress: shipmentFormRealDestinationAddress || undefined,
+      realDestinationCity: shipmentFormRealDestinationCity || undefined,
+      realDestinationCap: shipmentFormRealDestinationCap || undefined,
+      realDestinationProvince: shipmentFormRealDestinationProvince || undefined,
+      realDestinationCountry: shipmentFormRealDestinationCountry || undefined,
+      hubOrigineOperativo: shipmentFormHubOrigineOperativo || undefined,
+      hubDestinazioneOperativo: shipmentFormHubDestinazioneOperativo || undefined,
+      tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined
     };
 
     if (shipmentFormId) {
       updateShipment(shipmentFormId, payloadUpdates);
     } else {
-      addShipment(
-        cId,
-        carrId,
-        selectedDepotId,
-        shipmentFormOrder,
-        shipmentFormOrder2,
-        shipmentFormType,
-        shipmentFormPallets,
-        shipmentFormExpectedDate,
-        shipmentFormExpectedTime,
-        shipmentFormOriginDest,
-        shipmentFormGoods,
-        shipmentFormDeliveryDate || undefined,
-        shipmentFormSubjectName,
-        shipmentFormAddress,
-        shipmentFormCity,
-        shipmentFormCap,
-        shipmentFormProvince,
-        shipmentFormRegion,
-        shipmentFormCountry,
-        shipmentFormGrossWeight ? Number(shipmentFormGrossWeight) : undefined,
-        shipmentFormDeliveryNotes,
-        shipmentFormInternalNotes
-      );
+      addShipment(payloadUpdates);
     }
 
     resetShipmentForm();
@@ -716,19 +840,40 @@ export const MonitorYard: React.FC = () => {
       const deliveryNotes = parts[15] || '';
       const internalNotes = parts[16] || '';
 
-      addShipment(
-        defaultClient,
-        defaultCarrier,
-        selectedDepotId,
+      const realOriginName = parts[17] || (activityType === 'SCARICO' ? 'Provenienza Esterna' : 'Milano Logistics Plant');
+      const realOriginAddress = parts[18] || '';
+      const realOriginCity = parts[19] || '';
+      const realOriginCap = parts[20] || '';
+      const realOriginProvince = parts[21] || '';
+      const realOriginCountry = parts[22] || 'Italia';
+
+      const realDestinationName = parts[23] || (activityType === 'CARICO' ? 'Destinatario Esterno' : 'Milano Logistics Plant');
+      const realDestinationAddress = parts[24] || '';
+      const realDestinationCity = parts[25] || '';
+      const realDestinationCap = parts[26] || '';
+      const realDestinationProvince = parts[27] || '';
+      const realDestinationCountry = parts[28] || 'Italia';
+
+      const hubOrigineOperativo = parts[29] || (activityType === 'SCARICO' ? selectedDepotId : 'depot-roma');
+      const hubDestinazioneOperativo = parts[30] || (activityType === 'CARICO' ? selectedDepotId : 'depot-bari');
+      let tipoOperazioneHub = parts[31]?.toUpperCase();
+      if (!['INBOUND', 'OUTBOUND', 'TRANSITO'].includes(tipoOperazioneHub)) {
+        tipoOperazioneHub = activityType === 'SCARICO' ? 'INBOUND' : 'OUTBOUND';
+      }
+
+      addShipment({
+        clientId: defaultClient,
+        carrierId: defaultCarrier,
+        depotId: selectedDepotId,
         orderNumber,
-        orderNumber2,
-        activityType as any,
+        orderNumber2: orderNumber2 || undefined,
+        activityType: activityType as any,
         palletPlaces,
         expectedDate,
-        expectedTime,
-        city,
-        goodsType,
-        expectedDate,
+        expectedTime: expectedTime || undefined,
+        originOrDestination: city,
+        goodsType: goodsType || undefined,
+        expectedDeliveryDate: expectedDate,
         subjectName,
         address,
         city,
@@ -738,8 +883,23 @@ export const MonitorYard: React.FC = () => {
         country,
         grossWeight,
         deliveryNotes,
-        internalNotes
-      );
+        internalNotes,
+        realOriginName,
+        realOriginAddress,
+        realOriginCity,
+        realOriginCap,
+        realOriginProvince,
+        realOriginCountry,
+        realDestinationName,
+        realDestinationAddress,
+        realDestinationCity,
+        realDestinationCap,
+        realDestinationProvince,
+        realDestinationCountry,
+        hubOrigineOperativo,
+        hubDestinazioneOperativo,
+        tipoOperazioneHub: tipoOperazioneHub as any
+      });
       successCount++;
     });
 
@@ -1313,7 +1473,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
                         }`}
                       >
-                        🛬 Arrivi / Accettazione ({shipments.filter(s => s.depotId === selectedDepotId && s.activityType !== 'CARICO').length})
+                        🛬 Arrivi / Accettazione ({shipments.filter(s => (s.hubOrigineOperativo === selectedDepotId && (s.tipoOperazioneHub === 'INBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO')).length})
                       </button>
                       <button
                         onClick={() => setStationSubTab('partenze')}
@@ -1323,7 +1483,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
                         }`}
                       >
-                        🛫 Partenze / Spedizioni ({shipments.filter(s => s.depotId === selectedDepotId && s.activityType === 'CARICO').length})
+                        🛫 Partenze / Spedizioni ({shipments.filter(s => (s.hubDestinazioneOperativo === selectedDepotId && (s.tipoOperazioneHub === 'OUTBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO')).length})
                       </button>
                     </div>
                   }
@@ -1331,7 +1491,7 @@ export const MonitorYard: React.FC = () => {
                   {stationSubTab === 'arrivi' ? (
                     <Table
                       data={shipments
-                        .filter(s => s.depotId === selectedDepotId && s.activityType !== 'CARICO')
+                        .filter(s => (s.hubOrigineOperativo === selectedDepotId && (s.tipoOperazioneHub === 'INBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO'))
                         .sort((a, b) => {
                           const dateComp = (a.expectedDate || '').localeCompare(b.expectedDate || '');
                           if (dateComp !== 0) return dateComp;
@@ -1404,7 +1564,7 @@ export const MonitorYard: React.FC = () => {
                   ) : (
                     <Table
                       data={shipments
-                        .filter(s => s.depotId === selectedDepotId && s.activityType === 'CARICO')
+                        .filter(s => (s.hubDestinazioneOperativo === selectedDepotId && (s.tipoOperazioneHub === 'OUTBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO'))
                         .sort((a, b) => {
                           const dateComp = (a.expectedDate || '').localeCompare(b.expectedDate || '');
                           if (dateComp !== 0) return dateComp;
@@ -1707,10 +1867,50 @@ export const MonitorYard: React.FC = () => {
                 </div>
 
                 {/* TABELLA FULL-WIDTH DEI RISULTATI */}
-                <Card title="Viaggi e Spedizioni Daily Program">
+                <Card
+                  title="Viaggi e Spedizioni Daily Program"
+                  headerAction={
+                    <div className="flex gap-2 font-mono">
+                      <button
+                        onClick={() => setShipmentsFilterTab('all')}
+                        className={`px-3 py-1.5 font-mono text-[10px] font-bold uppercase transition-all rounded-lg cursor-pointer border ${
+                          shipmentsFilterTab === 'all'
+                            ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                            : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
+                        }`}
+                      >
+                        Tutte ({shipments.filter(s => s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId).length})
+                      </button>
+                      <button
+                        onClick={() => setShipmentsFilterTab('unbound')}
+                        className={`px-3 py-1.5 font-mono text-[10px] font-bold uppercase transition-all rounded-lg cursor-pointer border ${
+                          shipmentsFilterTab === 'unbound'
+                            ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                            : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
+                        }`}
+                      >
+                        Da Associare ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !s.bookingId).length})
+                      </button>
+                      <button
+                        onClick={() => setShipmentsFilterTab('bound')}
+                        className={`px-3 py-1.5 font-mono text-[10px] font-bold uppercase transition-all rounded-lg cursor-pointer border ${
+                          shipmentsFilterTab === 'bound'
+                            ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
+                            : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
+                        }`}
+                      >
+                        Già Associate ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !!s.bookingId).length})
+                      </button>
+                    </div>
+                  }
+                >
                   <Table
                     data={shipments.filter(s => {
-                      if (s.depotId !== selectedDepotId) return false;
+                      if (s.depotId !== selectedDepotId && s.hubOrigineOperativo !== selectedDepotId && s.hubDestinazioneOperativo !== selectedDepotId) return false;
+
+                      // Filtro Stato Associazione
+                      if (shipmentsFilterTab === 'unbound' && s.bookingId) return false;
+                      if (shipmentsFilterTab === 'bound' && !s.bookingId) return false;
 
                       // Riferimenti
                       if (filterReference.trim()) {
@@ -2289,7 +2489,99 @@ export const MonitorYard: React.FC = () => {
                     Funzione riservata alla sola Guardiola.
                   </p>
                 ) : (
-                  <form onSubmit={handleRegisterManualArrival} className="space-y-4 text-xs font-sans max-w-xl mx-auto p-2 bg-gray-50/50 rounded-xl">
+                  <div className="space-y-4">
+                    {/* BARRA DI RICERCA SMART CHECK-IN */}
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3 max-w-xl mx-auto">
+                      <div className="flex items-center gap-2 text-[#004B97] font-bold text-xs uppercase font-mono">
+                        <span>🔍 Smart Check-In & Matching al Cancello</span>
+                      </div>
+                      <p className="text-[10px] text-blue-700 leading-relaxed">
+                        Inserisci il <strong>Riferimento Ordine (1 o 2)</strong> o la <strong>Targa del Veicolo</strong> per trovare la spedizione pre-caricata ed eseguire l'abbinamento rapido.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="Es. ORD-2026-9923 o AA123BB..."
+                          value={smartSearchQuery}
+                          onChange={(e) => handleSmartGateSearch(e.target.value)}
+                          className="flex-grow bg-white border border-blue-300 rounded-lg px-3 py-1.5 text-xs font-mono focus:ring-0 focus:outline-none placeholder-blue-300 text-blue-900 font-bold"
+                        />
+                        {smartSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => { setSmartSearchQuery(''); setMatchedShipmentForGate(null); }}
+                            className="bg-blue-200 hover:bg-blue-300 text-blue-800 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer font-mono"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+
+                      {matchedShipmentForGate && (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-3 animate-fade-in text-xs">
+                          <div className="text-emerald-800 font-bold flex items-center gap-1.5">
+                            <span>✅ Spedizione Corrispondente Trovata!</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-emerald-900 bg-white/50 p-2 rounded-md">
+                            <div><strong>Rif Ordine 1:</strong> {matchedShipmentForGate.orderNumber}</div>
+                            {matchedShipmentForGate.orderNumber2 && <div><strong>Rif Ordine 2:</strong> {matchedShipmentForGate.orderNumber2}</div>}
+                            <div><strong>Tipo Flusso:</strong> {matchedShipmentForGate.activityType === 'CARICO' ? 'CARICO (Partenza)' : 'SCARICO (Arrivo)'}</div>
+                            <div><strong>Posti Pallet:</strong> {matchedShipmentForGate.palletPlaces} PL</div>
+                            <div><strong>Vettore:</strong> {carriers.find(c => c.id === matchedShipmentForGate.carrierId)?.name || matchedShipmentForGate.carrierId}</div>
+                            <div><strong>Cliente:</strong> {clients.find(c => c.id === matchedShipmentForGate.clientId)?.name || matchedShipmentForGate.clientId}</div>
+                            <div><strong>Partenza Reale:</strong> {matchedShipmentForGate.realOriginCity || '-'} ({matchedShipmentForGate.realOriginProvince || '-'})</div>
+                            <div><strong>Destinazione Reale:</strong> {matchedShipmentForGate.realDestinationCity || '-'} ({matchedShipmentForGate.realDestinationProvince || '-'})</div>
+                            <div><strong>Tipo Tratta Network:</strong> {matchedShipmentForGate.tipoOperazioneHub || '-'}</div>
+                          </div>
+                          
+                          <div className="border-t border-emerald-200 pt-3 space-y-2">
+                            <p className="text-[10px] text-emerald-800 font-bold">
+                              Inserisci i dati dell'autista del mezzo presentato al cancello:
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                label="Autista *"
+                                placeholder="Nome e Cognome Autore"
+                                value={manualDriver}
+                                onChange={(e) => setManualDriver(e.target.value)}
+                                required
+                              />
+                              <Input
+                                label="Telefono Autista"
+                                placeholder="Es. 3331234567"
+                                value={manualPhone}
+                                onChange={(e) => setManualPhone(e.target.value)}
+                              />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                label="Targa Rimorchio"
+                                placeholder="Es. CC789DD"
+                                value={manualPlateTrailer}
+                                onChange={(e) => setManualPlateTrailer(e.target.value)}
+                              />
+                              <Input
+                                label="Numero Patente"
+                                placeholder="Es. U12345"
+                                value={manualDriverLicense}
+                                onChange={(e) => setManualDriverLicense(e.target.value)}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleConfirmSmartCheckIn}
+                              disabled={!manualDriver}
+                              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase font-mono mt-2"
+                            >
+                              Conferma Check-in e Collega Spedizione
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {!matchedShipmentForGate && (
+                      <form onSubmit={handleRegisterManualArrival} className="space-y-4 text-xs font-sans max-w-xl mx-auto p-2 bg-gray-50/50 rounded-xl">
                     <Select
                       label="Vettore Selezionato *"
                       options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
@@ -2482,7 +2774,9 @@ export const MonitorYard: React.FC = () => {
                     <Button type="submit" className="w-full">
                       Esegui Check-In & Inserisci in Coda
                     </Button>
-                  </form>
+                    </form>
+                    )}
+                  </div>
                 )}
               </Card>
             )}
@@ -4143,82 +4437,139 @@ export const MonitorYard: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-black/5 pt-4">
-                <Input
-                  label="Nome (Mittente o Destinatario) *"
-                  placeholder="Inserisci ragione sociale"
-                  value={shipmentFormSubjectName}
-                  onChange={(e) => setShipmentFormSubjectName(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Indirizzo (facoltativo)"
-                  placeholder="Es. Via Roma 12"
-                  value={shipmentFormAddress}
-                  onChange={(e) => setShipmentFormAddress(e.target.value)}
-                />
-                <Input
-                  label="Località (Comune) *"
-                  placeholder="Es. Milano"
-                  value={shipmentFormCity}
-                  onChange={(e) => setShipmentFormCity(e.target.value)}
-                  required
-                />
+              {/* SEZIONE 1: ROUTING DI RETE */}
+              <div className="border-t border-black/5 pt-4">
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Routing di Rete (Network TMS)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Select
+                    label="Hub Origine Operativo *"
+                    options={depots.map(d => ({ value: d.id, label: d.name }))}
+                    value={shipmentFormHubOrigineOperativo}
+                    onChange={(e) => {
+                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
+                      if (found) setShipmentFormHubOrigineOperativo(found.id);
+                    }}
+                    required
+                  />
+                  <Select
+                    label="Hub Destinazione Operativo *"
+                    options={depots.map(d => ({ value: d.id, label: d.name }))}
+                    value={shipmentFormHubDestinazioneOperativo}
+                    onChange={(e) => {
+                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
+                      if (found) setShipmentFormHubDestinazioneOperativo(found.id);
+                    }}
+                    required
+                  />
+                  <Select
+                    label="Tipo Operazione Hub *"
+                    options={[
+                      { value: 'INBOUND', label: 'Inbound (Scarico)' },
+                      { value: 'OUTBOUND', label: 'Outbound (Carico)' },
+                      { value: 'TRANSITO', label: 'Transito / Cross-dock' }
+                    ]}
+                    value={shipmentFormTipoOperazioneHub}
+                    onChange={(e) => setShipmentFormTipoOperazioneHub(e.target.value as any)}
+                    required
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="CAP (facoltativo)"
-                  placeholder="Es. 20121"
-                  value={shipmentFormCap}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setShipmentFormCap(val);
-                    if (val.length >= 2) {
-                      const geo = getGeoDetailsByCap(val);
-                      if (geo) {
-                        setShipmentFormProvince(geo.province);
-                        setShipmentFormRegion(geo.region);
-                        setShipmentFormCountry(geo.country);
-                      }
-                    }
-                  }}
-                />
-                <Input
-                  label="Provincia (obbligatorio per IT) *"
-                  placeholder="Es. MI"
-                  value={shipmentFormProvince}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setShipmentFormProvince(val.toUpperCase());
-                    if (val.length >= 2) {
-                      const geo = getGeoDetailsByProv(val);
-                      if (geo) {
-                        setShipmentFormRegion(geo.region);
-                        setShipmentFormCountry(geo.country);
-                      }
-                    }
-                  }}
-                  required={shipmentFormCountry.toLowerCase() === 'italia'}
-                />
-                <Input
-                  label="Nazione *"
-                  placeholder="Es. Italia"
-                  value={shipmentFormCountry}
-                  onChange={(e) => setShipmentFormCountry(e.target.value)}
-                  required
-                />
+              {/* SEZIONE 2: ANAGRAFICA ORIGINE REALE */}
+              <div className="border-t border-black/5 pt-4">
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Carico Reale (Origine)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    label="Ragione Sociale Mittente *"
+                    placeholder="Nome mittente"
+                    value={shipmentFormRealOriginName}
+                    onChange={(e) => setShipmentFormRealOriginName(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Indirizzo Mittente"
+                    placeholder="Via, civico"
+                    value={shipmentFormRealOriginAddress}
+                    onChange={(e) => setShipmentFormRealOriginAddress(e.target.value)}
+                  />
+                  <Input
+                    label="Località (Città) Mittente *"
+                    placeholder="Milano, Torino..."
+                    value={shipmentFormRealOriginCity}
+                    onChange={(e) => setShipmentFormRealOriginCity(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                  <Input
+                    label="CAP Mittente"
+                    placeholder="Es. 20100"
+                    value={shipmentFormRealOriginCap}
+                    onChange={(e) => setShipmentFormRealOriginCap(e.target.value)}
+                  />
+                  <Input
+                    label="Provincia Mittente"
+                    placeholder="MI, TO..."
+                    value={shipmentFormRealOriginProvince}
+                    onChange={(e) => setShipmentFormRealOriginProvince(e.target.value.toUpperCase())}
+                  />
+                  <Input
+                    label="Nazione Mittente"
+                    placeholder="Es. Italia"
+                    value={shipmentFormRealOriginCountry}
+                    onChange={(e) => setShipmentFormRealOriginCountry(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Input
-                  label="Regione (Autocompilata)"
-                  placeholder="Es. Lombardia"
-                  value={shipmentFormRegion}
-                  onChange={(e) => setShipmentFormRegion(e.target.value)}
-                  readOnly
-                  className="bg-gray-100 cursor-not-allowed"
-                />
+              {/* SEZIONE 3: ANAGRAFICA DESTINAZIONE REALE */}
+              <div className="border-t border-black/5 pt-4">
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Destinazione Reale</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Input
+                    label="Ragione Sociale Destinatario *"
+                    placeholder="Nome destinatario"
+                    value={shipmentFormRealDestinationName}
+                    onChange={(e) => setShipmentFormRealDestinationName(e.target.value)}
+                    required
+                  />
+                  <Input
+                    label="Indirizzo Destinatario"
+                    placeholder="Via, civico"
+                    value={shipmentFormRealDestinationAddress}
+                    onChange={(e) => setShipmentFormRealDestinationAddress(e.target.value)}
+                  />
+                  <Input
+                    label="Località (Città) Destinatario *"
+                    placeholder="Roma, Bari..."
+                    value={shipmentFormRealDestinationCity}
+                    onChange={(e) => setShipmentFormRealDestinationCity(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                  <Input
+                    label="CAP Destinatario"
+                    placeholder="Es. 00100"
+                    value={shipmentFormRealDestinationCap}
+                    onChange={(e) => setShipmentFormRealDestinationCap(e.target.value)}
+                  />
+                  <Input
+                    label="Provincia Destinatario"
+                    placeholder="RM, BA..."
+                    value={shipmentFormRealDestinationProvince}
+                    onChange={(e) => setShipmentFormRealDestinationProvince(e.target.value.toUpperCase())}
+                  />
+                  <Input
+                    label="Nazione Destinatario"
+                    placeholder="Es. Italia"
+                    value={shipmentFormRealDestinationCountry}
+                    onChange={(e) => setShipmentFormRealDestinationCountry(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 border-t border-black/5 pt-4">
                 <Input
                   label="Data Prevista Slot *"
                   type="date"
