@@ -78,6 +78,8 @@ export interface SmartRoutingResult {
 
 export function getHubByProvince(prov: string): string | null {
   const cleanProv = prov.trim().toUpperCase();
+  if (cleanProv === 'PC') return 'depot-monticelli';
+  
   const region = PROV_TO_REGION[cleanProv];
   if (!region) return null;
 

@@ -414,7 +414,7 @@ async function initializeDb() {
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_status TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_notes TEXT`);
 
-  // Assicura la presenza dei nuovi stabilimenti di Oppeano (seeding incrementale)
+  // Assicura la presenza dei nuovi stabilimenti di Oppeano e Monticelli (seeding incrementale)
   try {
     const opp1Exists = await sql("SELECT id FROM depots WHERE id = 'depot-oppeano1'");
     if (opp1Exists.length === 0) {
@@ -430,10 +430,17 @@ async function initializeDb() {
       await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o2-01', 'depot-oppeano2', 'module-o2-1', 'Baia O2-01', 'DISPONIBILE')");
       await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-o2-02', 'depot-oppeano2', 'module-o2-1', 'Baia O2-02', 'DISPONIBILE')");
     }
+    const montExists = await sql("SELECT id FROM depots WHERE id = 'depot-monticelli'");
+    if (montExists.length === 0) {
+      await sql("INSERT INTO depots (id, name, city) VALUES ('depot-monticelli', 'Monticelli Logistics Plant', 'Monticelli d\'Ongina (PC)')");
+      await sql("INSERT INTO warehouse_modules (id, depot_id, name) VALUES ('module-mon-1', 'depot-monticelli', 'Modulo M1')");
+      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-mon-01', 'depot-monticelli', 'module-mon-1', 'Baia MON-01', 'DISPONIBILE')");
+      await sql("INSERT INTO bays (id, depot_id, module_id, name, status) VALUES ('bay-mon-02', 'depot-monticelli', 'module-mon-1', 'Baia MON-02', 'DISPONIBILE')");
+    }
     // Aggiorna anche depotIds dell'admin
-    await sql("UPDATE users SET depot_ids = '[\"depot-milano\",\"depot-roma\",\"depot-bari\",\"depot-oppeano1\",\"depot-oppeano2\"]' WHERE id = 'user-1'");
+    await sql("UPDATE users SET depot_ids = '[\"depot-milano\",\"depot-roma\",\"depot-bari\",\"depot-oppeano1\",\"depot-oppeano2\",\"depot-monticelli\"]' WHERE id = 'user-1'");
   } catch (err) {
-    console.error("Errore durante inserimento incrementale Oppeano:", err);
+    console.error("Errore durante inserimento incrementale Oppeano/Monticelli:", err);
   }
 
   // Se non ci sono plant inseriti, eseguiamo il seed iniziale
