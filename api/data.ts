@@ -46,7 +46,8 @@ function readDb() {
       clients: [],
       pallet_types: [],
       users: [],
-      shipments: []
+      shipments: [],
+      anagrafica_comuni: []
     };
   }
   return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
@@ -59,6 +60,54 @@ function writeDb(data: any) {
 async function mockSql(query: string, params: any[] = []): Promise<any[]> {
   const db = readDb();
   const q = query.trim().replace(/\s+/g, ' ');
+
+  // Intercettazione Query per anagrafica_comuni (Mock Database Fallback)
+  if (q.includes('anagrafica_comuni')) {
+    if (!db.anagrafica_comuni) {
+      db.anagrafica_comuni = [];
+    }
+
+    if (q.toUpperCase().startsWith('SELECT COUNT')) {
+      return [{ count: db.anagrafica_comuni.length.toString() }];
+    }
+
+    if (q.toUpperCase().startsWith('SELECT *')) {
+      const list = [...db.anagrafica_comuni];
+      list.sort((a, b) => a.comune.localeCompare(b.comune));
+      return list;
+    }
+
+    if (q.toUpperCase().startsWith('INSERT INTO')) {
+      const [comune, cap, provincia] = params;
+      db.anagrafica_comuni = db.anagrafica_comuni.filter(
+        (r: any) => !(r.comune === comune && r.cap === cap)
+      );
+      db.anagrafica_comuni.push({ comune, cap, provincia });
+      writeDb(db);
+      return [];
+    }
+
+    if (q.toUpperCase().startsWith('UPDATE')) {
+      const [comune, cap, provincia, oldComune, oldCap] = params;
+      db.anagrafica_comuni = db.anagrafica_comuni.map((r: any) => {
+        if (r.comune === oldComune && r.cap === oldCap) {
+          return { comune, cap, provincia };
+        }
+        return r;
+      });
+      writeDb(db);
+      return [];
+    }
+
+    if (q.toUpperCase().startsWith('DELETE')) {
+      const [comune, cap] = params;
+      db.anagrafica_comuni = db.anagrafica_comuni.filter(
+        (r: any) => !(r.comune === comune && r.cap === cap)
+      );
+      writeDb(db);
+      return [];
+    }
+  }
 
   // 1. CREATE TABLE
   if (q.toUpperCase().startsWith('CREATE TABLE')) {
@@ -793,7 +842,7 @@ async function initializeDb() {
 
     // SEED ANAGRAFICA COMUNI
     const checkComuni = await sql('SELECT count(*) as count FROM anagrafica_comuni');
-    if (parseInt(checkComuni[0].count) === 0) {
+    if (parseInt(checkComuni[0].count) < 5) {
       const defaultComuni = [
         { comune: 'Milano', cap: '20100', provincia: 'MI' },
         { comune: 'Roma', cap: '00100', provincia: 'RM' },
