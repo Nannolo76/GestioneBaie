@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     
     // @ts-ignore
     const checkComuni = await sql.query('SELECT count(*) as count FROM anagrafica_comuni');
-    const count = parseInt(checkComuni[0] ? checkComuni[0].count : (checkComuni.rows ? checkComuni.rows[0].count : 0));
+    const count = parseInt(checkComuni.rows ? checkComuni.rows[0].count : (checkComuni[0] ? checkComuni[0].count : 0));
     
     if (count >= 5000) {
       return res.status(200).json({ status: 'already seeded', count });
