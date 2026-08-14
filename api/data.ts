@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
-import { comuniData } from '../src/data/comuni';
+import { comuniData } from '../src/data/comuni.js';
 
 // Manual loading of .env.local for local Windows environments where Vercel CLI fails to inject env variables
 if (!process.env.DATABASE_URL) {
@@ -868,7 +868,7 @@ async function initializeDb() {
         } else {
           // Bulk insert in chunks for real Postgres database
           console.log(`Starting to seed anagrafica_comuni. Total items: ${comuniData ? comuniData.length : 'UNDEFINED'}`);
-          const chunkSize = 1000;
+          const chunkSize = 10000;
           for (let i = 0; i < (comuniData || []).length; i += chunkSize) {
             const chunk = comuniData.slice(i, i + chunkSize);
             const values = [];
