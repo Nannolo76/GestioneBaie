@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { Pool } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
 import { comuniData } from '../src/data/comuni.js';
@@ -239,20 +239,19 @@ const isLocalFallback = !process.env.DATABASE_URL ||
                         process.env.DATABASE_URL === '[SENSITIVE]' || 
                         !process.env.DATABASE_URL.startsWith('postgres');
 
-const neonSql = process.env.DATABASE_URL && process.env.DATABASE_URL !== '[SENSITIVE]' && process.env.DATABASE_URL.startsWith('postgres') 
-  ? neon(process.env.DATABASE_URL) 
+const pool = process.env.DATABASE_URL && process.env.DATABASE_URL !== '[SENSITIVE]' && process.env.DATABASE_URL.startsWith('postgres') 
+  ? new Pool({ connectionString: process.env.DATABASE_URL }) 
   : null;
 
 const sql: any = isLocalFallback ? mockSql : async (query: string, params: any[] = []) => {
-  if (!neonSql) throw new Error("Neon SQL not initialized");
-  // @ts-ignore
-  if (neonSql.query) {
-    // @ts-ignore
-    return neonSql.query(query, params);
+  if (!pool) throw new Error("Neon Pool not initialized");
+  const client = await pool.connect();
+  try {
+    const res = await client.query(query, params);
+    return res.rows;
+  } finally {
+    client.release();
   }
-  // Fallback for older neon versions or if .query doesn't exist
-  // @ts-ignore
-  return neonSql(query, params);
 };
 
 // Funzione helper per verificare ed inizializzare il DB
@@ -882,7 +881,7 @@ async function initializeDb() {
         } else {
           // Bulk insert in chunks for real Postgres database
           console.log(`Starting to seed anagrafica_comuni. Total items: ${comuniData ? comuniData.length : 'UNDEFINED'}`);
-          const chunkSize = 1000;
+          const chunkSize = 2000;
           for (let i = 0; i < (comuniData || []).length; i += chunkSize) {
             const chunk = comuniData.slice(i, i + chunkSize);
             const values = [];
