@@ -30,31 +30,47 @@ if (!process.env.DATABASE_URL) {
 
 const DB_FILE = path.resolve(process.cwd(), 'local_db.json');
 
+let inMemoryDb: any = null;
+
 function readDb() {
-  if (!fs.existsSync(DB_FILE)) {
-    return {
-      depots: [],
-      warehouse_modules: [],
-      bay_usages: [],
-      bays: [],
-      carriers: [],
-      bookings: [],
-      anomalies: [],
-      activity_logs: [],
-      activity_types: [],
-      report_schedules: [],
-      clients: [],
-      pallet_types: [],
-      users: [],
-      shipments: [],
-      anagrafica_comuni: []
-    };
+  if (inMemoryDb) return inMemoryDb;
+
+  if (fs.existsSync(DB_FILE)) {
+    try {
+      inMemoryDb = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+      return inMemoryDb;
+    } catch (e) {
+      console.error("Failed to read mock DB from disk:", e);
+    }
   }
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+
+  inMemoryDb = {
+    depots: [],
+    warehouse_modules: [],
+    bay_usages: [],
+    bays: [],
+    carriers: [],
+    bookings: [],
+    anomalies: [],
+    activity_logs: [],
+    activity_types: [],
+    report_schedules: [],
+    clients: [],
+    pallet_types: [],
+    users: [],
+    shipments: [],
+    anagrafica_comuni: []
+  };
+  return inMemoryDb;
 }
 
 function writeDb(data: any) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  inMemoryDb = data;
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
+  } catch (e) {
+    console.warn("Failed to write mock DB to disk (normal in serverless/read-only env):", e);
+  }
 }
 
 async function mockSql(query: string, params: any[] = []): Promise<any[]> {
