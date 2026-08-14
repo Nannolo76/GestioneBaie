@@ -109,6 +109,9 @@ interface AppContextType {
   addClient: (name: string, vatNumber?: string, email?: string, defaultDepotId?: string) => void;
   updateClient: (id: string, name: string, vatNumber?: string, email?: string, defaultDepotId?: string) => void;
   deleteClient: (id: string) => void;
+  addComune: (comune: string, cap: string, provincia: string) => void;
+  updateComune: (originalComune: string, originalCap: string, comune: string, cap: string, provincia: string) => void;
+  deleteComune: (comune: string, cap: string) => void;
   addPalletType: (name: string, description?: string) => void;
   updatePalletType: (id: string, name: string, description?: string) => void;
   deletePalletType: (id: string) => void;
@@ -1386,6 +1389,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logActivity(selectedDepotId, `Eliminato cliente con ID: ${id}`, 'WARNING');
   };
 
+  // --- GESTIONE COMUNI ---
+  const addComune = (comune: string, cap: string, provincia: string) => {
+    const newComune = { comune, cap, provincia };
+    setComuni((prev) => [...prev, newComune]);
+    saveAction('ADD_COMUNE', newComune);
+    logActivity(selectedDepotId, `Aggiunto comune: ${comune} (${provincia})`, 'SUCCESS');
+  };
+
+  const updateComune = (originalComune: string, originalCap: string, comune: string, cap: string, provincia: string) => {
+    setComuni((prev) => prev.map((c) => (c.comune === originalComune && c.cap === originalCap ? { comune, cap, provincia } : c)));
+    logActivity(selectedDepotId, `Aggiornato comune: ${comune} (${provincia})`, 'INFO');
+    saveAction('UPDATE_COMUNE', { oldComune: originalComune, oldCap: originalCap, comune, cap, provincia });
+  };
+
+  const deleteComune = (comune: string, cap: string) => {
+    setComuni((prev) => prev.filter((c) => !(c.comune === comune && c.cap === cap)));
+    saveAction('DELETE_COMUNE', { comune, cap });
+    logActivity(selectedDepotId, `Eliminato comune: ${comune} - ${cap}`, 'WARNING');
+  };
+
   // --- GESTIONE TIPI PALLET ---
   const addPalletType = (name: string, description?: string) => {
     const id = `plt-${Date.now()}`;
@@ -1647,6 +1670,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addClient,
         updateClient,
         deleteClient,
+        addComune,
+        updateComune,
+        deleteComune,
         addPalletType,
         updatePalletType,
         deletePalletType,

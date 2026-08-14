@@ -1301,6 +1301,22 @@ export default async function handler(req: any, res: any) {
           await sql('DELETE FROM clients WHERE id = $1', [payload.id]);
           break;
 
+        case 'ADD_COMUNE':
+          await sql('INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ($1, $2, $3)', [
+            payload.comune, payload.cap, payload.provincia
+          ]);
+          break;
+        case 'UPDATE_COMUNE':
+          await sql('UPDATE anagrafica_comuni SET comune = $1, cap = $2, provincia = $3 WHERE comune = $4 AND cap = $5', [
+            payload.comune, payload.cap, payload.provincia, payload.oldComune, payload.oldCap
+          ]);
+          break;
+        case 'DELETE_COMUNE':
+          await sql('DELETE FROM anagrafica_comuni WHERE comune = $1 AND cap = $2', [
+            payload.comune, payload.cap
+          ]);
+          break;
+
         case 'ADD_PALLET_TYPE':
           await sql('INSERT INTO pallet_types (id, name, description) VALUES ($1, $2, $3)', [
             payload.id, payload.name, payload.description || null

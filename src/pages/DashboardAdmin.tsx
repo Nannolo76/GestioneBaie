@@ -60,13 +60,17 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     addShipment,
     updateShipmentStatus,
     deleteShipment,
+    comuni,
+    addComune,
+    updateComune,
+    deleteComune
   } = useApp();
 
-  const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments'>(defaultTab);
+  const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments' | 'comuni'>(defaultTab);
 
   // Stato Modifica Generale (Edit Modal)
   const [editingItem, setEditingItem] = useState<{
-    type: 'depot' | 'warehouseModule' | 'bay' | 'carrier' | 'activityType' | 'reportSchedule' | 'client' | 'palletType' | 'user';
+    type: 'depot' | 'warehouseModule' | 'bay' | 'carrier' | 'activityType' | 'reportSchedule' | 'client' | 'palletType' | 'user' | 'comune';
     id: string;
     fields: any;
   } | null>(null);
@@ -78,6 +82,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newHubCap, setNewHubCap] = useState('');
   const [newHubProvince, setNewHubProvince] = useState('');
   const [newHubCountry, setNewHubCountry] = useState('Italia');
+
+  // Stati Autocomplete
+  const [filteredHubComuni, setFilteredHubComuni] = useState<any[]>([]);
+  const [showHubSuggestions, setShowHubSuggestions] = useState(false);
+  const [filteredEditHubComuni, setFilteredEditHubComuni] = useState<any[]>([]);
+  const [showEditHubSuggestions, setShowEditHubSuggestions] = useState(false);
+  const [filteredShipComuni, setFilteredShipComuni] = useState<any[]>([]);
+  const [showShipSuggestions, setShowShipSuggestions] = useState(false);
 
   // Stati Baia
   const [selectedHubForBay, setSelectedHubForBay] = useState(depots[0]?.id || '');
@@ -139,6 +151,117 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState<'ADMIN' | 'OPERATORE_YARD' | 'GUARDIA_CANCELLO' | 'PREPOSTO'>('GUARDIA_CANCELLO');
   const [newUserDepotIds, setNewUserDepotIds] = useState<string[]>([]);
+  const [comuniSearch, setComuniSearch] = useState('');
+
+  // Autocomplete Nuovo Hub
+  const handleHubCityChange = (val: string) => {
+    setNewHubCity(val);
+    if (!val) {
+      setFilteredHubComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.comune.toLowerCase().includes(val.toLowerCase()) ||
+      c.provincia.toLowerCase().includes(val.toLowerCase())
+    );
+    setFilteredHubComuni(filtered.slice(0, 6));
+    setShowHubSuggestions(true);
+  };
+
+  const handleHubCapChange = (val: string) => {
+    setNewHubCap(val);
+    if (!val) {
+      setFilteredHubComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.cap.startsWith(val)
+    );
+    setFilteredHubComuni(filtered.slice(0, 6));
+    setShowHubSuggestions(true);
+  };
+
+  const handleSelectHubComune = (c: { comune: string; cap: string; provincia: string }) => {
+    setNewHubCity(c.comune);
+    setNewHubCap(c.cap);
+    setNewHubProvince(c.provincia);
+    setNewHubCountry('Italia');
+    setFilteredHubComuni([]);
+    setShowHubSuggestions(false);
+  };
+
+  // Autocomplete Modifica Hub
+  const handleEditHubCityChange = (val: string) => {
+    if (!editingItem) return;
+    setEditingItem({
+      ...editingItem,
+      fields: { ...editingItem.fields, city: val }
+    });
+    if (!val) {
+      setFilteredEditHubComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.comune.toLowerCase().includes(val.toLowerCase()) ||
+      c.provincia.toLowerCase().includes(val.toLowerCase())
+    );
+    setFilteredEditHubComuni(filtered.slice(0, 6));
+    setShowEditHubSuggestions(true);
+  };
+
+  const handleEditHubCapChange = (val: string) => {
+    if (!editingItem) return;
+    setEditingItem({
+      ...editingItem,
+      fields: { ...editingItem.fields, cap: val }
+    });
+    if (!val) {
+      setFilteredEditHubComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.cap.startsWith(val)
+    );
+    setFilteredEditHubComuni(filtered.slice(0, 6));
+    setShowEditHubSuggestions(true);
+  };
+
+  const handleSelectEditHubComune = (c: { comune: string; cap: string; provincia: string }) => {
+    if (!editingItem) return;
+    setEditingItem({
+      ...editingItem,
+      fields: {
+        ...editingItem.fields,
+        city: c.comune,
+        cap: c.cap,
+        province: c.provincia,
+        country: 'Italia'
+      }
+    });
+    setFilteredEditHubComuni([]);
+    setShowEditHubSuggestions(false);
+  };
+
+  const handleShipOriginOrDestChange = (val: string) => {
+    setNewShipOriginOrDestination(val);
+    if (!val) {
+      setFilteredShipComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.comune.toLowerCase().includes(val.toLowerCase()) ||
+      c.provincia.toLowerCase().includes(val.toLowerCase()) ||
+      c.cap.startsWith(val)
+    );
+    setFilteredShipComuni(filtered.slice(0, 6));
+    setShowShipSuggestions(true);
+  };
+
+  const handleSelectShipComune = (c: { comune: string; cap: string; provincia: string }) => {
+    setNewShipOriginOrDestination(`${c.comune} (${c.provincia}) - ${c.cap}`);
+    setFilteredShipComuni([]);
+    setShowShipSuggestions(false);
+  };
 
   useEffect(() => {
     if (depots.length > 0) {
@@ -372,6 +495,12 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
 
   const activeHubModules = warehouseModules.filter((m) => m.depotId === selectedHubForBay);
 
+  const filteredComuniTable = (comuni || []).filter(c => 
+    c.comune.toLowerCase().includes(comuniSearch.toLowerCase()) ||
+    c.cap.includes(comuniSearch) ||
+    c.provincia.toLowerCase().includes(comuniSearch.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       {/* Header Pagina */}
@@ -476,6 +605,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
         >
           🚢 Spedizioni / Viaggi ({shipments.length})
         </button>
+        <button
+          onClick={() => setAdminTab('comuni')}
+          className={`px-3 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
+            adminTab === 'comuni' ? 'border-ticket-accent text-ticket-accent bg-white/50' : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
+          }`}
+        >
+          🗺️ Anagrafica Comuni ({(comuni || []).length})
+        </button>
       </div>
 
       {/* --- TAB: HUB & BAIE --- */}
@@ -498,26 +635,48 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   onChange={(e) => setNewHubAddress(e.target.value)}
                 />
                 <div className="grid grid-cols-2 gap-4">
-                  <Input
-                    label="CAP"
-                    placeholder="Es. 20020"
-                    value={newHubCap}
-                    onChange={(e) => setNewHubCap(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      label="CAP"
+                      placeholder="Es. 20020"
+                      value={newHubCap}
+                      onChange={(e) => handleHubCapChange(e.target.value)}
+                      onFocus={() => setShowHubSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowHubSuggestions(false), 200)}
+                    />
+                  </div>
                   <Input
                     label="Provincia"
                     placeholder="Es. MI"
                     value={newHubProvince}
-                    onChange={(e) => setNewHubProvince(e.target.value)}
+                    onChange={(e) => setNewHubProvince(e.target.value.toUpperCase())}
                   />
                 </div>
-                <Input
-                  label="Località"
-                  placeholder="Es. Lainate"
-                  value={newHubCity}
-                  onChange={(e) => setNewHubCity(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    label="Località"
+                    placeholder="Es. Lainate"
+                    value={newHubCity}
+                    onChange={(e) => handleHubCityChange(e.target.value)}
+                    onFocus={() => setShowHubSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowHubSuggestions(false), 200)}
+                    required
+                  />
+                  {showHubSuggestions && filteredHubComuni.length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto font-sans text-xs">
+                      {filteredHubComuni.map((c, i) => (
+                        <div
+                          key={i}
+                          onClick={() => handleSelectHubComune(c)}
+                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-b-0 flex justify-between items-center"
+                        >
+                          <span className="font-bold text-slate-800">{c.comune}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{c.cap} ({c.provincia})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <Input
                   label="Nazione"
                   placeholder="Es. Italia"
@@ -1718,13 +1877,31 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     onChange={(e) => setNewShipExpectedTime(e.target.value)}
                   />
                 </div>
-                <Input
-                  label="Provenienza / Destinazione *"
-                  placeholder="Es. Hub Milano / Client Location"
-                  value={newShipOriginOrDestination}
-                  onChange={(e) => setNewShipOriginOrDestination(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    label="Provenienza / Destinazione *"
+                    placeholder="Es. Hub Milano / Client Location"
+                    value={newShipOriginOrDestination}
+                    onChange={(e) => handleShipOriginOrDestChange(e.target.value)}
+                    onFocus={() => setShowShipSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowShipSuggestions(false), 200)}
+                    required
+                  />
+                  {showShipSuggestions && filteredShipComuni.length > 0 && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto font-sans text-xs text-black">
+                      {filteredShipComuni.map((c, i) => (
+                        <div
+                          key={i}
+                          onClick={() => handleSelectShipComune(c)}
+                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-b-0 flex justify-between items-center"
+                        >
+                          <span className="font-bold text-slate-800">{c.comune}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{c.cap} ({c.provincia})</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Input
                     label="Tipologia Merce"
@@ -1873,6 +2050,120 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
         </div>
       )}
 
+      {/* --- TAB: ANAGRAFICA COMUNI --- */}
+      {adminTab === 'comuni' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in text-black font-sans">
+          <div>
+            <Card title="Aggiungi Comune (Master Data)" accent="orange">
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const data = new FormData(form);
+                const comuneVal = (data.get('comune') as string || '').trim();
+                const capVal = (data.get('cap') as string || '').trim();
+                const provVal = (data.get('provincia') as string || '').trim().toUpperCase();
+                if (comuneVal && capVal && provVal) {
+                  addComune(comuneVal, capVal, provVal);
+                  form.reset();
+                }
+              }} className="space-y-4">
+                <Input
+                  name="comune"
+                  label="Nome Comune *"
+                  placeholder="Es. Oppeano"
+                  required
+                />
+                <Input
+                  name="cap"
+                  label="CAP *"
+                  placeholder="Es. 37050"
+                  required
+                />
+                <Input
+                  name="provincia"
+                  label="Provincia (Sigla) *"
+                  placeholder="Es. VR"
+                  maxLength={2}
+                  required
+                />
+                <Button type="submit" className="w-full">
+                  Aggiungi Comune
+                </Button>
+              </form>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2 space-y-4">
+            <Card title="Database Comuni Italiani (ISTAT)">
+              <div className="mb-4">
+                <Input
+                  placeholder="Cerca comune per nome, cap o provincia..."
+                  value={comuniSearch}
+                  onChange={(e) => setComuniSearch(e.target.value)}
+                />
+              </div>
+              <Table
+                data={filteredComuniTable}
+                emptyMessage="Nessun comune trovato per i criteri specificati."
+                columns={[
+                  {
+                    header: 'Comune',
+                    accessor: (c) => <span className="font-bold text-black">{c.comune}</span>
+                  },
+                  {
+                    header: 'CAP',
+                    accessor: (c) => <span className="font-mono text-xs">{c.cap}</span>
+                  },
+                  {
+                    header: 'Provincia',
+                    accessor: (c) => <span className="font-mono font-bold text-xs uppercase text-[#004B97]">{c.provincia}</span>
+                  },
+                  {
+                    header: 'Nazione',
+                    accessor: () => <span className="text-xs text-gray-500">Italia</span>
+                  },
+                  {
+                    header: 'Azioni',
+                    accessor: (c) => (
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setEditingItem({
+                            type: 'comune',
+                            id: `${c.comune}-${c.cap}`,
+                            fields: {
+                              oldComune: c.comune,
+                              oldCap: c.cap,
+                              comune: c.comune,
+                              cap: c.cap,
+                              provincia: c.provincia
+                            }
+                          })}
+                        >
+                          Modifica
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => {
+                            if (confirm(`Eliminare il comune ${c.comune} (${c.cap})?`)) {
+                              deleteComune(c.comune, c.cap);
+                            }
+                          }}
+                        >
+                          Elimina
+                        </Button>
+                      </div>
+                    )
+                  }
+                ]}
+              />
+            </Card>
+          </div>
+        </div>
+      )}
+
       {/* MODAL RISOLUZIONE ANOMALIA */}
       {activeResolveAnomalyId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
@@ -1940,6 +2231,8 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                 updatePalletType(id, fields.name, fields.description || undefined);
               } else if (type === 'user') {
                 updateUser(id, fields.name, fields.email, fields.role, fields.depotIds, fields.username);
+              } else if (type === 'comune') {
+                updateComune(fields.oldComune, fields.oldCap, fields.comune, fields.cap, fields.provincia);
               }
               setEditingItem(null);
             }} className="p-5 space-y-4 text-xs">
@@ -1972,30 +2265,42 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
+                    <div className="space-y-1 relative">
                       <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">CAP</label>
                       <input
                         type="text"
                         value={editingItem.fields.cap || ''}
-                        onChange={(e) => setEditingItem({
-                          ...editingItem,
-                          fields: { ...editingItem.fields, cap: e.target.value }
-                        })}
+                        onChange={(e) => handleEditHubCapChange(e.target.value)}
+                        onFocus={() => setShowEditHubSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowEditHubSuggestions(false), 200)}
                         className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
                       />
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1 relative">
                       <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Località *</label>
                       <input
                         type="text"
                         value={editingItem.fields.city}
-                        onChange={(e) => setEditingItem({
-                          ...editingItem,
-                          fields: { ...editingItem.fields, city: e.target.value }
-                        })}
+                        onChange={(e) => handleEditHubCityChange(e.target.value)}
+                        onFocus={() => setShowEditHubSuggestions(true)}
+                        onBlur={() => setTimeout(() => setShowEditHubSuggestions(false), 200)}
                         className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
                         required
                       />
+                      {showEditHubSuggestions && filteredEditHubComuni.length > 0 && (
+                        <div className="absolute z-50 left-0 right-0 mt-1 bg-slate-900 border border-white/10 rounded-lg shadow-xl max-h-48 overflow-y-auto font-sans text-xs text-white">
+                          {filteredEditHubComuni.map((c, i) => (
+                            <div
+                              key={i}
+                              onClick={() => handleSelectEditHubComune(c)}
+                              className="px-3 py-2 hover:bg-[#11BCEC]/20 cursor-pointer border-b border-white/5 last:border-b-0 flex justify-between items-center"
+                            >
+                              <span className="font-bold text-white">{c.comune}</span>
+                              <span className="text-[10px] text-gray-400 font-mono">{c.cap} ({c.provincia})</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1">
                       <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Provincia</label>
@@ -2004,7 +2309,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                         value={editingItem.fields.province || ''}
                         onChange={(e) => setEditingItem({
                           ...editingItem,
-                          fields: { ...editingItem.fields, province: e.target.value }
+                          fields: { ...editingItem.fields, province: e.target.value.toUpperCase() }
                         })}
                         className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
                       />
@@ -2471,6 +2776,51 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                         );
                       })}
                     </div>
+                  </div>
+                </>
+              )}
+
+              {editingItem.type === 'comune' && (
+                <>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Comune *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.comune}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, comune: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">CAP *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.cap}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, cap: e.target.value }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Provincia *</label>
+                    <input
+                      type="text"
+                      value={editingItem.fields.provincia}
+                      onChange={(e) => setEditingItem({
+                        ...editingItem,
+                        fields: { ...editingItem.fields, provincia: e.target.value.toUpperCase() }
+                      })}
+                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                      maxLength={2}
+                      required
+                    />
                   </div>
                 </>
               )}
