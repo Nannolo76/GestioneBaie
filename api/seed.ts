@@ -8,27 +8,25 @@ export default async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     
-    // @ts-ignore
-    const checkComuni = await sql.query('SELECT count(*) as count FROM anagrafica_comuni');
-    const count = parseInt(checkComuni.rows ? checkComuni.rows[0].count : (checkComuni[0] ? checkComuni[0].count : 0));
+    const checkComuni = await sqlSELECT count(*) as count FROM anagrafica_comuni;
+    const count = parseInt(checkComuni[0].count);
     
     if (count >= 5000) {
       return res.status(200).json({ status: 'already seeded', count });
     }
     
-    const chunkSize = 100;
+    const chunkSize = 2000;
     let seeded = 0;
     for (let i = 0; i < comuniData.length; i += chunkSize) {
       const chunk = comuniData.slice(i, i + chunkSize);
-      const values = [];
-      const params = [];
-      let paramIdx = 1;
-      for (const c of chunk) {
-        values.push( + "($${paramIdx++}, $${paramIdx++}, $${paramIdx++}) + ");
-        params.push(c.comune, c.cap, c.provincia);
-      }
-      // @ts-ignore
-      await sql.query( + "INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES  ON CONFLICT DO NOTHING + ", params);
+      
+      const jsonStr = JSON.stringify(chunk);
+      await sql
+        INSERT INTO anagrafica_comuni (comune, cap, provincia)
+        SELECT comune, cap, provincia FROM json_to_recordset(::json)
+        AS x(comune text, cap text, provincia text)
+        ON CONFLICT DO NOTHING
+      ;
       seeded += chunk.length;
     }
     
