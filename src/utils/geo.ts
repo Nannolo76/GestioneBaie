@@ -413,6 +413,31 @@ export function getHubByClientAndLocation(
   };
 }
 
+function findMatchingHub(
+  loc: { city?: string; cap?: string; province?: string; name?: string },
+  depots: Depot[]
+): Depot | null {
+  if (!depots || depots.length === 0) return null;
+  
+  const locName = (loc.name || '').trim().toLowerCase();
+  const locCity = (loc.city || '').trim().toLowerCase();
+  const locProv = (loc.province || '').trim().toLowerCase();
+  
+  for (const d of depots) {
+    const dName = d.name.trim().toLowerCase();
+    const dCity = d.city.trim().toLowerCase();
+    const dProv = (d.province || '').trim().toLowerCase();
+    
+    if (locName && (dName === locName || dName.includes(locName) || locName.includes(dName))) {
+      return d;
+    }
+    if (locCity && locProv && dCity.includes(locCity) && dProv === locProv) {
+      return d;
+    }
+  }
+  return null;
+}
+
 export function calculateSmartRouting(
   origin: { city?: string; cap?: string; province?: string; name?: string },
   destination: { city?: string; cap?: string; province?: string; name?: string },
@@ -421,19 +446,71 @@ export function calculateSmartRouting(
   depots?: Depot[],
   clients?: Client[]
 ): SmartRoutingResult & { routingNotes: string } {
+  const defaultHub = depots && depots.length > 0 ? depots[0].id : 'depot-milano';
+
+  // 1. Applica prima le regole del cliente se configurate a database
+  if (clients && clientId) {
+    const cleanClient = clientId.toLowerCase();
+    const matchedClient = clients.find(c => c.id === clientId || c.name.toLowerCase() === cleanClient);
+    if (matchedClient?.defaultDepotId) {
+      const depotName = depots?.find(d => d.id === matchedClient.defaultDepotId)?.name || matchedClient.defaultDepotId;
+      return {
+        hubOrigineOperativo: matchedClient.defaultDepotId,
+        hubDestinazioneOperativo: matchedClient.defaultDepotId,
+        tipoOperazioneHub: ['SCARICO', 'RESO'].includes(activityType) ? 'INBOUND' : 'OUTBOUND',
+        isAmbiguous: false,
+        routingNotes: `Regola Cliente: Assegnato a ${depotName}`
+      };
+    }
+  }
+
+  // 2. Classificazione dei Nodi (Hub vs Esterno)
+  const matchedOriginHub = depots ? findMatchingHub(origin, depots) : null;
+  const matchedDestHub = depots ? findMatchingHub(destination, depots) : null;
+
+  const isOriginHub = !!matchedOriginHub;
+  const isDestHub = !!matchedDestHub;
+
+  if (isOriginHub && !isDestHub) {
+    // Caso 1: Mittente = HUB, Destinatario = CLIENTE ESTERNO
+    return {
+      hubOrigineOperativo: matchedOriginHub.id,
+      hubDestinazioneOperativo: matchedOriginHub.id,
+      tipoOperazioneHub: 'OUTBOUND',
+      isAmbiguous: false,
+      routingNotes: `Spedizione OUTBOUND (Carico) da Hub: ${matchedOriginHub.name}`
+    };
+  } else if (!isOriginHub && isDestHub) {
+    // Caso 2: Mittente = CLIENTE ESTERNO, Destinatario = HUB
+    return {
+      hubOrigineOperativo: matchedDestHub.id,
+      hubDestinazioneOperativo: matchedDestHub.id,
+      tipoOperazioneHub: 'INBOUND',
+      isAmbiguous: false,
+      routingNotes: `Spedizione INBOUND (Scarico) presso Hub: ${matchedDestHub.name}`
+    };
+  } else if (isOriginHub && isDestHub) {
+    // Caso 3: Mittente = HUB, Destinatario = HUB (Transito interno)
+    return {
+      hubOrigineOperativo: matchedOriginHub.id,
+      hubDestinazioneOperativo: matchedDestHub.id,
+      tipoOperazioneHub: 'TRANSITO',
+      isAmbiguous: false,
+      routingNotes: `Transito Interno: ${matchedOriginHub.name} ➡️ ${matchedDestHub.name}`
+    };
+  }
+
+  // Caso 4: Entrambi Esterni -> Fallback standard geografico
   const origResult = getHubByClientAndLocation(clientId, origin, depots, clients);
   const destResult = getHubByClientAndLocation(clientId, destination, depots, clients);
-
-  const defaultHub = depots && depots.length > 0 ? depots[0].id : 'depot-milano';
 
   const hubOrigineOperativo = origResult.hubId || defaultHub;
   const hubDestinazioneOperativo = destResult.hubId || defaultHub;
   const isAmbiguous = origResult.isAmbiguous || destResult.isAmbiguous;
   
-  const routingNotes = origResult.routingNotes || destResult.routingNotes || 'Instradamento calcolato';
+  const routingNotes = origResult.routingNotes || destResult.routingNotes || 'Instradamento calcolato per vicinanza geografica';
 
   let tipoOperazioneHub: 'INBOUND' | 'OUTBOUND' | 'TRANSITO' = 'TRANSITO';
-
   if (hubOrigineOperativo === hubDestinazioneOperativo) {
     tipoOperazioneHub = ['SCARICO', 'RESO'].includes(activityType) ? 'INBOUND' : 'OUTBOUND';
   } else {

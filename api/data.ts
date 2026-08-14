@@ -346,6 +346,15 @@ async function initializeDb() {
   await sql(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT`);
 
   await sql(`
+    CREATE TABLE IF NOT EXISTS anagrafica_comuni (
+      comune TEXT NOT NULL,
+      cap TEXT NOT NULL,
+      provincia TEXT NOT NULL,
+      PRIMARY KEY (comune, cap)
+    )
+  `);
+
+  await sql(`
     CREATE TABLE IF NOT EXISTS shipments (
       id TEXT PRIMARY KEY,
       client_id TEXT NOT NULL,
@@ -781,6 +790,33 @@ async function initializeDb() {
         b.clientId || null, b.palletReturns, b.palletVoucherNumber
       ]);
     }
+
+    // SEED ANAGRAFICA COMUNI
+    const checkComuni = await sql('SELECT count(*) as count FROM anagrafica_comuni');
+    if (parseInt(checkComuni[0].count) === 0) {
+      const defaultComuni = [
+        { comune: 'Milano', cap: '20100', provincia: 'MI' },
+        { comune: 'Roma', cap: '00100', provincia: 'RM' },
+        { comune: 'Bari', cap: '70100', provincia: 'BA' },
+        { comune: 'Oppeano', cap: '37050', provincia: 'VR' },
+        { comune: 'Monticelli d\'Ongina', cap: '29010', provincia: 'PC' },
+        { comune: 'Limito', cap: '20096', provincia: 'MI' },
+        { comune: 'Pioltello', cap: '20096', provincia: 'MI' },
+        { comune: 'Verona', cap: '37100', provincia: 'VR' },
+        { comune: 'Piacenza', cap: '29100', provincia: 'PC' },
+        { comune: 'Brescia', cap: '25100', provincia: 'BS' },
+        { comune: 'Bologna', cap: '40100', provincia: 'BO' },
+        { comune: 'Torino', cap: '10100', provincia: 'TO' },
+        { comune: 'Napoli', cap: '80100', provincia: 'NA' },
+        { comune: 'Firenze', cap: '50100', provincia: 'FI' },
+        { comune: 'Palermo', cap: '90100', provincia: 'PA' },
+        { comune: 'Genova', cap: '16100', provincia: 'GE' },
+        { comune: 'Venezia', cap: '30100', provincia: 'VE' },
+      ];
+      for (const c of defaultComuni) {
+        await sql('INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ($1, $2, $3)', [c.comune, c.cap, c.provincia]);
+      }
+    }
   }
 }
 
@@ -814,7 +850,8 @@ export default async function handler(req: any, res: any) {
         clients,
         palletTypes,
         users,
-        shipments
+        shipments,
+        comuni
       ] = await Promise.all([
         sql('SELECT * FROM depots'),
         sql('SELECT * FROM warehouse_modules'),
@@ -830,6 +867,7 @@ export default async function handler(req: any, res: any) {
         sql('SELECT * FROM pallet_types ORDER BY name ASC'),
         sql('SELECT * FROM users ORDER BY name ASC'),
         sql('SELECT * FROM shipments ORDER BY order_number ASC'),
+        sql('SELECT * FROM anagrafica_comuni ORDER BY comune ASC'),
       ]);
 
       // Mappiamo i campi snake_case in camelCase per mantenere la compatibilità col frontend e parse dei campi JSON
@@ -1010,7 +1048,8 @@ export default async function handler(req: any, res: any) {
         clients: parsedClients,
         palletTypes,
         users: parsedUsers,
-        shipments: parsedShipments
+        shipments: parsedShipments,
+        comuni
       });
     }
 

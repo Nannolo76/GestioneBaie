@@ -42,6 +42,7 @@ export const MonitorYard: React.FC = () => {
     bindShipmentsToBooking,
     unbindShipmentFromBooking,
     updateShipment,
+    comuni
   } = useApp();
 
   // Stato navigazione sottomenu a sinistra (Opzione A)
@@ -99,6 +100,13 @@ export const MonitorYard: React.FC = () => {
   const [isRoutingAutoCalculated, setIsRoutingAutoCalculated] = useState(false);
   const [isRoutingAmbiguous, setIsRoutingAmbiguous] = useState(false);
   const [isAutoRoutingEnabled, setIsAutoRoutingEnabled] = useState(true);
+  const [shipmentFormRoutingNotes, setShipmentFormRoutingNotes] = useState('Instradamento confermato');
+
+  // Stati per l'autocompletamento comuni italiani
+  const [filteredOriginComuni, setFilteredOriginComuni] = useState<any[]>([]);
+  const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
+  const [filteredDestComuni, setFilteredDestComuni] = useState<any[]>([]);
+  const [showDestSuggestions, setShowDestSuggestions] = useState(false);
 
   // Stati Modali e Selezioni Multipli
   const [isNewShipmentModalOpen, setIsNewShipmentModalOpen] = useState(false);
@@ -433,6 +441,79 @@ export const MonitorYard: React.FC = () => {
     setManualClientUsageId('');
     
     setGuardiolaView('gate');
+  };
+
+  // --- AUTOMATIZZAZIONE AUTOCOMPLETE COMUNI ITALIANI ---
+  const handleOriginCityChange = (val: string) => {
+    setShipmentFormRealOriginCity(val);
+    if (!val) {
+      setFilteredOriginComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.comune.toLowerCase().includes(val.toLowerCase()) ||
+      c.provincia.toLowerCase().includes(val.toLowerCase())
+    );
+    setFilteredOriginComuni(filtered.slice(0, 6));
+    setShowOriginSuggestions(true);
+  };
+
+  const handleOriginCapChange = (val: string) => {
+    setShipmentFormRealOriginCap(val);
+    if (!val) {
+      setFilteredOriginComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.cap.startsWith(val)
+    );
+    setFilteredOriginComuni(filtered.slice(0, 6));
+    setShowOriginSuggestions(true);
+  };
+
+  const handleSelectOriginComune = (c: { comune: string; cap: string; provincia: string }) => {
+    setShipmentFormRealOriginCity(c.comune);
+    setShipmentFormRealOriginCap(c.cap);
+    setShipmentFormRealOriginProvince(c.provincia);
+    setShipmentFormRealOriginCountry('Italia');
+    setFilteredOriginComuni([]);
+    setShowOriginSuggestions(false);
+  };
+
+  const handleDestCityChange = (val: string) => {
+    setShipmentFormRealDestinationCity(val);
+    if (!val) {
+      setFilteredDestComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.comune.toLowerCase().includes(val.toLowerCase()) ||
+      c.provincia.toLowerCase().includes(val.toLowerCase())
+    );
+    setFilteredDestComuni(filtered.slice(0, 6));
+    setShowDestSuggestions(true);
+  };
+
+  const handleDestCapChange = (val: string) => {
+    setShipmentFormRealDestinationCap(val);
+    if (!val) {
+      setFilteredDestComuni([]);
+      return;
+    }
+    const filtered = (comuni || []).filter(c => 
+      c.cap.startsWith(val)
+    );
+    setFilteredDestComuni(filtered.slice(0, 6));
+    setShowDestSuggestions(true);
+  };
+
+  const handleSelectDestComune = (c: { comune: string; cap: string; provincia: string }) => {
+    setShipmentFormRealDestinationCity(c.comune);
+    setShipmentFormRealDestinationCap(c.cap);
+    setShipmentFormRealDestinationProvince(c.provincia);
+    setShipmentFormRealDestinationCountry('Italia');
+    setFilteredDestComuni([]);
+    setShowDestSuggestions(false);
   };
 
   const handleRegisterManualArrival = (e: React.FormEvent) => {
@@ -777,9 +858,11 @@ export const MonitorYard: React.FC = () => {
       setShipmentFormTipoOperazioneHub(routing.tipoOperazioneHub);
       setIsRoutingAutoCalculated(true);
       setIsRoutingAmbiguous(routing.isAmbiguous);
+      setShipmentFormRoutingNotes(routing.routingNotes);
     } else {
       setIsRoutingAutoCalculated(false);
       setIsRoutingAmbiguous(false);
+      setShipmentFormRoutingNotes('Instradamento confermato');
     }
   }, [
     shipmentFormRealOriginCity,
@@ -839,9 +922,7 @@ export const MonitorYard: React.FC = () => {
       hubDestinazioneOperativo: shipmentFormHubDestinazioneOperativo || undefined,
       tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
       routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
-      routingNotes: isRoutingAmbiguous && isAutoRoutingEnabled
-        ? 'Ambivalenza Hub: Oppeano 1 vs Oppeano 2 (Da confermare)'
-        : 'Instradamento confermato'
+      routingNotes: shipmentFormRoutingNotes
     };
 
     if (shipmentFormId) {
@@ -4588,21 +4669,43 @@ export const MonitorYard: React.FC = () => {
                     value={shipmentFormRealOriginAddress}
                     onChange={(e) => setShipmentFormRealOriginAddress(e.target.value)}
                   />
-                  <Input
-                    label="Località (Città) Mittente *"
-                    placeholder="Milano, Torino..."
-                    value={shipmentFormRealOriginCity}
-                    onChange={(e) => setShipmentFormRealOriginCity(e.target.value)}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      label="Località (Città) Mittente *"
+                      placeholder="Milano, Torino..."
+                      value={shipmentFormRealOriginCity}
+                      onChange={(e) => handleOriginCityChange(e.target.value)}
+                      onFocus={() => setShowOriginSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
+                      required
+                    />
+                    {showOriginSuggestions && filteredOriginComuni.length > 0 && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto font-sans text-xs">
+                        {filteredOriginComuni.map((c, i) => (
+                          <div
+                            key={i}
+                            onClick={() => handleSelectOriginComune(c)}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-b-0 flex justify-between items-center"
+                          >
+                            <span className="font-bold text-slate-800">{c.comune}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{c.cap} ({c.provincia})</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  <Input
-                    label="CAP Mittente"
-                    placeholder="Es. 20100"
-                    value={shipmentFormRealOriginCap}
-                    onChange={(e) => setShipmentFormRealOriginCap(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      label="CAP Mittente"
+                      placeholder="Es. 20100"
+                      value={shipmentFormRealOriginCap}
+                      onChange={(e) => handleOriginCapChange(e.target.value)}
+                      onFocus={() => setShowOriginSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 200)}
+                    />
+                  </div>
                   <Input
                     label="Provincia Mittente"
                     placeholder="MI, TO..."
@@ -4635,21 +4738,43 @@ export const MonitorYard: React.FC = () => {
                     value={shipmentFormRealDestinationAddress}
                     onChange={(e) => setShipmentFormRealDestinationAddress(e.target.value)}
                   />
-                  <Input
-                    label="Località (Città) Destinatario *"
-                    placeholder="Roma, Bari..."
-                    value={shipmentFormRealDestinationCity}
-                    onChange={(e) => setShipmentFormRealDestinationCity(e.target.value)}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      label="Località (Città) Destinatario *"
+                      placeholder="Roma, Bari..."
+                      value={shipmentFormRealDestinationCity}
+                      onChange={(e) => handleDestCityChange(e.target.value)}
+                      onFocus={() => setShowDestSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowDestSuggestions(false), 200)}
+                      required
+                    />
+                    {showDestSuggestions && filteredDestComuni.length > 0 && (
+                      <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto font-sans text-xs">
+                        {filteredDestComuni.map((c, i) => (
+                          <div
+                            key={i}
+                            onClick={() => handleSelectDestComune(c)}
+                            className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-b-0 flex justify-between items-center"
+                          >
+                            <span className="font-bold text-slate-800">{c.comune}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{c.cap} ({c.provincia})</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  <Input
-                    label="CAP Destinatario"
-                    placeholder="Es. 00100"
-                    value={shipmentFormRealDestinationCap}
-                    onChange={(e) => setShipmentFormRealDestinationCap(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      label="CAP Destinatario"
+                      placeholder="Es. 00100"
+                      value={shipmentFormRealDestinationCap}
+                      onChange={(e) => handleDestCapChange(e.target.value)}
+                      onFocus={() => setShowDestSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowDestSuggestions(false), 200)}
+                    />
+                  </div>
                   <Input
                     label="Provincia Destinatario"
                     placeholder="RM, BA..."
@@ -4942,7 +5067,7 @@ export const MonitorYard: React.FC = () => {
               <div className="flex items-center gap-2">
                 <span className="text-lg">⚠️</span>
                 <h3 className="font-bold text-sm uppercase tracking-wide">
-                  Risoluzione Rapida Instradamento Spedizioni
+                  Risoluzione Rapida / Revisione Import Spedizioni
                 </h3>
               </div>
               <button 
@@ -4955,7 +5080,7 @@ export const MonitorYard: React.FC = () => {
             
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs leading-relaxed">
-                Le seguenti spedizioni presentano tratte geografiche che corrispondono a più hub del cluster (es. Oppeano 1 vs Oppeano 2) senza una regola cliente predefinita.
+                Le seguenti spedizioni presentano tratte geografiche ambigue (es. più hub nella stessa zona) o inserite da importazione CSV con dati incompleti.
                 Conferma l'hub suggerito o assegna manualmente l'hub corretto verificando la disponibilità delle baie in tempo reale.
               </div>
 

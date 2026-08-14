@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog, Client, PalletType, Shipment } from '../types';
+import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog, Client, PalletType, Shipment, ComuneItaliano } from '../types';
 
 interface AppContextType {
   depots: Depot[];
@@ -13,6 +13,7 @@ interface AppContextType {
   checklistAlerts: ChecklistFailureAlert[];
   bayUsages: BayUsage[];
   anomalies: AnomalyLog[];
+  comuni: ComuneItaliano[];
   currentRole: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null;
   currentUser: User | null;
   currentCarrierId: string;
@@ -310,6 +311,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [palletTypes, setPalletTypes] = useState<PalletType[]>(defaultPalletTypes);
   const [users, setUsers] = useState<User[]>(defaultUsers);
   const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [comuni, setComuni] = useState<ComuneItaliano[]>([]);
   const [simulatedEmails, setSimulatedEmails] = useState<{ userId: string; userName: string; userEmail: string; confirmLink: string }[]>([]);
 
   const clearSimulatedEmail = (userId: string) => {
@@ -356,6 +358,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.palletTypes && data.palletTypes.length > 0) setPalletTypes(data.palletTypes);
         if (data.users && data.users.length > 0) setUsers(data.users);
         if (data.shipments) setShipments(data.shipments);
+        if (data.comuni) setComuni(data.comuni);
       } catch (err) {
         console.error('Errore durante il caricamento dal database:', err);
       }
@@ -1588,6 +1591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         checklistAlerts,
         bayUsages,
         anomalies,
+        comuni,
         currentRole,
         currentUser,
         currentCarrierId,

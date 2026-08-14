@@ -248,3 +248,9 @@ export interface User {
   password?: string;
   status: 'PENDING_CONFIRMATION' | 'FIRST_ACCESS' | 'ACTIVE';
 }
+
+export interface ComuneItaliano {
+  comune: string;
+  cap: string;
+  provincia: string;
+}
