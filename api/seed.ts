@@ -8,14 +8,15 @@ export default async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     
-    const checkComuni = await sql('SELECT count(*) as count FROM anagrafica_comuni');
-    const count = parseInt(checkComuni[0].count);
+    // @ts-ignore
+    const checkComuni = await sql.query('SELECT count(*) as count FROM anagrafica_comuni');
+    const count = parseInt(checkComuni[0] ? checkComuni[0].count : (checkComuni.rows ? checkComuni.rows[0].count : 0));
     
     if (count >= 5000) {
       return res.status(200).json({ status: 'already seeded', count });
     }
     
-    const chunkSize = 1000;
+    const chunkSize = 10000;
     let seeded = 0;
     for (let i = 0; i < comuniData.length; i += chunkSize) {
       const chunk = comuniData.slice(i, i + chunkSize);
@@ -26,7 +27,8 @@ export default async function handler(req, res) {
         values.push( + "($${paramIdx++}, $${paramIdx++}, $${paramIdx++}) + ");
         params.push(c.comune, c.cap, c.provincia);
       }
-      await sql( + "INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES  ON CONFLICT DO NOTHING + ", params);
+      // @ts-ignore
+      await sql.query( + "INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES  ON CONFLICT DO NOTHING + ", params);
       seeded += chunk.length;
     }
     
