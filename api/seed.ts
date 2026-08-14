@@ -1,11 +1,12 @@
+import { neon } from '@neondatabase/serverless';
+import { comuniData } from '../src/data/comuni.js';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET') return res.status(405).json({error: 'Method not allowed'});
   
   try {
-    const { neon } = require('@neondatabase/serverless');
     const sql = neon(process.env.DATABASE_URL);
-    const { comuniData } = require('../src/data/comuni');
     
     const checkComuni = await sql('SELECT count(*) as count FROM anagrafica_comuni');
     const count = parseInt(checkComuni[0].count);
@@ -31,6 +32,6 @@ export default async function handler(req, res) {
     
     return res.status(200).json({ status: 'success', seeded });
   } catch (err) {
-    return res.status(500).json({ error: err.message, stack: err.stack });
+    return res.status(500).json({ error: err.message, stack: err.stack, hasComuniData: !!comuniData, comuniDataLen: comuniData ? comuniData.length : 0 });
   }
 }
