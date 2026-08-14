@@ -1,7 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
-import { comuniData } from '../src/data/comuni.js';
+import { comuniData } from '../src/data/comuni';
 
 // Manual loading of .env.local for local Windows environments where Vercel CLI fails to inject env variables
 if (!process.env.DATABASE_URL) {
@@ -858,27 +858,34 @@ async function initializeDb() {
     }
 
     // SEED ANAGRAFICA COMUNI
-    const checkComuni = await sql('SELECT count(*) as count FROM anagrafica_comuni');
-    if (parseInt(checkComuni[0].count) < 5000) {
-      if (isLocalFallback) {
-        const db = readDb();
-        db.anagrafica_comuni = comuniData;
-        writeDb(db);
-      } else {
-        // Bulk insert in chunks for real Postgres database
-        const chunkSize = 1000;
-        for (let i = 0; i < comuniData.length; i += chunkSize) {
-          const chunk = comuniData.slice(i, i + chunkSize);
-          const values = [];
-          const params = [];
-          let paramIdx = 1;
-          for (const c of chunk) {
-            values.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
-            params.push(c.comune, c.cap, c.provincia);
+    try {
+      const checkComuni = await sql('SELECT count(*) as count FROM anagrafica_comuni');
+      if (parseInt(checkComuni[0].count) < 5000) {
+        if (isLocalFallback) {
+          const db = readDb();
+          db.anagrafica_comuni = comuniData;
+          writeDb(db);
+        } else {
+          // Bulk insert in chunks for real Postgres database
+          console.log(`Starting to seed anagrafica_comuni. Total items: ${comuniData ? comuniData.length : 'UNDEFINED'}`);
+          const chunkSize = 1000;
+          for (let i = 0; i < (comuniData || []).length; i += chunkSize) {
+            const chunk = comuniData.slice(i, i + chunkSize);
+            const values = [];
+            const params = [];
+            let paramIdx = 1;
+            for (const c of chunk) {
+              values.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
+              params.push(c.comune, c.cap, c.provincia);
+            }
+            await sql(`INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ${values.join(',')} ON CONFLICT DO NOTHING`, params);
+            console.log(`Seeded chunk ${i} to ${i + chunk.length}`);
           }
-          await sql(`INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ${values.join(',')} ON CONFLICT DO NOTHING`, params);
+          console.log('Seed anagrafica_comuni completed successfully');
         }
       }
+    } catch (seedErr) {
+      console.error('Failed to seed anagrafica_comuni:', seedErr);
     }
   }
 }
