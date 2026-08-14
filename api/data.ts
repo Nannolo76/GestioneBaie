@@ -239,7 +239,21 @@ const isLocalFallback = !process.env.DATABASE_URL ||
                         process.env.DATABASE_URL === '[SENSITIVE]' || 
                         !process.env.DATABASE_URL.startsWith('postgres');
 
-const sql: any = isLocalFallback ? mockSql : neon(process.env.DATABASE_URL!);
+const neonSql = process.env.DATABASE_URL && process.env.DATABASE_URL !== '[SENSITIVE]' && process.env.DATABASE_URL.startsWith('postgres') 
+  ? neon(process.env.DATABASE_URL) 
+  : null;
+
+const sql: any = isLocalFallback ? mockSql : async (query: string, params: any[] = []) => {
+  if (!neonSql) throw new Error("Neon SQL not initialized");
+  // @ts-ignore
+  if (neonSql.query) {
+    // @ts-ignore
+    return neonSql.query(query, params);
+  }
+  // Fallback for older neon versions or if .query doesn't exist
+  // @ts-ignore
+  return neonSql(query, params);
+};
 
 // Funzione helper per verificare ed inizializzare il DB
 async function initializeDb() {
