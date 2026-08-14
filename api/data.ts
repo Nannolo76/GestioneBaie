@@ -882,7 +882,7 @@ async function initializeDb() {
         } else {
           // Bulk insert in chunks for real Postgres database
           console.log(`Starting to seed anagrafica_comuni. Total items: ${comuniData ? comuniData.length : 'UNDEFINED'}`);
-          const chunkSize = 10000;
+          const chunkSize = 1000;
           for (let i = 0; i < (comuniData || []).length; i += chunkSize) {
             const chunk = comuniData.slice(i, i + chunkSize);
             const values = [];
