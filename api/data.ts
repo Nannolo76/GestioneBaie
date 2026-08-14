@@ -885,14 +885,10 @@ async function initializeDb() {
           const chunkSize = 2000;
           for (let i = 0; i < (comuniData || []).length; i += chunkSize) {
             const chunk = comuniData.slice(i, i + chunkSize);
-            const values = [];
-            const params = [];
-            let paramIdx = 1;
-            for (const c of chunk) {
-              values.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
-              params.push(c.comune, c.cap, c.provincia);
-            }
-            await sql(`INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ${values.join(',')} ON CONFLICT DO NOTHING`, params);
+            const valuesStr = chunk.map(c => `('${c.comune.replace(/'/g, "''")}', '${c.cap}', '${c.provincia.replace(/'/g, "''")}')`).join(',');
+            const queryStr = `INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ${valuesStr} ON CONFLICT DO NOTHING`;
+            
+            await sql(queryStr);
             console.log(`Seeded chunk ${i} to ${i + chunk.length}`);
           }
           console.log('Seed anagrafica_comuni completed successfully');
