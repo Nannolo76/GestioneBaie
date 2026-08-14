@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import fs from 'fs';
 import path from 'path';
+import { comuniData } from '../src/data/comuni.js';
 
 // Manual loading of .env.local for local Windows environments where Vercel CLI fails to inject env variables
 if (!process.env.DATABASE_URL) {
@@ -858,28 +859,25 @@ async function initializeDb() {
 
     // SEED ANAGRAFICA COMUNI
     const checkComuni = await sql('SELECT count(*) as count FROM anagrafica_comuni');
-    if (parseInt(checkComuni[0].count) < 5) {
-      const defaultComuni = [
-        { comune: 'Milano', cap: '20100', provincia: 'MI' },
-        { comune: 'Roma', cap: '00100', provincia: 'RM' },
-        { comune: 'Bari', cap: '70100', provincia: 'BA' },
-        { comune: 'Oppeano', cap: '37050', provincia: 'VR' },
-        { comune: 'Monticelli d\'Ongina', cap: '29010', provincia: 'PC' },
-        { comune: 'Limito', cap: '20096', provincia: 'MI' },
-        { comune: 'Pioltello', cap: '20096', provincia: 'MI' },
-        { comune: 'Verona', cap: '37100', provincia: 'VR' },
-        { comune: 'Piacenza', cap: '29100', provincia: 'PC' },
-        { comune: 'Brescia', cap: '25100', provincia: 'BS' },
-        { comune: 'Bologna', cap: '40100', provincia: 'BO' },
-        { comune: 'Torino', cap: '10100', provincia: 'TO' },
-        { comune: 'Napoli', cap: '80100', provincia: 'NA' },
-        { comune: 'Firenze', cap: '50100', provincia: 'FI' },
-        { comune: 'Palermo', cap: '90100', provincia: 'PA' },
-        { comune: 'Genova', cap: '16100', provincia: 'GE' },
-        { comune: 'Venezia', cap: '30100', provincia: 'VE' },
-      ];
-      for (const c of defaultComuni) {
-        await sql('INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ($1, $2, $3)', [c.comune, c.cap, c.provincia]);
+    if (parseInt(checkComuni[0].count) < 5000) {
+      if (isLocalFallback) {
+        const db = readDb();
+        db.anagrafica_comuni = comuniData;
+        writeDb(db);
+      } else {
+        // Bulk insert in chunks for real Postgres database
+        const chunkSize = 1000;
+        for (let i = 0; i < comuniData.length; i += chunkSize) {
+          const chunk = comuniData.slice(i, i + chunkSize);
+          const values = [];
+          const params = [];
+          let paramIdx = 1;
+          for (const c of chunk) {
+            values.push(`($${paramIdx++}, $${paramIdx++}, $${paramIdx++})`);
+            params.push(c.comune, c.cap, c.provincia);
+          }
+          await sql(`INSERT INTO anagrafica_comuni (comune, cap, provincia) VALUES ${values.join(',')} ON CONFLICT DO NOTHING`, params);
+        }
       }
     }
   }
