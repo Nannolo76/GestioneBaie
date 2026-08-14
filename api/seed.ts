@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'already seeded', count });
     }
     
-    const chunkSize = 1000;
+    const chunkSize = 100;
     let seeded = 0;
     for (let i = 0; i < comuniData.length; i += chunkSize) {
       const chunk = comuniData.slice(i, i + chunkSize);
