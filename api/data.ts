@@ -1,4 +1,4 @@
-import { neon } from '@neondatabase/serverless';
+import { sql as vercelSql, db } from '@vercel/postgres';
 import fs from 'fs';
 import path from 'path';
 import { comuniData } from '../src/data/comuni.js';
@@ -1525,4 +1525,5 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: error.message || 'Errore interno del server' });
   }
 }
+
 
