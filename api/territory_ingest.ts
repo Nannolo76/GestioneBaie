@@ -33,21 +33,21 @@ export default async function handler(req, res) {
         return res.status(200).json({ status: 'no data' });
       }
       
-      const mapped = chunk.map(c => ({
-        regione: c.regione,
-        provincia: c.provincia,
-        provincia_sigla: c.provincia_sigla,
-        comune: c.comune,
-        cap: c.cap,
-        istat_code: c.istat_code
-      }));
+      // Costruiamo una query VALUES multi-riga
+      const values = [];
+      for (const c of chunk) {
+        const reg = c.regione.replace(/'/g, "''");
+        const prov = c.provincia.replace(/'/g, "''");
+        const sigla = c.provincia_sigla.replace(/'/g, "''");
+        const com = c.comune.replace(/'/g, "''");
+        const cap = c.cap.replace(/'/g, "''");
+        const istat = c.istat_code.replace(/'/g, "''");
+        values.push( + "" + ('', '', '', '', '', '') + "" + );
+      }
       
-      const jsonStr = JSON.stringify(mapped).replace(/'/g, "''");
       const queryStr =  + "" + 
         INSERT INTO anagrafica_territoriale (regione, provincia, provincia_sigla, comune, cap, istat_code)
-        SELECT regione, provincia, provincia_sigla, comune, cap, istat_code 
-        FROM json_to_recordset(''::json)
-        AS x(regione text, provincia text, provincia_sigla text, comune text, cap text, istat_code text)
+        VALUES 
         ON CONFLICT (istat_code) DO NOTHING
        + "" + ;
       
