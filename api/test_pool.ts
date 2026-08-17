@@ -5,13 +5,10 @@ export default async function handler(req, res) {
     const dbPool = new Pool({ connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL });
     const client = await dbPool.connect();
     
-    // Create a 150KB string
-    const bigStr = "A".repeat(150000);
-    const queryStr = "SELECT '" + bigStr + "' as success";
-    const result = await client.query(queryStr);
+    const result = await client.query("SELECT count(*) as count FROM anagrafica_comuni");
     client.release();
     
-    res.json({ result: "success", length: result.rows[0].success.length, driver: "native pg" });
+    res.json({ count: result.rows[0].count });
   } catch(e) {
     res.json({ error: e.message, stack: e.stack });
   }
