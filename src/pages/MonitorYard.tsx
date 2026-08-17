@@ -4594,7 +4594,7 @@ export const MonitorYard: React.FC = () => {
                     <label className="block text-xs font-bold text-gray-700 mb-1">Località (Città) Mittente *</label>
                     <TerritoryAutocomplete
                       value={shipmentFormRealOriginCity}
-                      onChange={(val, record) => {
+                      onChange={(val: string, record: any) => {
                         setShipmentFormRealOriginCity(val);
                         if (record) {
                           setShipmentFormRealOriginCap(record.cap);
@@ -4651,7 +4651,7 @@ export const MonitorYard: React.FC = () => {
                     <label className="block text-xs font-bold text-gray-700 mb-1">Località (Città) Destinatario *</label>
                     <TerritoryAutocomplete
                       value={shipmentFormRealDestinationCity}
-                      onChange={(val, record) => {
+                      onChange={(val: string, record: any) => {
                         setShipmentFormRealDestinationCity(val);
                         if (record) {
                           setShipmentFormRealDestinationCap(record.cap);
