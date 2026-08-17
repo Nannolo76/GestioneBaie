@@ -12,30 +12,37 @@ export default async function handler(req, res) {
       const checkComuni = await client.query('SELECT count(*) as count FROM anagrafica_comuni');
       const count = parseInt(checkComuni.rows[0].count);
       
-      if (count >= 5000) {
-        return res.status(200).json({ status: 'already seeded', count });
+      if (count >= 7900) {
+        return res.status(200).json({ status: 'already seeded fully', count });
       }
       
+      // We process exactly ONE chunk of 2000 items starting from the current count.
+      // This prevents Vercel's 10-second Serverless timeout!
       const chunkSize = 2000;
-      let seeded = 0;
-      for (let i = 0; i < comuniData.length; i += chunkSize) {
-        const chunk = comuniData.slice(i, i + chunkSize);
-        const jsonStr = JSON.stringify(chunk);
-        
-        // Passando la stringa JSON interpolata invece che come parametro
-        // Bypassiamo i bug del proxy Neon di Vercel per i parametri giganteschi
-        const safeJsonStr = jsonStr.replace(/'/g, "''");
-        const queryStr = 
-          INSERT INTO anagrafica_comuni (comune, cap, provincia)
-          SELECT comune, cap, provincia FROM json_to_recordset(' + safeJsonStr + '::json)
-          AS x(comune text, cap text, provincia text)
-          ON CONFLICT DO NOTHING
-        ;
-        await client.query(queryStr);
-        seeded += chunk.length;
+      const startIndex = count;
+      const chunk = comuniData.slice(startIndex, startIndex + chunkSize);
+      
+      if (chunk.length === 0) {
+        return res.status(200).json({ status: 'no more data to seed', count });
       }
       
-      return res.status(200).json({ status: 'success', seeded });
+      const jsonStr = JSON.stringify(chunk);
+      const safeJsonStr = jsonStr.replace(/'/g, "''");
+      const queryStr = 
+        INSERT INTO anagrafica_comuni (comune, cap, provincia)
+        SELECT comune, cap, provincia FROM json_to_recordset(' + safeJsonStr + '::json)
+        AS x(comune text, cap text, provincia text)
+        ON CONFLICT DO NOTHING
+      ;
+      await client.query(queryStr);
+      
+      const newCount = count + chunk.length;
+      return res.status(200).json({ 
+        status: 'partial success - refresh page to continue', 
+        seeded_in_this_batch: chunk.length,
+        total_now: newCount,
+        message: 'Aggiorna la pagina per caricare i prossimi 2000 comuni!'
+      });
     } finally {
       client.release();
     }
