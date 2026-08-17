@@ -22,12 +22,16 @@ export default async function handler(req, res) {
         const chunk = comuniData.slice(i, i + chunkSize);
         const jsonStr = JSON.stringify(chunk);
         
-        await client.query( + "" + 
+        // Passando la stringa JSON interpolata invece che come parametro
+        // Bypassiamo i bug del proxy Neon di Vercel per i parametri giganteschi
+        const safeJsonStr = jsonStr.replace(/'/g, "''");
+        const queryStr = 
           INSERT INTO anagrafica_comuni (comune, cap, provincia)
-          SELECT comune, cap, provincia FROM json_to_recordset(::json)
+          SELECT comune, cap, provincia FROM json_to_recordset(' + safeJsonStr + '::json)
           AS x(comune text, cap text, provincia text)
           ON CONFLICT DO NOTHING
-         + "" + , [jsonStr]);
+        ;
+        await client.query(queryStr);
         seeded += chunk.length;
       }
       
