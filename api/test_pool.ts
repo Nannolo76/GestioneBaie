@@ -1,14 +1,13 @@
-import { createPool } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
 
 export default async function handler(req, res) {
   try {
-    const pool = createPool({ connectionString: process.env.DATABASE_URL });
-    const client = await pool.connect();
+    const sql = neon(process.env.DATABASE_URL);
     
-    const result = await client.query("SELECT 1 as success");
-    client.release();
-    
-    res.json({ result: result.rows, isCreatePool: true });
+    // Create a 50KB string
+    const bigStr = "A".repeat(50000);
+    const result = await sqlSELECT  as success;
+    res.json({ result: "success", length: result[0].success.length });
   } catch(e) {
     res.json({ error: e.message });
   }
