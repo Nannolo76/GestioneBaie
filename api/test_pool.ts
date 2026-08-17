@@ -7,7 +7,8 @@ export default async function handler(req, res) {
     
     // Create a 150KB string
     const bigStr = "A".repeat(150000);
-    const result = await client.query("SELECT \::text as success", [bigStr]);
+    const queryStr = "SELECT '" + bigStr + "' as success";
+    const result = await client.query(queryStr);
     client.release();
     
     res.json({ result: "success", length: result.rows[0].success.length, driver: "native pg" });
