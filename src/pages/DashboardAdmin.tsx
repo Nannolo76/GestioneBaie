@@ -5,6 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Input';
 import { Table } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
+import territoryData from '../data/territory.json';
 
 
 
@@ -59,12 +60,10 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     deleteUser,
     addShipment,
     updateShipmentStatus,
-    deleteShipment,
-    comuni,
-    addComune,
-    updateComune,
-    deleteComune
+    deleteShipment
   } = useApp();
+
+  const comuni = territoryData;
 
   const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments' | 'comuni'>(defaultTab);
 
@@ -2052,49 +2051,9 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
 
       {/* --- TAB: ANAGRAFICA COMUNI --- */}
       {adminTab === 'comuni' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in text-black font-sans">
-          <div>
-            <Card title="Aggiungi Comune (Master Data)" accent="orange">
-              <form onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const data = new FormData(form);
-                const comuneVal = (data.get('comune') as string || '').trim();
-                const capVal = (data.get('cap') as string || '').trim();
-                const provVal = (data.get('provincia') as string || '').trim().toUpperCase();
-                if (comuneVal && capVal && provVal) {
-                  addComune(comuneVal, capVal, provVal);
-                  form.reset();
-                }
-              }} className="space-y-4">
-                <Input
-                  name="comune"
-                  label="Nome Comune *"
-                  placeholder="Es. Oppeano"
-                  required
-                />
-                <Input
-                  name="cap"
-                  label="CAP *"
-                  placeholder="Es. 37050"
-                  required
-                />
-                <Input
-                  name="provincia"
-                  label="Provincia (Sigla) *"
-                  placeholder="Es. VR"
-                  maxLength={2}
-                  required
-                />
-                <Button type="submit" className="w-full">
-                  Aggiungi Comune
-                </Button>
-              </form>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-2 space-y-4">
-            <Card title="Database Comuni Italiani (ISTAT)">
+        <div className="grid grid-cols-1 lg:grid-cols-1 gap-6 animate-fade-in text-black font-sans">
+          <div className="space-y-4">
+            <Card title="Database Comuni Italiani (ISTAT - 7904 Record Ufficiali)">
               <div className="mb-4">
                 <Input
                   placeholder="Cerca comune per nome, cap o provincia..."
@@ -2121,41 +2080,6 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   {
                     header: 'Nazione',
                     accessor: () => <span className="text-xs text-gray-500">Italia</span>
-                  },
-                  {
-                    header: 'Azioni',
-                    accessor: (c) => (
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => setEditingItem({
-                            type: 'comune',
-                            id: `${c.comune}-${c.cap}`,
-                            fields: {
-                              oldComune: c.comune,
-                              oldCap: c.cap,
-                              comune: c.comune,
-                              cap: c.cap,
-                              provincia: c.provincia
-                            }
-                          })}
-                        >
-                          Modifica
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          onClick={() => {
-                            if (confirm(`Eliminare il comune ${c.comune} (${c.cap})?`)) {
-                              deleteComune(c.comune, c.cap);
-                            }
-                          }}
-                        >
-                          Elimina
-                        </Button>
-                      </div>
-                    )
                   }
                 ]}
               />
@@ -2231,8 +2155,6 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                 updatePalletType(id, fields.name, fields.description || undefined);
               } else if (type === 'user') {
                 updateUser(id, fields.name, fields.email, fields.role, fields.depotIds, fields.username);
-              } else if (type === 'comune') {
-                updateComune(fields.oldComune, fields.oldCap, fields.comune, fields.cap, fields.provincia);
               }
               setEditingItem(null);
             }} className="p-5 space-y-4 text-xs">
@@ -2776,51 +2698,6 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                         );
                       })}
                     </div>
-                  </div>
-                </>
-              )}
-
-              {editingItem.type === 'comune' && (
-                <>
-                  <div className="space-y-1">
-                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Nome Comune *</label>
-                    <input
-                      type="text"
-                      value={editingItem.fields.comune}
-                      onChange={(e) => setEditingItem({
-                        ...editingItem,
-                        fields: { ...editingItem.fields, comune: e.target.value }
-                      })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">CAP *</label>
-                    <input
-                      type="text"
-                      value={editingItem.fields.cap}
-                      onChange={(e) => setEditingItem({
-                        ...editingItem,
-                        fields: { ...editingItem.fields, cap: e.target.value }
-                      })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Provincia *</label>
-                    <input
-                      type="text"
-                      value={editingItem.fields.provincia}
-                      onChange={(e) => setEditingItem({
-                        ...editingItem,
-                        fields: { ...editingItem.fields, provincia: e.target.value.toUpperCase() }
-                      })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
-                      maxLength={2}
-                      required
-                    />
                   </div>
                 </>
               )}
