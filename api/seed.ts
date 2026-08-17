@@ -1,4 +1,4 @@
-import { db } from '@vercel/postgres';
+import { createPool } from '@vercel/postgres';
 import { comuniData } from '../src/data/comuni.js';
 
 export default async function handler(req, res) {
@@ -6,7 +6,8 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({error: 'Method not allowed'});
   
   try {
-    const client = await db.connect();
+    const dbPool = createPool({ connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL });
+    const client = await dbPool.connect();
     try {
       const checkComuni = await client.query('SELECT count(*) as count FROM anagrafica_comuni');
       const count = parseInt(checkComuni.rows[0].count);

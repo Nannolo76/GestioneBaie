@@ -235,24 +235,17 @@ async function mockSql(query: string, params: any[] = []): Promise<any[]> {
   return [];
 }
 
-const isLocalFallback = !process.env.DATABASE_URL || 
-                        process.env.DATABASE_URL === '[SENSITIVE]' || 
-                        !process.env.DATABASE_URL.startsWith('postgres');
-
-const neonSql = process.env.DATABASE_URL && process.env.DATABASE_URL !== '[SENSITIVE]' && process.env.DATABASE_URL.startsWith('postgres') 
-  ? neon(process.env.DATABASE_URL) 
-  : null;
+const isLocalFallback = !process.env.POSTGRES_URL && !process.env.DATABASE_URL;
 
 const sql: any = isLocalFallback ? mockSql : async (query: string, params: any[] = []) => {
-  if (!neonSql) throw new Error("Neon SQL not initialized");
-  if (params && params.length > 0) {
-    if (neonSql.query) {
-      return neonSql.query(query, params);
-    }
-    return neonSql(query, params);
+  const dbPool = createPool({ connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL });
+  const client = await dbPool.connect();
+  try {
+    const res = await client.query(query, params);
+    return res.rows;
+  } finally {
+    client.release();
   }
-  return neonSql([query] as any as TemplateStringsArray);
-};
 };
 
 // Funzione helper per verificare ed inizializzare il DB
@@ -1525,5 +1518,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: error.message || 'Errore interno del server' });
   }
 }
+
+
 
 
