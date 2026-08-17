@@ -4,13 +4,9 @@ export default async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     
-    // Dynamic query string with .raw property
-    const query = "SELECT 1 as success";
-    const arr = [query] as any;
-    arr.raw = [query];
-    
-    const result = await sql(arr);
-    res.json({ result, isDynamicTemplate: true });
+    // Test if sql.query exists and works
+    const result = await sql.query("SELECT 1 as success");
+    res.json({ result, isQueryFn: true });
   } catch(e) {
     res.json({ error: e.message });
   }
