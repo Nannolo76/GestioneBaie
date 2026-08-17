@@ -1,4 +1,4 @@
-import { sql as vercelSql, db } from '@vercel/postgres';
+import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { comuniData } from '../src/data/comuni.js';
@@ -238,7 +238,7 @@ async function mockSql(query: string, params: any[] = []): Promise<any[]> {
 const isLocalFallback = !process.env.POSTGRES_URL && !process.env.DATABASE_URL;
 
 const sql: any = isLocalFallback ? mockSql : async (query: string, params: any[] = []) => {
-  const dbPool = createPool({ connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL });
+  const dbPool = new Pool({ connectionString: process.env.POSTGRES_URL || process.env.DATABASE_URL });
   const client = await dbPool.connect();
   try {
     const res = await client.query(query, params);
@@ -1518,6 +1518,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: error.message || 'Errore interno del server' });
   }
 }
+
 
 
 
