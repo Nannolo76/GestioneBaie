@@ -96,7 +96,7 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormRealDestinationCountry, setShipmentFormRealDestinationCountry] = useState('');
   const [shipmentFormHubOrigineOperativo, setShipmentFormHubOrigineOperativo] = useState('');
   const [shipmentFormHubDestinazioneOperativo, setShipmentFormHubDestinazioneOperativo] = useState('');
-  const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND' | 'TRANSITO'>('INBOUND');
+  const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND' | 'TRANSITO'>('OUTBOUND');
   const [isRoutingAutoCalculated, setIsRoutingAutoCalculated] = useState(false);
   const [isRoutingAmbiguous, setIsRoutingAmbiguous] = useState(false);
   const [isAutoRoutingEnabled, setIsAutoRoutingEnabled] = useState(true);
@@ -696,7 +696,7 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormRealDestinationCountry('');
     setShipmentFormHubOrigineOperativo('');
     setShipmentFormHubDestinazioneOperativo('');
-    setShipmentFormTipoOperazioneHub('INBOUND');
+    setShipmentFormTipoOperazioneHub('OUTBOUND');
     setIsRoutingAutoCalculated(false);
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(true);
@@ -741,7 +741,7 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormRealDestinationCountry(s.realDestinationCountry || '');
     setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
     setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
-    setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'INBOUND');
+    setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'OUTBOUND');
     setIsRoutingAutoCalculated(false);
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(false);
@@ -754,19 +754,19 @@ export const MonitorYard: React.FC = () => {
     const hasOriginInfo = !!(shipmentFormRealOriginCity || shipmentFormRealOriginCap || shipmentFormRealOriginProvince || shipmentFormRealOriginName);
     const hasDestInfo = !!(shipmentFormRealDestinationCity || shipmentFormRealDestinationCap || shipmentFormRealDestinationProvince || shipmentFormRealDestinationName);
 
-    if (hasOriginInfo && hasDestInfo) {
+    if (hasOriginInfo || hasDestInfo) {
       const routing = calculateSmartRouting(
         {
-          city: shipmentFormRealOriginCity,
-          cap: shipmentFormRealOriginCap,
-          province: shipmentFormRealOriginProvince,
-          name: shipmentFormRealOriginName
+          city: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.city : shipmentFormRealOriginCity,
+          cap: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.cap : shipmentFormRealOriginCap,
+          province: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.province : shipmentFormRealOriginProvince,
+          name: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.name : shipmentFormRealOriginName
         },
         {
-          city: shipmentFormRealDestinationCity,
-          cap: shipmentFormRealDestinationCap,
-          province: shipmentFormRealDestinationProvince,
-          name: shipmentFormRealDestinationName
+          city: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.city : shipmentFormRealDestinationCity,
+          cap: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.cap : shipmentFormRealDestinationCap,
+          province: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.province : shipmentFormRealDestinationProvince,
+          name: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.name : shipmentFormRealDestinationName
         },
         shipmentFormType,
         shipmentFormClient,
@@ -774,9 +774,17 @@ export const MonitorYard: React.FC = () => {
         clients
       );
 
-      setShipmentFormHubOrigineOperativo(routing.hubOrigineOperativo);
-      setShipmentFormHubDestinazioneOperativo(routing.hubDestinazioneOperativo);
-      setShipmentFormTipoOperazioneHub(routing.tipoOperazioneHub);
+      if (shipmentFormTipoOperazioneHub === 'INBOUND') {
+        setShipmentFormHubOrigineOperativo(routing.hubOrigineOperativo);
+        setShipmentFormHubDestinazioneOperativo(selectedDepotId);
+      } else if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
+        setShipmentFormHubOrigineOperativo(selectedDepotId);
+        setShipmentFormHubDestinazioneOperativo(routing.hubDestinazioneOperativo);
+      } else {
+        setShipmentFormHubOrigineOperativo(routing.hubOrigineOperativo);
+        setShipmentFormHubDestinazioneOperativo(routing.hubDestinazioneOperativo);
+      }
+
       setIsRoutingAutoCalculated(true);
       setIsRoutingAmbiguous(routing.isAmbiguous);
       setShipmentFormRoutingNotes(routing.routingNotes);
@@ -796,7 +804,9 @@ export const MonitorYard: React.FC = () => {
     shipmentFormRealDestinationName,
     shipmentFormType,
     shipmentFormClient,
-    isAutoRoutingEnabled
+    isAutoRoutingEnabled,
+    shipmentFormTipoOperazioneHub,
+    selectedDepotId
   ]);
   const handleSaveShipmentForm = (e: React.FormEvent) => {
     e.preventDefault();
@@ -827,20 +837,20 @@ export const MonitorYard: React.FC = () => {
       grossWeight: shipmentFormGrossWeight ? Number(shipmentFormGrossWeight) : undefined,
       deliveryNotes: shipmentFormDeliveryNotes || undefined,
       internalNotes: shipmentFormInternalNotes || undefined,
-      realOriginName: shipmentFormRealOriginName || undefined,
-      realOriginAddress: shipmentFormRealOriginAddress || undefined,
-      realOriginCity: shipmentFormRealOriginCity || undefined,
-      realOriginCap: shipmentFormRealOriginCap || undefined,
-      realOriginProvince: shipmentFormRealOriginProvince || undefined,
-      realOriginCountry: shipmentFormRealOriginCountry || undefined,
-      realDestinationName: shipmentFormRealDestinationName || undefined,
-      realDestinationAddress: shipmentFormRealDestinationAddress || undefined,
-      realDestinationCity: shipmentFormRealDestinationCity || undefined,
-      realDestinationCap: shipmentFormRealDestinationCap || undefined,
-      realDestinationProvince: shipmentFormRealDestinationProvince || undefined,
-      realDestinationCountry: shipmentFormRealDestinationCountry || undefined,
-      hubOrigineOperativo: shipmentFormHubOrigineOperativo || undefined,
-      hubDestinazioneOperativo: shipmentFormHubDestinazioneOperativo || undefined,
+      realOriginName: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.name : (shipmentFormRealOriginName || undefined),
+      realOriginAddress: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.address : (shipmentFormRealOriginAddress || undefined),
+      realOriginCity: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.city : (shipmentFormRealOriginCity || undefined),
+      realOriginCap: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.cap : (shipmentFormRealOriginCap || undefined),
+      realOriginProvince: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.province : (shipmentFormRealOriginProvince || undefined),
+      realOriginCountry: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.country : (shipmentFormRealOriginCountry || undefined),
+      realDestinationName: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.name : (shipmentFormRealDestinationName || undefined),
+      realDestinationAddress: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.address : (shipmentFormRealDestinationAddress || undefined),
+      realDestinationCity: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.city : (shipmentFormRealDestinationCity || undefined),
+      realDestinationCap: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.cap : (shipmentFormRealDestinationCap || undefined),
+      realDestinationProvince: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.province : (shipmentFormRealDestinationProvince || undefined),
+      realDestinationCountry: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.country : (shipmentFormRealDestinationCountry || undefined),
+      hubOrigineOperativo: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? selectedDepotId : (shipmentFormHubOrigineOperativo || undefined),
+      hubDestinazioneOperativo: shipmentFormTipoOperazioneHub === 'INBOUND' ? selectedDepotId : (shipmentFormHubDestinazioneOperativo || undefined),
       tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
       routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
       routingNotes: shipmentFormRoutingNotes
@@ -4518,34 +4528,55 @@ export const MonitorYard: React.FC = () => {
               {/* DISTINZIONE NETTA ARRIVO / PARTENZA */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
-                  Tipologia Flusso (Distinzione Arrivo/Partenza sul Plant)
+                  Tipologia Flusso Operativo
                 </label>
-                <div className="flex rounded-xl bg-gray-100 p-1 border border-black/5">
+                <div className="flex rounded-xl bg-gray-100 p-1 border border-black/5 gap-1">
                   <button
                     type="button"
                     onClick={() => {
-                      setShipmentFormType('SCARICO');
+                      setShipmentFormTipoOperazioneHub('OUTBOUND');
+                      setShipmentFormType('CARICO');
+                      setShipmentFormHubOrigineOperativo(selectedDepotId);
                     }}
-                    className={`flex-grow py-2 text-center text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      ['SCARICO', 'RESO'].includes(shipmentFormType)
+                    className={`flex-1 py-2 px-1 text-center text-xs font-bold rounded-lg transition-all cursor-pointer leading-tight ${
+                      shipmentFormTipoOperazioneHub === 'OUTBOUND'
                         ? 'bg-[#004B97] text-white shadow-sm'
-                        : 'text-gray-500 hover:text-black'
+                        : 'text-gray-500 hover:text-black hover:bg-gray-200'
                     }`}
                   >
-                    📥 Arrivo sul Plant (Accettazione / Scarico / Reso)
+                    <span className="block text-sm mb-0.5">📤</span>
+                    Uscita da Hub<br/>(Outbound)
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      setShipmentFormType('CARICO');
+                      setShipmentFormTipoOperazioneHub('INBOUND');
+                      setShipmentFormType('SCARICO');
+                      setShipmentFormHubDestinazioneOperativo(selectedDepotId);
                     }}
-                    className={`flex-grow py-2 text-center text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      ['CARICO', 'CONTAINER'].includes(shipmentFormType)
+                    className={`flex-1 py-2 px-1 text-center text-xs font-bold rounded-lg transition-all cursor-pointer leading-tight ${
+                      shipmentFormTipoOperazioneHub === 'INBOUND'
                         ? 'bg-[#004B97] text-white shadow-sm'
-                        : 'text-gray-500 hover:text-black'
+                        : 'text-gray-500 hover:text-black hover:bg-gray-200'
                     }`}
                   >
-                    📤 Partenza dal Plant (Spedizione / Carico / Container)
+                    <span className="block text-sm mb-0.5">📥</span>
+                    Arrivo su Hub<br/>(Inbound)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShipmentFormTipoOperazioneHub('TRANSITO');
+                      setShipmentFormType('CARICO');
+                    }}
+                    className={`flex-1 py-2 px-1 text-center text-xs font-bold rounded-lg transition-all cursor-pointer leading-tight ${
+                      shipmentFormTipoOperazioneHub === 'TRANSITO'
+                        ? 'bg-[#004B97] text-white shadow-sm'
+                        : 'text-gray-500 hover:text-black hover:bg-gray-200'
+                    }`}
+                  >
+                    <span className="block text-sm mb-0.5">🔄</span>
+                    Transito<br/>(Hub-to-Hub)
                   </button>
                 </div>
               </div>
@@ -4573,9 +4604,10 @@ export const MonitorYard: React.FC = () => {
                 />
               </div>
 
-              {/* SEZIONE 2: ANAGRAFICA ORIGINE REALE */}
+              {/* SEZIONE 2: ANAGRAFICA ORIGINE REALE (Nascosta se OUTBOUND) */}
+              {shipmentFormTipoOperazioneHub !== 'OUTBOUND' && (
               <div className="border-t border-black/5 pt-4">
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Carico Reale (Origine)</h4>
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Carico Reale (Origine Mittente)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input
                     label="Ragione Sociale Mittente *"
@@ -4629,10 +4661,12 @@ export const MonitorYard: React.FC = () => {
                   />
                 </div>
               </div>
+              )}
 
-              {/* SEZIONE 3: ANAGRAFICA DESTINAZIONE REALE */}
+              {/* SEZIONE 3: ANAGRAFICA DESTINAZIONE REALE (Nascosta se INBOUND) */}
+              {shipmentFormTipoOperazioneHub !== 'INBOUND' && (
               <div className="border-t border-black/5 pt-4">
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Destinazione Reale</h4>
+                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Destinazione Reale (Destinatario)</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input
                     label="Ragione Sociale Destinatario *"
@@ -4686,43 +4720,35 @@ export const MonitorYard: React.FC = () => {
                   />
                 </div>
               </div>
+              )}
 
               {/* SEZIONE 1: ROUTING DI RETE */}
               <div className="border-t border-black/5 pt-4 bg-gray-50/50 p-4 rounded-xl space-y-3">
                 <div className="flex justify-between items-center">
                   <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">
-                    Routing di Rete (Network TMS)
+                    Routing di Rete (Assisted Routing)
                   </h4>
-                  <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={isAutoRoutingEnabled}
-                      onChange={(e) => setIsAutoRoutingEnabled(e.target.checked)}
-                      className="rounded border-black/10 text-[#004B97] focus:ring-[#004B97] h-3 w-3"
-                    />
-                    <span className="text-[9px] font-mono font-bold text-gray-500 uppercase">Auto-Routing Attivo</span>
-                  </label>
                 </div>
 
                 {isRoutingAutoCalculated && (
                   <div className="animate-fade-in">
                     {isRoutingAmbiguous ? (
                       <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-md font-medium block">
-                        ⚠️ **Instradamento Ambiguo:** I dati geografici inseriti non sono sufficienti per una determinazione univoca. Verifica o seleziona gli hub corretti manualmente.
+                        ⚠️ **Instradamento Ambiguo:** Il sistema non ha trovato un match univoco per l'Hub suggerito. Verifica manualmente la selezione.
                       </span>
                     ) : (
                       <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md font-medium block">
-                        ✨ **Auto-Routing Attivo:** Hub calcolati in base alla provenienza e destinazione reale.
+                        ✨ **Assisted Routing Attivo:** L'Hub è stato suggerito in base alla località {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'di destinazione' : 'di provenienza'}.
                       </span>
                     )}
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Select
                     label="Hub Origine Operativo *"
                     options={depots.map(d => ({ value: d.id, label: d.name }))}
-                    value={shipmentFormHubOrigineOperativo}
+                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.name : (depots.find(d => d.id === shipmentFormHubOrigineOperativo)?.name || '')}
                     onChange={(e) => {
                       const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
                       if (found) {
@@ -4731,11 +4757,12 @@ export const MonitorYard: React.FC = () => {
                       }
                     }}
                     required
+                    disabled={shipmentFormTipoOperazioneHub === 'OUTBOUND'}
                   />
                   <Select
                     label="Hub Destinazione Operativo *"
                     options={depots.map(d => ({ value: d.id, label: d.name }))}
-                    value={shipmentFormHubDestinazioneOperativo}
+                    value={shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.name : (depots.find(d => d.id === shipmentFormHubDestinazioneOperativo)?.name || '')}
                     onChange={(e) => {
                       const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
                       if (found) {
@@ -4744,20 +4771,7 @@ export const MonitorYard: React.FC = () => {
                       }
                     }}
                     required
-                  />
-                  <Select
-                    label="Tipo Operazione Hub *"
-                    options={[
-                      { value: 'INBOUND', label: 'Inbound (Scarico)' },
-                      { value: 'OUTBOUND', label: 'Outbound (Carico)' },
-                      { value: 'TRANSITO', label: 'Transito / Cross-dock' }
-                    ]}
-                    value={shipmentFormTipoOperazioneHub}
-                    onChange={(e) => {
-                      setShipmentFormTipoOperazioneHub(e.target.value as any);
-                      setIsAutoRoutingEnabled(false);
-                    }}
-                    required
+                    disabled={shipmentFormTipoOperazioneHub === 'INBOUND'}
                   />
                 </div>
               </div>

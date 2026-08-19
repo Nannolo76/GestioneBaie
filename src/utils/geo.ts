@@ -420,19 +420,28 @@ function findMatchingHub(
   if (!depots || depots.length === 0) return null;
   
   const locName = (loc.name || '').trim().toLowerCase();
-  const locCity = (loc.city || '').trim().toLowerCase();
-  const locProv = (loc.province || '').trim().toLowerCase();
+  
+  // Se non abbiamo un nome/ragione sociale, non possiamo determinare se è un hub o una GDO
+  if (!locName) return null;
   
   for (const d of depots) {
     const dName = d.name.trim().toLowerCase();
-    const dCity = d.city.trim().toLowerCase();
-    const dProv = (d.province || '').trim().toLowerCase();
     
-    if (locName && (dName === locName || dName.includes(locName) || locName.includes(dName))) {
+    // Riconoscimento esplicito: il nome del mittente/destinatario DEVE contenere o corrispondere 
+    // al nome dell'Hub censito (es. "Oppeano 1", "Milano"). 
+    // Abbiamo rimosso il match basato solo sulla città, altrimenti una GDO a Verona 
+    // veniva scambiata per l'Hub di Verona.
+    if (dName === locName || dName.includes(locName) || locName.includes(dName)) {
       return d;
     }
-    if (locCity && locProv && dCity.includes(locCity) && dProv === locProv) {
-      return d;
+    
+    // Keyword aggiuntive per riconoscere gli hub interni (se l'utente scrive "Logistica Uno" o "Hub")
+    if (locName.includes('logistica uno') || locName.includes('hub')) {
+      const dCity = d.city.trim().toLowerCase();
+      const locCity = (loc.city || '').trim().toLowerCase();
+      if (locCity && dCity.includes(locCity)) {
+        return d;
+      }
     }
   }
   return null;
