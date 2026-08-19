@@ -45,13 +45,23 @@ export function TerritoryAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Combina i dati statici con quelli inseriti manualmente e salvati nel localStorage
+  const allTerritories = useMemo(() => {
+    const customStr = localStorage.getItem('custom_territories');
+    let custom: TerritoryRecord[] = [];
+    if (customStr) {
+      try { custom = JSON.parse(customStr); } catch (e) {}
+    }
+    return [...custom, ...territoryData];
+  }, []);
+
   // Filtra i record in base alla ricerca (massimo 50 per performance)
   const filteredRecords = useMemo(() => {
     if (!searchTerm || searchTerm.length < 2) return [];
     
     const term = searchTerm.toLowerCase();
     
-    return territoryData.filter(record => {
+    return allTerritories.filter(record => {
       const matchComune = record.comune.toLowerCase().includes(term);
       const matchProvincia = record.provincia.toLowerCase().includes(term);
       const matchSigla = record.provincia_sigla.toLowerCase() === term;
@@ -59,7 +69,7 @@ export function TerritoryAutocomplete({
       
       return matchComune || matchProvincia || matchSigla || matchCap;
     }).slice(0, 50);
-  }, [searchTerm]);
+  }, [searchTerm, allTerritories]);
 
   const handleSelect = (record: TerritoryRecord) => {
     const displayValue = `${record.comune} (${record.provincia_sigla}) - ${record.cap}`;
@@ -72,6 +82,37 @@ export function TerritoryAutocomplete({
     setSearchTerm(e.target.value);
     onChange(e.target.value, undefined);
     setIsOpen(true);
+  };
+
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newCity, setNewCity] = useState('');
+  const [newProv, setNewProv] = useState('');
+  const [newCap, setNewCap] = useState('');
+
+  const handleAddNew = () => {
+    if (!newCity || !newProv || !newCap) return;
+    const newRecord: TerritoryRecord = {
+      comune: newCity,
+      provincia: newProv,
+      provincia_sigla: newProv.substring(0, 2).toUpperCase(),
+      cap: newCap,
+      regione: 'Custom',
+      istat_code: `custom-${Date.now()}`
+    };
+    
+    const customStr = localStorage.getItem('custom_territories');
+    let custom: TerritoryRecord[] = [];
+    if (customStr) {
+      try { custom = JSON.parse(customStr); } catch (e) {}
+    }
+    custom.push(newRecord);
+    localStorage.setItem('custom_territories', JSON.stringify(custom));
+    
+    handleSelect(newRecord);
+    setIsAddingNew(false);
+    setNewCity('');
+    setNewProv('');
+    setNewCap('');
   };
 
   return (
@@ -89,7 +130,7 @@ export function TerritoryAutocomplete({
       />
       
       {isOpen && searchTerm.length >= 2 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-80 overflow-y-auto">
           {filteredRecords.length > 0 ? (
             <ul className="py-1">
               {filteredRecords.map((record) => (
@@ -106,8 +147,35 @@ export function TerritoryAutocomplete({
               ))}
             </ul>
           ) : (
-            <div className="px-4 py-2 text-gray-500 text-sm">
-              Nessun comune trovato. Prova con un CAP o una provincia.
+            <div className="p-3">
+              {!isAddingNew ? (
+                <div className="flex flex-col gap-2">
+                  <div className="text-gray-500 text-sm">
+                    Nessun comune trovato.
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      setNewCity(searchTerm);
+                      setIsAddingNew(true);
+                    }}
+                    className="w-full bg-blue-100 text-blue-700 py-1.5 rounded text-xs font-bold hover:bg-blue-200 transition-colors"
+                  >
+                    + AGGIUNGI COMUNE AL DATABASE
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2 text-xs">
+                  <span className="font-bold text-gray-700">Nuovo Comune:</span>
+                  <input type="text" placeholder="Nome Comune" className="border p-1.5 rounded" value={newCity} onChange={e => setNewCity(e.target.value)} />
+                  <input type="text" placeholder="Sigla Provincia (Es. MI)" className="border p-1.5 rounded uppercase" maxLength={2} value={newProv} onChange={e => setNewProv(e.target.value.toUpperCase())} />
+                  <input type="text" placeholder="CAP" className="border p-1.5 rounded" value={newCap} onChange={e => setNewCap(e.target.value)} />
+                  <div className="flex gap-2 mt-1">
+                    <button type="button" onClick={() => setIsAddingNew(false)} className="flex-1 bg-gray-200 py-1.5 rounded text-gray-700 font-bold">Annulla</button>
+                    <button type="button" onClick={handleAddNew} className="flex-1 bg-emerald-500 py-1.5 rounded text-white font-bold">Salva e Usa</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

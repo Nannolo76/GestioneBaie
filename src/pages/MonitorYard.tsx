@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
+import { TerritoryAutocomplete } from '../components/TerritoryAutocomplete';
 import { Card } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
@@ -65,6 +66,7 @@ export const MonitorYard: React.FC = () => {
   // Trip Builder states
   const [tripShipments, setTripShipments] = useState<Partial<Shipment>[]>([{ id: `tmp-${Date.now()}` }]);
   const [tripJustificationNote, setTripJustificationNote] = useState('');
+  const [shipmentFormTripNumber, setShipmentFormTripNumber] = useState('');
 
   const [shipmentFormType, setShipmentFormType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
   
@@ -132,7 +134,7 @@ export const MonitorYard: React.FC = () => {
   const [kpiDataSource, setKpiDataSource] = useState<'reali' | 'simulati'>('simulati');
   const [kpiTimeRange, setKpiTimeRange] = useState<'oggi' | '7g' | '30g'>('7g');
   
-  // Data selezionata per le attività
+  // Data selezionata per le attivitÃƒÂ 
   const [scheduleDate, setScheduleDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Stato per la navigazione del mese nel calendario
@@ -233,7 +235,7 @@ export const MonitorYard: React.FC = () => {
   const [relocateBayId, setRelocateBayId] = useState('');
   const [relocateReason, setRelocateReason] = useState('');
 
-  // Checklist Qualità Form
+  // Checklist QualitÃƒÂ  Form
   const [showChecklistForm, setShowChecklistForm] = useState(false);
   const [pianaleSporco, setPianaleSporco] = useState(false);
   const [presenzaInfestantiMezzo, setPresenzaInfestantiMezzo] = useState(false);
@@ -675,6 +677,7 @@ export const MonitorYard: React.FC = () => {
   const resetShipmentForm = () => {
     setTripShipments([{ id: `tmp-${Date.now()}` }]);
     setTripJustificationNote('');
+    setShipmentFormTripNumber('');
     setShipmentFormId('');
 
 
@@ -831,7 +834,7 @@ export const MonitorYard: React.FC = () => {
     if (!cId || !carrId) return;
 
     // Preserva il tripId esistente o creane uno nuovo per questo blocco di spedizioni
-    const commonTripId = tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
+    const commonTripId = shipmentFormTripNumber || tripShipments[0]?.tripId || "TRIP-";
 
     tripShipments.forEach((row, index) => {
       const payloadUpdates = {
@@ -847,6 +850,9 @@ export const MonitorYard: React.FC = () => {
         expectedTime: shipmentFormExpectedTime || undefined,
         originOrDestination: row.originOrDestination || '',
         goodsType: row.goodsType || undefined,
+        isAdr: row.isAdr || false,
+        requiresTailLift: row.requiresTailLift || false,
+        noteVarie: row.noteVarie || undefined,
         expectedDeliveryDate: shipmentFormDeliveryDate || undefined,
         subjectName: row.subjectName || undefined,
         address: row.address || undefined,
@@ -892,7 +898,7 @@ export const MonitorYard: React.FC = () => {
 
   const handleImportShipments = () => {
     if (!importText.trim()) {
-      setImportError('Il testo di importazione è vuoto.');
+      setImportError('Il testo di importazione ÃƒÂ¨ vuoto.');
       return;
     }
 
@@ -993,8 +999,8 @@ export const MonitorYard: React.FC = () => {
 
         if (routing.isAmbiguous) {
           finalInternalNotes = finalInternalNotes 
-            ? `${finalInternalNotes} | ⚠️ Hub ambiguo - verificare instradamento manuale`
-            : `⚠️ Hub ambiguo - verificare instradamento manuale`;
+            ? `${finalInternalNotes} | Ã¢Å¡Â Ã¯Â¸Â Hub ambiguo - verificare instradamento manuale`
+            : `Ã¢Å¡Â Ã¯Â¸Â Hub ambiguo - verificare instradamento manuale`;
         }
       } else {
         // Se fornito esplicitamente, lo consideriamo confermato
@@ -1316,7 +1322,7 @@ export const MonitorYard: React.FC = () => {
                   <thead>
                     <tr className="border-b border-black text-gray-500">
                       <th className="py-1">Tipologia Legno</th>
-                      <th className="py-1 text-center">Quantità Resa</th>
+                      <th className="py-1 text-center">QuantitÃƒÂ  Resa</th>
                       <th className="py-1 text-right">Stato / Condizione</th>
                     </tr>
                   </thead>
@@ -1333,7 +1339,7 @@ export const MonitorYard: React.FC = () => {
               </div>
 
               <p className="text-[9px] text-gray-600 font-sans italic">
-                * Il presente buono attesta la sola quantità e tipologia di pallet vuoti lasciati a magazzino dall'autista ed ha valore di ricevuta.
+                * Il presente buono attesta la sola quantitÃƒÂ  e tipologia di pallet vuoti lasciati a magazzino dall'autista ed ha valore di ricevuta.
               </p>
 
               <div className="pt-12 grid grid-cols-2 gap-8 text-center font-mono">
@@ -1369,25 +1375,25 @@ export const MonitorYard: React.FC = () => {
                   <div><strong>Targa Trattore:</strong> {printBooking.licensePlate} {printBooking.licensePlateTrailer && `(Rimorchio: ${printBooking.licensePlateTrailer})`}</div>
                   <div><strong>Autista:</strong> {printBooking.driverName}</div>
                   <div><strong>Vettore:</strong> {carriers.find(c => c.id === printBooking.carrierId)?.name || 'N/D'}</div>
-                  <div><strong>Data Attività:</strong> {printBooking.date}</div>
+                  <div><strong>Data AttivitÃƒÂ :</strong> {printBooking.date}</div>
                   <div><strong>Baia di Attracco:</strong> {bays.find(b => b.id === printBooking.bayId)?.name || 'N/D'}</div>
-                  <div><strong>Attività:</strong> {printBooking.activityType}</div>
+                  <div><strong>AttivitÃƒÂ :</strong> {printBooking.activityType}</div>
                   <div><strong>Ordine 1:</strong> {printBooking.orderNumber} {printBooking.orderNumber2 && `| Ordine 2: ${printBooking.orderNumber2}`}</div>
                   <div><strong>Patente Autista:</strong> {printBooking.driverLicense || 'N/D'} {printBooking.driverLicenseRelease && `(Ril. ${printBooking.driverLicenseRelease})`} {printBooking.driverLicenseExpiry && `(Scad. ${printBooking.driverLicenseExpiry})`}</div>
                 </div>
 
                 <div className="border border-black rounded p-3 space-y-4">
-                  <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">1. Idoneità Igienico-Sanitaria Mezzo</h2>
+                  <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">1. IdoneitÃƒÂ  Igienico-Sanitaria Mezzo</h2>
                   <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
                     <div>Pianale Sporco: [ {printBooking.checklist.pianaleSporco ? 'SI' : 'NO'} ]</div>
                     <div>Presenza Infestanti: [ {printBooking.checklist.presenzaInfestantiMezzo ? 'SI' : 'NO'} ]</div>
                     <div>Odori Anomali: [ {printBooking.checklist.odoriAnomali ? 'SI' : 'NO'} ]</div>
                   </div>
 
-                  <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">2. Idoneità Igienica Prodotto & Pallet</h2>
+                  <h2 className="font-bold border-b border-black pb-1 uppercase tracking-wide">2. IdoneitÃƒÂ  Igienica Prodotto & Pallet</h2>
                   <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
                     <div>Pulizia Pallet: [ {printBooking.checklist.puliziaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
-                    <div>Integrità Pallet: [ {printBooking.checklist.integritaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
+                    <div>IntegritÃƒÂ  Pallet: [ {printBooking.checklist.integritaPallet ? 'CONFORME' : 'NON CONFORME'} ]</div>
                     <div>Presenza Infestanti Prodotto: [ {printBooking.checklist.presenzaInfestantiProdotto ? 'SI' : 'NO'} ]</div>
                     <div>Prodotti biologici (Bio): [ {printBooking.checklist.presenzaBio ? 'SI' : 'NO'} ]</div>
                   </div>
@@ -1453,11 +1459,11 @@ export const MonitorYard: React.FC = () => {
         {ambiguousShipments.length > 0 && (
           <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-pulse-slow">
             <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
+              <span className="text-2xl">Ã¢Å¡Â Ã¯Â¸Â</span>
               <div>
                 <h4 className="font-bold text-xs text-amber-800 uppercase tracking-wide">Spedizioni con instradamento ambiguo</h4>
                 <p className="text-[10.5px] text-amber-700 font-sans mt-0.5">
-                  Rilevate <strong>{ambiguousShipments.length}</strong> spedizioni con ambivalenza geografica sull'hub (es. Oppeano 1 vs Oppeano 2). È richiesta la conferma o l'instradamento manuale dell'operatore per sbloccarle nello Yard Board.
+                  Rilevate <strong>{ambiguousShipments.length}</strong> spedizioni con ambivalenza geografica sull'hub (es. Oppeano 1 vs Oppeano 2). ÃƒË† richiesta la conferma o l'instradamento manuale dell'operatore per sbloccarle nello Yard Board.
                 </p>
               </div>
             </div>
@@ -1490,7 +1496,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">🚂 Yard Board</span>
+              <span className="flex items-center gap-2">Ã°Å¸Å¡â€š Yard Board</span>
               <Badge variant={guardiolaView === 'station' ? 'info' : 'primary'}>
                 {shipments.filter(s => s.depotId === selectedDepotId && s.status !== 'COMPLETATO').length}
               </Badge>
@@ -1504,7 +1510,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">⚡ Baie Attive</span>
+              <span className="flex items-center gap-2">Ã¢Å¡Â¡ Baie Attive</span>
               <Badge variant={guardiolaView === 'bays' ? 'info' : 'primary'}>
                 {activeBays.filter(b => b.status === 'OCCUPATA').length}
               </Badge>
@@ -1518,7 +1524,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">🚧 Coda Piazzale</span>
+              <span className="flex items-center gap-2">Ã°Å¸Å¡Â§ Coda Piazzale</span>
               {gateBookings.length > 0 && (
                 <Badge variant="warning" className="animate-pulse-glow">
                   {gateBookings.length}
@@ -1534,7 +1540,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">📅 Attesi Oggi</span>
+              <span className="flex items-center gap-2">Ã°Å¸â€œâ€¦ Attesi Oggi</span>
               {incomingBookings.length > 0 && (
                 <Badge variant="info">
                   {incomingBookings.length}
@@ -1551,7 +1557,7 @@ export const MonitorYard: React.FC = () => {
                     : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
                 }`}
               >
-                <span className="flex items-center gap-2">✍️ Nuovo Check-In</span>
+                <span className="flex items-center gap-2">Ã¢Å“ÂÃ¯Â¸Â Nuovo Check-In</span>
               </button>
             )}
 
@@ -1563,7 +1569,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">🗓️ Programmazione</span>
+              <span className="flex items-center gap-2">Ã°Å¸â€”â€œÃ¯Â¸Â Programmazione</span>
             </button>
 
             <button
@@ -1574,7 +1580,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">🚨 Anomalie</span>
+              <span className="flex items-center gap-2">Ã°Å¸Å¡Â¨ Anomalie</span>
               {activeAnomaliesCount > 0 && (
                 <Badge variant="danger" className="animate-pulse-glow">
                   {activeAnomaliesCount}
@@ -1590,7 +1596,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">🚢 Gestione Spedizioni</span>
+              <span className="flex items-center gap-2">Ã°Å¸Å¡Â¢ Gestione Spedizioni</span>
               <Badge variant={guardiolaView === ('shipments' as any) ? 'info' : 'primary'}>
                 {shipments.filter(s => s.depotId === selectedDepotId).length}
               </Badge>
@@ -1604,7 +1610,7 @@ export const MonitorYard: React.FC = () => {
                   : 'text-gray-600 hover:bg-gray-200/50 hover:text-black border-transparent'
               }`}
             >
-              <span className="flex items-center gap-2">📊 Statistiche & KPI</span>
+              <span className="flex items-center gap-2">Ã°Å¸â€œÅ  Statistiche & KPI</span>
             </button>
 
             <div className="pt-4 border-t border-black/5 mt-4">
@@ -1642,7 +1648,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
                         }`}
                       >
-                        🛬 Arrivi / Accettazione ({shipments.filter(s => (s.hubOrigineOperativo === selectedDepotId && (s.tipoOperazioneHub === 'INBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO')).length})
+                        Ã°Å¸â€ºÂ¬ Arrivi / Accettazione ({shipments.filter(s => (s.hubOrigineOperativo === selectedDepotId && (s.tipoOperazioneHub === 'INBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO')).length})
                       </button>
                       <button
                         onClick={() => setStationSubTab('partenze')}
@@ -1652,7 +1658,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
                         }`}
                       >
-                        🛫 Partenze / Spedizioni ({shipments.filter(s => (s.hubDestinazioneOperativo === selectedDepotId && (s.tipoOperazioneHub === 'OUTBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO')).length})
+                        Ã°Å¸â€ºÂ« Partenze / Spedizioni ({shipments.filter(s => (s.hubDestinazioneOperativo === selectedDepotId && (s.tipoOperazioneHub === 'OUTBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO')).length})
                       </button>
                     </div>
                   }
@@ -1720,11 +1726,11 @@ export const MonitorYard: React.FC = () => {
                             const isAssigned = !!s.bookingId;
                             return isAssigned ? (
                               <div className="flex flex-col items-center gap-0.5">
-                                <Badge variant="success">🔗 {booking?.ticketNumber || 'Abbinato'}</Badge>
+                                <Badge variant="success">Ã°Å¸â€â€” {booking?.ticketNumber || 'Abbinato'}</Badge>
                                 {booking?.status && <span className="text-[8px] text-gray-400 font-mono uppercase">({booking.status.replace('_', ' ')})</span>}
                               </div>
                             ) : (
-                              <Badge variant="warning">📭 Da abbinare</Badge>
+                              <Badge variant="warning">Ã°Å¸â€œÂ­ Da abbinare</Badge>
                             );
                           }
                         }
@@ -1793,11 +1799,11 @@ export const MonitorYard: React.FC = () => {
                             const isAssigned = !!s.bookingId;
                             return isAssigned ? (
                               <div className="flex flex-col items-center gap-0.5">
-                                <Badge variant="success">🔗 {booking?.ticketNumber || 'Abbinato'}</Badge>
+                                <Badge variant="success">Ã°Å¸â€â€” {booking?.ticketNumber || 'Abbinato'}</Badge>
                                 {booking?.status && <span className="text-[8px] text-gray-400 font-mono uppercase">({booking.status.replace('_', ' ')})</span>}
                               </div>
                             ) : (
-                              <Badge variant="warning">📭 Da abbinare</Badge>
+                              <Badge variant="warning">Ã°Å¸â€œÂ­ Da abbinare</Badge>
                             );
                           }
                         }
@@ -1874,7 +1880,7 @@ export const MonitorYard: React.FC = () => {
                               ) : (
                                 <div className="flex justify-end pt-1">
                                   <Button size="sm" variant="primary" className="text-[10px]" onClick={() => { setActiveLinkingShipmentId(s.id); setLinkingBookingId(''); }}>
-                                    🔗 Collega a Veicolo
+                                    Ã°Å¸â€â€” Collega a Veicolo
                                   </Button>
                                 </div>
                               )}
@@ -1890,7 +1896,7 @@ export const MonitorYard: React.FC = () => {
                   </Card>
 
                   {/* Spedizioni associate attive */}
-                  <Card title="Spedizioni già associate ai viaggi in corso" accent="green">
+                  <Card title="Spedizioni giÃƒÂ  associate ai viaggi in corso" accent="green">
                     <div className="space-y-4 max-h-[350px] overflow-y-auto">
                       {shipments
                         .filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO')
@@ -1947,7 +1953,7 @@ export const MonitorYard: React.FC = () => {
                       }}
                       className="font-bold text-xs uppercase tracking-wide cursor-pointer"
                     >
-                      ➕ Nuova Spedizione Manuale
+                      Ã¢Å¾â€¢ Nuova Spedizione Manuale
                     </Button>
                     <Button 
                       variant="secondary" 
@@ -1956,7 +1962,7 @@ export const MonitorYard: React.FC = () => {
                       }}
                       className="font-bold text-xs uppercase tracking-wide cursor-pointer"
                     >
-                      📥 Import Spedizioni (CSV/TXT)
+                      Ã°Å¸â€œÂ¥ Import Spedizioni (CSV/TXT)
                     </Button>
                   </div>
 
@@ -1977,7 +1983,7 @@ export const MonitorYard: React.FC = () => {
                         }}
                         className="py-1 text-[9px] uppercase font-bold"
                       >
-                        🗑️ Elimina Selezionate
+                        Ã°Å¸â€”â€˜Ã¯Â¸Â Elimina Selezionate
                       </Button>
                     </div>
                   )}
@@ -1999,7 +2005,7 @@ export const MonitorYard: React.FC = () => {
                   </div>
                   <div>
                     <label className="text-[9px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
-                      Cerca Soggetto / Città / Tratta (Con &)
+                      Cerca Soggetto / CittÃƒÂ  / Tratta (Con &)
                     </label>
                     <input
                       type="text"
@@ -2068,7 +2074,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
                         }`}
                       >
-                        Già Associate ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !!s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length})
+                        GiÃƒÂ  Associate ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !!s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length})
                       </button>
                     </div>
                   }
@@ -2194,12 +2200,12 @@ export const MonitorYard: React.FC = () => {
                             {s.orderNumber2 && <span className="text-gray-400 text-[10px] block">Rif 2: {s.orderNumber2}</span>}
                             {s.deliveryNotes && (
                               <span className="inline-block mt-1 text-[9px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.deliveryNotes}>
-                                📝 {s.deliveryNotes}
+                                Ã°Å¸â€œÂ {s.deliveryNotes}
                               </span>
                             )}
                             {s.internalNotes && (
                               <span className="inline-block mt-1 text-[9px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.internalNotes}>
-                                🔒 {s.internalNotes}
+                                Ã°Å¸â€â€™ {s.internalNotes}
                               </span>
                             )}
                           </div>
@@ -2219,7 +2225,7 @@ export const MonitorYard: React.FC = () => {
                                 </div>
                               )}
                               <div className="text-[10px] text-gray-500 font-semibold mt-1">
-                                📍 {s.city || s.originOrDestination || 'N/D'} 
+                                Ã°Å¸â€œÂ {s.city || s.originOrDestination || 'N/D'} 
                                 {s.province && ` (${s.province})`}
                                 {s.country && ` - ${s.country}`}
                               </div>
@@ -2384,14 +2390,14 @@ export const MonitorYard: React.FC = () => {
                                   bay.status === 'OCCUPATA' ? 'primary' : 'danger'
                                 }
                               >
-                                {isChecklistFailed ? 'Bloccato Qualità' :
+                                {isChecklistFailed ? 'Bloccato QualitÃƒÂ ' :
                                  isTimeoutSforato ? 'TEMPO SCADUTO' :
                                  bay.status === 'DISPONIBILE' ? 'Libera' :
                                  bay.status === 'OCCUPATA' ? 'In Uso' : 'Manutenzione'}
                               </Badge>
                               {isModified && !isChecklistFailed && !isTimeoutSforato && (
                                 <span className="text-[8px] font-bold text-amber-600 bg-amber-100 border border-amber-300 px-1 rounded">
-                                  ⚠️ MODIFICATO
+                                  Ã¢Å¡Â Ã¯Â¸Â MODIFICATO
                                 </span>
                               )}
                             </div>
@@ -2415,7 +2421,7 @@ export const MonitorYard: React.FC = () => {
                                   <span className="truncate max-w-[150px] text-right font-bold text-gray-700">{carrierName}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                  <span className="text-ticket-muted">Attività:</span>
+                                  <span className="text-ticket-muted">AttivitÃƒÂ :</span>
                                   <span className="font-bold">{activeBooking.activityType} ({activeBooking.palletPlaces ?? 0} PL)</span>
                                 </div>
                                 {activeBooking.orderNumber && (
@@ -2426,12 +2432,12 @@ export const MonitorYard: React.FC = () => {
                                 )}
                                 {activeBooking.palletReturns && activeBooking.palletReturns.length > 0 && (
                                   <div className="text-[8px] font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded p-1 text-center mt-1 animate-pulse-glow">
-                                    ⚠️ HA RESO PALLET VUOTI
+                                    Ã¢Å¡Â Ã¯Â¸Â HA RESO PALLET VUOTI
                                   </div>
                                 )}
                                 {isTimeoutSforato && (
                                   <div className="text-[8px] font-bold text-red-600 bg-red-100 border border-red-300 rounded p-1 text-center mt-1 animate-pulse-glow">
-                                    🚨 SFORATO DI {elapsedMinutes - timeLimit} MIN (Prev: {timeLimit}m, Sosta: {elapsedMinutes}m)
+                                    Ã°Å¸Å¡Â¨ SFORATO DI {elapsedMinutes - timeLimit} MIN (Prev: {timeLimit}m, Sosta: {elapsedMinutes}m)
                                   </div>
                                 )}
                               </div>
@@ -2449,7 +2455,7 @@ export const MonitorYard: React.FC = () => {
 
                           {bay.status === 'OCCUPATA' ? (
                             <div className="text-[9px] text-center text-ticket-muted font-sans border-t border-black/5 pt-1.5 mt-1">
-                              {currentRole === 'PREPOSTO' ? 'Dettagli & Checklist ➔' : 'Gestisci Rampa ➔'}
+                              {currentRole === 'PREPOSTO' ? 'Dettagli & Checklist Ã¢Å¾â€' : 'Gestisci Rampa Ã¢Å¾â€'}
                             </div>
                           ) : (
                             <div className="h-4" />
@@ -2479,12 +2485,12 @@ export const MonitorYard: React.FC = () => {
                             {renderTriageTicket(b.ticketNumber)}
                             {isIncomplete && (
                               <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
-                                ⚠️ Incompleto
+                                Ã¢Å¡Â Ã¯Â¸Â Incompleto
                               </span>
                             )}
                             {isExpired && (
                               <span className="text-[8px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
-                                ⚠️ SCADUTA
+                                Ã¢Å¡Â Ã¯Â¸Â SCADUTA
                               </span>
                             )}
                           </div>
@@ -2516,7 +2522,7 @@ export const MonitorYard: React.FC = () => {
                             {b.palletPlaces && <Badge variant="primary">{b.palletPlaces} PL</Badge>}
                             {b.palletReturns && b.palletReturns.length > 0 && (
                               <span className="text-[8px] font-bold bg-amber-500 text-white border border-amber-600 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
-                                ⚠️ HA RESO PALLET VUOTI
+                                Ã¢Å¡Â Ã¯Â¸Â HA RESO PALLET VUOTI
                               </span>
                             )}
                           </div>
@@ -2554,7 +2560,7 @@ export const MonitorYard: React.FC = () => {
                                 const usageName = bayUsages.find(u => u.id === bay.bayUsageId)?.name || 'Generica';
                                 return (
                                   <option key={bay.id} value={bay.id} className={isRecommended ? 'font-bold text-emerald-600' : ''}>
-                                    {isRecommended ? `⭐ [CONSIGLIATA - ${usageName}] ` : ''}{bay.name}
+                                    {isRecommended ? `Ã¢Â­Â [CONSIGLIATA - ${usageName}] ` : ''}{bay.name}
                                   </option>
                                 );
                               })}
@@ -2593,12 +2599,12 @@ export const MonitorYard: React.FC = () => {
                             {renderTriageTicket(b.ticketNumber)}
                             {isIncomplete && (
                               <span className="text-[8px] font-bold bg-amber-50 text-amber-600 border border-amber-200 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider">
-                                ⚠️ Incompleto
+                                Ã¢Å¡Â Ã¯Â¸Â Incompleto
                               </span>
                             )}
                             {isExpired && (
                               <span className="text-[8px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
-                                ⚠️ SCADUTA
+                                Ã¢Å¡Â Ã¯Â¸Â SCADUTA
                               </span>
                             )}
                           </div>
@@ -2622,7 +2628,7 @@ export const MonitorYard: React.FC = () => {
                       }
                     },
                     {
-                      header: 'Attività / Sped.',
+                      header: 'AttivitÃƒÂ  / Sped.',
                       accessor: (b) => (
                         <div className="text-xs font-mono">
                           <Badge variant="info">{b.activityType}</Badge>
@@ -2663,7 +2669,7 @@ export const MonitorYard: React.FC = () => {
                     {/* BARRA DI RICERCA SMART CHECK-IN */}
                     <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl space-y-3 max-w-xl mx-auto">
                       <div className="flex items-center gap-2 text-[#004B97] font-bold text-xs uppercase font-mono">
-                        <span>🔍 Smart Check-In & Matching al Cancello</span>
+                        <span>Ã°Å¸â€Â Smart Check-In & Matching al Cancello</span>
                       </div>
                       <p className="text-[10px] text-blue-700 leading-relaxed">
                         Inserisci il <strong>Riferimento Ordine (1 o 2)</strong> o la <strong>Targa del Veicolo</strong> per trovare la spedizione pre-caricata ed eseguire l'abbinamento rapido.
@@ -2690,7 +2696,7 @@ export const MonitorYard: React.FC = () => {
                       {matchedShipmentsForGate.length > 0 && (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-3 animate-fade-in text-xs">
                           <div className="text-emerald-800 font-bold flex items-center gap-1.5">
-                            <span>✅ Viaggio Corrispondente Trovato! ({matchedShipmentsForGate.length} spedizioni)</span>
+                            <span>Ã¢Å“â€¦ Viaggio Corrispondente Trovato! ({matchedShipmentsForGate.length} spedizioni)</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-emerald-900 bg-white/50 p-2 rounded-md">
                             <div><strong>Rif Ordine 1:</strong> {matchedShipmentsForGate.map(s => s.orderNumber).join(', ')}</div>
@@ -2772,7 +2778,7 @@ export const MonitorYard: React.FC = () => {
                         />
                         {isManualPlateDuplicate && (
                           <span className="text-[10px] text-amber-600 font-bold block leading-tight">
-                            ⚠️ Targa associata ad altro vettore!
+                            Ã¢Å¡Â Ã¯Â¸Â Targa associata ad altro vettore!
                           </span>
                         )}
                       </div>
@@ -2849,7 +2855,7 @@ export const MonitorYard: React.FC = () => {
                           <>
                             <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold uppercase tracking-wider font-mono">
                               <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                              🎯 Spedizioni Abbinabili Trovate!
+                              Ã°Å¸Å½Â¯ Spedizioni Abbinabili Trovate!
                             </div>
                             <p className="text-[9px] text-gray-500 font-sans">Seleziona le spedizioni previste a sistema per questo carico:</p>
                             <div className="space-y-1.5 font-mono text-[10px]">
@@ -2890,10 +2896,10 @@ export const MonitorYard: React.FC = () => {
                           </>
                         ) : (
                           <div className="flex items-start gap-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[10px] font-sans">
-                            <span className="text-xs">⚠️</span>
+                            <span className="text-xs">Ã¢Å¡Â Ã¯Â¸Â</span>
                             <div>
                               <span className="font-bold block">Nessun viaggio/spedizione pianificato trovato per '{manualOrderNumber}'</span>
-                              <span className="text-rose-600 block mt-0.5">Il mezzo verrà registrato in Yard sul piazzale come transito generico. Potrà essere abbinato postumo nel tabellone.</span>
+                              <span className="text-rose-600 block mt-0.5">Il mezzo verrÃƒÂ  registrato in Yard sul piazzale come transito generico. PotrÃƒÂ  essere abbinato postumo nel tabellone.</span>
                             </div>
                           </div>
                         )}
@@ -2921,13 +2927,13 @@ export const MonitorYard: React.FC = () => {
                         />
                         {isManualLicenseExpired && (
                           <span className="text-[9px] text-red-600 font-bold block leading-tight animate-pulse-glow">
-                            ⚠️ SCADUTA!
+                            Ã¢Å¡Â Ã¯Â¸Â SCADUTA!
                           </span>
                         )}
                       </div>
                     </div>
                     <Select
-                      label="Attività Richiesta"
+                      label="AttivitÃƒÂ  Richiesta"
                       options={activityTypes.map(act => ({ value: act.code, label: act.name }))}
                       value={activityTypes.find(a => a.code === manualActivityCode)?.name || manualActivityCode}
                       onChange={(e) => {
@@ -2956,7 +2962,7 @@ export const MonitorYard: React.FC = () => {
               <div className="grid grid-cols-1 gap-6 animate-fade-in">
                 
                 {/* CALENDARIO */}
-                <Card title="Calendario Attività Mensile" accent="orange">
+                <Card title="Calendario AttivitÃƒÂ  Mensile" accent="orange">
                   <div className="space-y-4">
                     <div className="flex justify-between items-center border-b border-black/5 pb-2 font-mono">
                       <button
@@ -2970,7 +2976,7 @@ export const MonitorYard: React.FC = () => {
                         }}
                         className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
                       >
-                        ◀
+                        Ã¢â€”â‚¬
                       </button>
                       <span className="font-bold text-xs uppercase tracking-wider">
                         {monthsNames[currentMonth]} {currentYear}
@@ -2986,7 +2992,7 @@ export const MonitorYard: React.FC = () => {
                         }}
                         className="p-1 hover:bg-gray-100 rounded text-xs font-bold"
                       >
-                        ▶
+                        Ã¢â€“Â¶
                       </button>
                     </div>
 
@@ -3040,7 +3046,7 @@ export const MonitorYard: React.FC = () => {
                 </Card>
 
                 {/* TABELLONE */}
-                <Card title={`Programmazione Attività del Yard - Giorno: ${scheduleDate}`}>
+                <Card title={`Programmazione AttivitÃƒÂ  del Yard - Giorno: ${scheduleDate}`}>
                   <Table
                     data={dayBookings}
                     emptyMessage="Nessun transito pianificato o registrato per questa data."
@@ -3056,12 +3062,12 @@ export const MonitorYard: React.FC = () => {
                               {renderTriageTicket(b.ticketNumber)}
                               {isIncomplete && (
                                 <span className="text-[7px] font-bold bg-amber-50 text-amber-600 border border-amber-300 px-1 py-0.5 rounded shadow-2xs select-none tracking-wider">
-                                  ⚠️ Incompleto
+                                  Ã¢Å¡Â Ã¯Â¸Â Incompleto
                                 </span>
                               )}
                               {isExpired && (
                                 <span className="text-[7px] font-bold bg-rose-50 text-rose-600 border border-rose-300 px-1 py-0.5 rounded shadow-2xs select-none tracking-wider animate-pulse-glow">
-                                  ⚠️ SCADUTA
+                                  Ã¢Å¡Â Ã¯Â¸Â SCADUTA
                                 </span>
                               )}
                             </div>
@@ -3108,7 +3114,7 @@ export const MonitorYard: React.FC = () => {
                         accessor: (b) => <span className="font-mono text-xs">{b.palletPlaces || '-'}</span>
                       },
                       {
-                        header: 'Attività',
+                        header: 'AttivitÃƒÂ ',
                         accessor: (b) => <Badge variant="info">{b.activityType}</Badge>
                       },
                       {
@@ -3138,7 +3144,7 @@ export const MonitorYard: React.FC = () => {
                             {getBookingStatusBadge(b.status)}
                             {b.palletReturns && b.palletReturns.length > 0 && (
                               <span className="text-[7px] font-bold bg-amber-500 text-white border border-amber-600 px-1 py-0.5 rounded shadow-2xs select-none uppercase tracking-wider animate-pulse-glow">
-                                ⚠️ RESO PALLET
+                                Ã¢Å¡Â Ã¯Â¸Â RESO PALLET
                               </span>
                             )}
                             {b.palletVoucherNumber && (
@@ -3151,7 +3157,7 @@ export const MonitorYard: React.FC = () => {
                                 onClick={() => handlePrintChecklist(b)}
                                 className="text-[8px] font-bold uppercase tracking-wider text-[#11BCEC] hover:underline cursor-pointer"
                               >
-                                🖨️ Stampa checklist
+                                Ã°Å¸â€“Â¨Ã¯Â¸Â Stampa checklist
                               </button>
                             )}
                           </div>
@@ -3241,10 +3247,10 @@ export const MonitorYard: React.FC = () => {
                 <div className="flex flex-wrap gap-4 items-center justify-between bg-white border border-black/10 p-4 rounded-xl shadow-xs">
                   <div>
                     <h3 className="font-bold text-sm uppercase text-ticket-accent tracking-wide">
-                      📊 Cruscotto Direzionale KPI & Performance
+                      Ã°Å¸â€œÅ  Cruscotto Direzionale KPI & Performance
                     </h3>
                     <p className="text-[9px] text-gray-400 font-mono mt-0.5">
-                      Statistiche di efficienza piazzale, puntualità vettori e saturazione baie per {activeDepot?.name}
+                      Statistiche di efficienza piazzale, puntualitÃƒÂ  vettori e saturazione baie per {activeDepot?.name}
                     </p>
                   </div>
                   
@@ -3456,7 +3462,7 @@ export const MonitorYard: React.FC = () => {
                     </Card>
 
                     {/* Carrier Performance */}
-                    <Card title="2. Affidabilità e Ritardi Vettori (Carrier Performance)">
+                    <Card title="2. AffidabilitÃƒÂ  e Ritardi Vettori (Carrier Performance)">
                       <div className="space-y-4 font-mono text-xs">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="p-3 bg-red-50 border border-red-100 text-red-800 rounded-xl space-y-1">
@@ -3520,21 +3526,21 @@ export const MonitorYard: React.FC = () => {
                         {/* Inbound */}
                         <div className="p-3.5 bg-blue-50 border border-blue-100 text-blue-900 rounded-xl space-y-2">
                           <div className="flex justify-between items-center font-bold text-[10px] uppercase">
-                            <span>📥 Inbound (Entrata)</span>
+                            <span>Ã°Å¸â€œÂ¥ Inbound (Entrata)</span>
                             <span className="font-bold">{kpis.throughput.inboundCount} Camion</span>
                           </div>
                           <div className="text-lg font-bold">{kpis.throughput.inboundPallets} PLT</div>
-                          <span className="text-[8px] text-gray-400 block font-sans">Attività di Scarico e Ricezione Resi</span>
+                          <span className="text-[8px] text-gray-400 block font-sans">AttivitÃƒÂ  di Scarico e Ricezione Resi</span>
                         </div>
 
                         {/* Outbound */}
                         <div className="p-3.5 bg-emerald-50 border border-emerald-100 text-emerald-900 rounded-xl space-y-2">
                           <div className="flex justify-between items-center font-bold text-[10px] uppercase">
-                            <span>📤 Outbound (Uscita)</span>
+                            <span>Ã°Å¸â€œÂ¤ Outbound (Uscita)</span>
                             <span className="font-bold">{kpis.throughput.outboundCount} Camion</span>
                           </div>
                           <div className="text-lg font-bold">{kpis.throughput.outboundPallets} PLT</div>
-                          <span className="text-[8px] text-gray-400 block font-sans">Attività di Carico e Containerizzazioni</span>
+                          <span className="text-[8px] text-gray-400 block font-sans">AttivitÃƒÂ  di Carico e Containerizzazioni</span>
                         </div>
 
                       </div>
@@ -3593,7 +3599,7 @@ export const MonitorYard: React.FC = () => {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border-4 border-rose-500 overflow-hidden">
             <div className="bg-rose-500 text-white p-4">
               <h3 className="font-extrabold text-sm uppercase tracking-wide flex items-center gap-2">
-                🚨 BLOCCO QUALITÀ: CHECKLIST FALLITA
+                Ã°Å¸Å¡Â¨ BLOCCO QUALITÃƒâ‚¬: CHECKLIST FALLITA
               </h3>
               <p className="text-[10px] text-white/80 font-mono mt-1">
                 Generata allerta da Preposto: {activeAlertForGuardiola.prepostoName}
@@ -3744,7 +3750,7 @@ export const MonitorYard: React.FC = () => {
                     <>
                       <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold uppercase tracking-wider font-mono">
                         <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-                        🎯 Spedizioni Abbinabili Trovate!
+                        Ã°Å¸Å½Â¯ Spedizioni Abbinabili Trovate!
                       </div>
                       <p className="text-[9px] text-gray-500 font-sans">Seleziona le spedizioni previste a sistema per questo carico:</p>
                       <div className="space-y-1.5 font-mono text-[10px]">
@@ -3785,10 +3791,10 @@ export const MonitorYard: React.FC = () => {
                     </>
                   ) : (
                     <div className="flex items-start gap-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-[10px] font-sans">
-                      <span className="text-xs">⚠️</span>
+                      <span className="text-xs">Ã¢Å¡Â Ã¯Â¸Â</span>
                       <div>
                         <span className="font-bold block">Nessun viaggio/spedizione pianificato trovato per '{checkInOrderNumber}'</span>
-                        <span className="text-rose-600 block mt-0.5">Il mezzo farà ingresso senza spedizioni collegate a sistema.</span>
+                        <span className="text-rose-600 block mt-0.5">Il mezzo farÃƒÂ  ingresso senza spedizioni collegate a sistema.</span>
                       </div>
                     </div>
                   )}
@@ -3817,7 +3823,7 @@ export const MonitorYard: React.FC = () => {
                   />
                   {isCheckInLicenseExpired && (
                     <span className="text-[8px] text-red-600 font-bold block leading-tight animate-pulse-glow">
-                      ⚠️ SCADUTA!
+                      Ã¢Å¡Â Ã¯Â¸Â SCADUTA!
                     </span>
                   )}
                 </div>
@@ -3943,7 +3949,7 @@ export const MonitorYard: React.FC = () => {
                     modalTab === 'info' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
                   }`}
                 >
-                  📋 Info & Note
+                  Ã°Å¸â€œâ€¹ Info & Note
                 </button>
                 <button
                   onClick={() => { setModalTab('checklist'); }}
@@ -3951,7 +3957,7 @@ export const MonitorYard: React.FC = () => {
                     modalTab === 'checklist' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
                   }`}
                 >
-                  🛡️ Checklist Qualità
+                  Ã°Å¸â€ºÂ¡Ã¯Â¸Â Checklist QualitÃƒÂ 
                 </button>
                 <button
                   onClick={() => { setModalTab('reso'); setShowChecklistForm(false); }}
@@ -3959,7 +3965,7 @@ export const MonitorYard: React.FC = () => {
                     modalTab === 'reso' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
                   }`}
                 >
-                  📦 Reso Pallet
+                  Ã°Å¸â€œÂ¦ Reso Pallet
                 </button>
                 <button
                   onClick={() => { setModalTab('edit'); setShowChecklistForm(false); }}
@@ -3967,7 +3973,7 @@ export const MonitorYard: React.FC = () => {
                     modalTab === 'edit' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
                   }`}
                 >
-                  ✏️ Modifica Dati
+                  Ã¢Å“ÂÃ¯Â¸Â Modifica Dati
                 </button>
                 {(currentRole === 'GUARDIA' || currentRole === 'ADMIN' || currentRole === 'PREPOSTO') && (
                   <button
@@ -3976,7 +3982,7 @@ export const MonitorYard: React.FC = () => {
                       modalTab === 'move' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
                     }`}
                   >
-                    🔄 Sposta Baia
+                    Ã°Å¸â€â€ž Sposta Baia
                   </button>
                 )}
               </div>
@@ -4032,7 +4038,7 @@ export const MonitorYard: React.FC = () => {
                 </div>
               )}
 
-              {/* VISTA: CHECKLIST QUALITÀ */}
+              {/* VISTA: CHECKLIST QUALITÃƒâ‚¬ */}
               {modalTab === 'checklist' && (
                 <div className="space-y-4 animate-fade-in">
                   {!showChecklistForm ? (
@@ -4040,19 +4046,19 @@ export const MonitorYard: React.FC = () => {
                       {activeBayDetail.booking.checklist ? (
                         <div className={`p-4 rounded-xl border flex justify-between items-start ${activeBayDetail.booking.checklist.isFailed ? 'bg-rose-50 border-rose-200 text-rose-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`}>
                           <div className="space-y-2">
-                            <span className="font-bold block text-[11px] uppercase font-mono">Checklist di Conformità Qualità</span>
+                            <span className="font-bold block text-[11px] uppercase font-mono">Checklist di ConformitÃƒÂ  QualitÃƒÂ </span>
                             <span className="text-[10px] block text-gray-500">Compilata da: {activeBayDetail.booking.checklist.compilataDa} il {new Date(activeBayDetail.booking.checklist.dataOraCheck).toLocaleString()}</span>
                             <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-3 font-mono text-[10px] bg-white/60 p-2.5 rounded-lg border border-black/5">
-                              <div>Pianale Sporco: <span className="font-bold">{activeBayDetail.booking.checklist.pianaleSporco ? 'SI (⚠️)' : 'NO'}</span></div>
-                              <div>Presenza Infestanti Mezzo: <span className="font-bold">{activeBayDetail.booking.checklist.presenzaInfestantiMezzo ? 'SI (⚠️)' : 'NO'}</span></div>
-                              <div>Odori Anomali: <span className="font-bold">{activeBayDetail.booking.checklist.odoriAnomali ? 'SI (⚠️)' : 'NO'}</span></div>
-                              <div>Pallet Puliti: <span className="font-bold">{activeBayDetail.booking.checklist.puliziaPallet ? 'SI' : 'NO (⚠️)'}</span></div>
-                              <div>Pallet Integri: <span className="font-bold">{activeBayDetail.booking.checklist.integritaPallet ? 'SI' : 'NO (⚠️)'}</span></div>
-                              <div>Presenza Infestanti Prodotto: <span className="font-bold">{activeBayDetail.booking.checklist.presenzaInfestantiProdotto ? 'SI (⚠️)' : 'NO'}</span></div>
+                              <div>Pianale Sporco: <span className="font-bold">{activeBayDetail.booking.checklist.pianaleSporco ? 'SI (Ã¢Å¡Â Ã¯Â¸Â)' : 'NO'}</span></div>
+                              <div>Presenza Infestanti Mezzo: <span className="font-bold">{activeBayDetail.booking.checklist.presenzaInfestantiMezzo ? 'SI (Ã¢Å¡Â Ã¯Â¸Â)' : 'NO'}</span></div>
+                              <div>Odori Anomali: <span className="font-bold">{activeBayDetail.booking.checklist.odoriAnomali ? 'SI (Ã¢Å¡Â Ã¯Â¸Â)' : 'NO'}</span></div>
+                              <div>Pallet Puliti: <span className="font-bold">{activeBayDetail.booking.checklist.puliziaPallet ? 'SI' : 'NO (Ã¢Å¡Â Ã¯Â¸Â)'}</span></div>
+                              <div>Pallet Integri: <span className="font-bold">{activeBayDetail.booking.checklist.integritaPallet ? 'SI' : 'NO (Ã¢Å¡Â Ã¯Â¸Â)'}</span></div>
+                              <div>Presenza Infestanti Prodotto: <span className="font-bold">{activeBayDetail.booking.checklist.presenzaInfestantiProdotto ? 'SI (Ã¢Å¡Â Ã¯Â¸Â)' : 'NO'}</span></div>
                               <div>Prodotti biologici (Bio): <span className="font-bold">{activeBayDetail.booking.checklist.presenzaBio ? 'SI' : 'NO'}</span></div>
                               <div>Sigillo di Sicurezza: <span className="font-bold">{activeBayDetail.booking.checklist.sigilloPresente ? `Presente (${activeBayDetail.booking.checklist.numeroSigillo || 'N/A'})` : 'Assente'}</span></div>
                               {activeBayDetail.booking.checklist.sigilloPresente && (
-                                <div className="col-span-2">Corrispondenza DDT Sigillo: <span className="font-bold">{activeBayDetail.booking.checklist.corrispondenzaDdt ? 'CONFORME' : 'NON CONFORME (⚠️)'}</span></div>
+                                <div className="col-span-2">Corrispondenza DDT Sigillo: <span className="font-bold">{activeBayDetail.booking.checklist.corrispondenzaDdt ? 'CONFORME' : 'NON CONFORME (Ã¢Å¡Â Ã¯Â¸Â)'}</span></div>
                               )}
                             </div>
                             {activeBayDetail.booking.checklist.noteLibere && (
@@ -4061,7 +4067,7 @@ export const MonitorYard: React.FC = () => {
                           </div>
                           <div className="flex flex-col gap-2">
                             <Button size="sm" variant="secondary" onClick={() => handlePrintChecklist(activeBayDetail.booking)}>
-                              🖨️ Stampa QA
+                              Ã°Å¸â€“Â¨Ã¯Â¸Â Stampa QA
                             </Button>
                             {currentRole === 'PREPOSTO' && (
                               <Button size="sm" variant="primary" onClick={() => setShowChecklistForm(true)}>
@@ -4074,29 +4080,29 @@ export const MonitorYard: React.FC = () => {
                         currentRole === 'PREPOSTO' ? (
                           <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl flex justify-between items-center">
                             <div>
-                              <span className="text-[11px] font-bold uppercase font-mono">Checklist Qualità non compilata!</span>
+                              <span className="text-[11px] font-bold uppercase font-mono">Checklist QualitÃƒÂ  non compilata!</span>
                               <p className="text-[10px] text-amber-700/80 mt-0.5 font-sans">Compilare la checklist per procedere con le operazioni.</p>
                             </div>
                             <Button size="sm" variant="warning" onClick={() => setShowChecklistForm(true)}>
-                              Compila Checklist ➔
+                              Compila Checklist Ã¢Å¾â€
                             </Button>
                           </div>
                         ) : (
                           <div className="text-center py-8 text-xs font-mono text-gray-400 italic bg-gray-50 border border-black/5 rounded-xl">
-                            // CHECKLIST QUALITÀ NON ANCORA COMPILATA DAL PREPOSTO DI MAGAZZINO
+                            // CHECKLIST QUALITÃƒâ‚¬ NON ANCORA COMPILATA DAL PREPOSTO DI MAGAZZINO
                           </div>
                         )
                       )}
                     </div>
                   ) : (
-                    /* --- FORM COMPILAZIONE CHECKLIST QUALITÀ --- */
+                    /* --- FORM COMPILAZIONE CHECKLIST QUALITÃƒâ‚¬ --- */
                     <div className="space-y-4">
                       <h4 className="font-bold text-[11px] uppercase font-mono tracking-wider text-amber-600 border-b border-black/10 pb-1">
-                        Compilazione Checklist Qualità & Conformità Mezzo
+                        Compilazione Checklist QualitÃƒÂ  & ConformitÃƒÂ  Mezzo
                       </h4>
 
                       <div className="space-y-2">
-                        <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">1. Idoneità Igienica del Mezzo</span>
+                        <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">1. IdoneitÃƒÂ  Igienica del Mezzo</span>
                         <div className="grid grid-cols-3 gap-4 bg-gray-50 p-3 rounded-lg">
                           <div className="flex items-center justify-between">
                             <span className="font-mono text-xs">Pianale Sporco?</span>
@@ -4129,7 +4135,7 @@ export const MonitorYard: React.FC = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">2. Idoneità Igienica del Prodotto & Pallet</span>
+                        <span className="block font-bold text-gray-500 text-[9px] uppercase tracking-wider">2. IdoneitÃƒÂ  Igienica del Prodotto & Pallet</span>
                         <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3 rounded-lg font-mono">
                           <div className="flex items-center justify-between">
                             <span>Pallet Puliti?</span>
@@ -4169,7 +4175,7 @@ export const MonitorYard: React.FC = () => {
                           </div>
                         </div>
                         <Input
-                          label="Note Libere Conformità Merci"
+                          label="Note Libere ConformitÃƒÂ  Merci"
                           placeholder="Anomalie pallet, rotture..."
                           value={noteLibere}
                           onChange={(e) => setNoteLibere(e.target.value)}
@@ -4249,7 +4255,7 @@ export const MonitorYard: React.FC = () => {
                       <thead>
                         <tr className="bg-gray-50 border-b border-black/10 text-gray-400 text-[8px] uppercase">
                           <th className="p-2">Tipologia Legno</th>
-                          <th className="p-2">Quantità Resa</th>
+                          <th className="p-2">QuantitÃƒÂ  Resa</th>
                           <th className="p-2">Stato/Condizione</th>
                           {(currentRole === 'PREPOSTO' || currentRole === 'ADMIN') && <th className="p-2 text-right">Azione</th>}
                         </tr>
@@ -4313,7 +4319,7 @@ export const MonitorYard: React.FC = () => {
                           onChange={(e) => setPalletType(e.target.value as any)}
                         />
                         <Input
-                          label="Quantità *"
+                          label="QuantitÃƒÂ  *"
                           type="number"
                           placeholder="Es. 15"
                           value={palletQuantity}
@@ -4369,7 +4375,7 @@ export const MonitorYard: React.FC = () => {
                             }, 50);
                           }}
                         >
-                          📄 Emetti Buono Pallet Ricevuta
+                          Ã°Å¸â€œâ€ž Emetti Buono Pallet Ricevuta
                         </Button>
                       ) : (
                         <Button
@@ -4383,7 +4389,7 @@ export const MonitorYard: React.FC = () => {
                             }, 300);
                           }}
                         >
-                          🖨️ Stampa Ricevuta Buono Pallet
+                          Ã°Å¸â€“Â¨Ã¯Â¸Â Stampa Ricevuta Buono Pallet
                         </Button>
                       )}
                     </div>
@@ -4455,7 +4461,7 @@ export const MonitorYard: React.FC = () => {
                       onChange={(e) => setDetailLicenseRelease(e.target.value)}
                     />
                     <Select
-                      label="Cambia Tipo Attività"
+                      label="Cambia Tipo AttivitÃƒÂ "
                       options={activityTypes.map(a => ({ value: a.code, label: a.name }))}
                       value={activityTypes.find(a => a.code === detailActivity)?.name || detailActivity}
                       onChange={(e) => {
@@ -4524,7 +4530,7 @@ export const MonitorYard: React.FC = () => {
                   className="flex-grow text-xs"
                   onClick={() => handleCompleteActivityFromDetail(activeBayDetail.booking.id)}
                 >
-                  Completa Attività & Libera
+                  Completa AttivitÃƒÂ  & Libera
                 </Button>
               )}
             </div>
@@ -4544,7 +4550,7 @@ export const MonitorYard: React.FC = () => {
                 onClick={() => { resetShipmentForm(); setIsNewShipmentModalOpen(false); }}
                 className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
               >
-                ×
+                Ãƒâ€”
               </button>
             </div>
             <form onSubmit={handleSaveShipmentForm} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
@@ -4568,7 +4574,7 @@ export const MonitorYard: React.FC = () => {
                         : 'text-gray-500 hover:text-black hover:bg-gray-200'
                     }`}
                   >
-                    <span className="block text-sm mb-0.5">📤</span>
+                    <span className="block text-sm mb-0.5">Ã°Å¸â€œÂ¤</span>
                     Uscita da Hub<br/>(Outbound)
                   </button>
                   <button
@@ -4584,7 +4590,7 @@ export const MonitorYard: React.FC = () => {
                         : 'text-gray-500 hover:text-black hover:bg-gray-200'
                     }`}
                   >
-                    <span className="block text-sm mb-0.5">📥</span>
+                    <span className="block text-sm mb-0.5">Ã°Å¸â€œÂ¥</span>
                     Arrivo su Hub<br/>(Inbound)
                   </button>
                   <button
@@ -4599,13 +4605,19 @@ export const MonitorYard: React.FC = () => {
                         : 'text-gray-500 hover:text-black hover:bg-gray-200'
                     }`}
                   >
-                    <span className="block text-sm mb-0.5">🔄</span>
+                    <span className="block text-sm mb-0.5">Ã°Å¸â€â€ž</span>
                     Transito<br/>(Hub-to-Hub)
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Input
+                  label="Numero Viaggio"
+                  placeholder="Generato in auto se vuoto"
+                  value={shipmentFormTripNumber}
+                  onChange={(e) => setShipmentFormTripNumber(e.target.value)}
+                />
                 <Select
                   label="Cliente Committente *"
                   options={clients.map(c => ({ value: c.id, label: c.name }))}
@@ -4648,98 +4660,142 @@ export const MonitorYard: React.FC = () => {
                       <tr className="bg-gray-100 border-b border-black/10">
                         <th className="p-2 w-10 text-center text-[10px] font-mono text-gray-500 uppercase">Seq</th>
                         <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">Rif / Ordine *</th>
-                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Destinazione (Città)' : 'Origine (Città)'}</th>
+                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Destinazione (CittÃƒÂ )' : 'Origine (CittÃƒÂ )'}</th>
                         <th className="p-2 w-20 text-[10px] font-mono text-gray-500 uppercase text-center">Pallet</th>
                         <th className="p-2 w-24 text-[10px] font-mono text-gray-500 uppercase text-center">Peso (kg)</th>
                         <th className="p-2 w-10"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-black/5">
-                      {tripShipments.map((row, index) => (
-                        <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="p-2 text-center font-mono font-bold text-gray-400">{index + 1}</td>
-                          <td className="p-2">
-                            <input 
-                              type="text" 
-                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
-                              placeholder="Es. ORD-123"
-                              value={row.orderNumber || ''}
-                              onChange={(e) => {
-                                const newTripShipments = [...tripShipments];
-                                newTripShipments[index].orderNumber = e.target.value;
-                                setTripShipments(newTripShipments);
-                              }}
-                              required
-                            />
-                          </td>
-                          <td className="p-2">
-                            {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? (
+                                            {tripShipments.map((row, index) => (
+                        <React.Fragment key={row.id}>
+                          <tr className="hover:bg-gray-50 transition-colors">
+                            <td className="p-2 text-center font-mono font-bold text-gray-400">{index + 1}</td>
+                            <td className="p-2">
                               <input 
                                 type="text" 
                                 className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
-                                placeholder="Città Destinazione"
-                                value={row.realDestinationCity || ''}
+                                placeholder="Es. ORD-123"
+                                value={row.orderNumber || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  newTripShipments[index].realDestinationCity = e.target.value;
+                                  newTripShipments[index].orderNumber = e.target.value;
                                   setTripShipments(newTripShipments);
                                 }}
+                                required
                               />
-                            ) : (
+                            </td>
+                            <td className="p-2">
+                              <TerritoryAutocomplete
+                                value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? (row.realDestinationCity || '') : (row.realOriginCity || '')}
+                                onChange={(val, rec) => {
+                                  const newTripShipments = [...tripShipments];
+                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
+                                    newTripShipments[index].realDestinationCity = val;
+                                    if (rec) {
+                                      newTripShipments[index].realDestinationProvince = rec.provincia_sigla;
+                                      newTripShipments[index].realDestinationCap = rec.cap;
+                                    }
+                                  } else {
+                                    newTripShipments[index].realOriginCity = val;
+                                    if (rec) {
+                                      newTripShipments[index].realOriginProvince = rec.provincia_sigla;
+                                      newTripShipments[index].realOriginCap = rec.cap;
+                                    }
+                                  }
+                                  setTripShipments(newTripShipments);
+                                }}
+                                placeholder={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? "Città Destinazione" : "Città Origine"}
+                                className="!p-1.5 !text-xs !border-black/10 !rounded-lg"
+                              />
+                            </td>
+                            <td className="p-2">
                               <input 
-                                type="text" 
-                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
-                                placeholder="Città Origine"
-                                value={row.realOriginCity || ''}
+                                type="number" 
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
+                                value={row.palletPlaces || ''}
+                                min="0"
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  newTripShipments[index].realOriginCity = e.target.value;
+                                  newTripShipments[index].palletPlaces = Number(e.target.value);
                                   setTripShipments(newTripShipments);
                                 }}
                               />
-                            )}
-                          </td>
-                          <td className="p-2">
-                            <input 
-                              type="number" 
-                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
-                              value={row.palletPlaces || ''}
-                              min="0"
-                              onChange={(e) => {
-                                const newTripShipments = [...tripShipments];
-                                newTripShipments[index].palletPlaces = Number(e.target.value);
-                                setTripShipments(newTripShipments);
-                              }}
-                            />
-                          </td>
-                          <td className="p-2">
-                            <input 
-                              type="number" 
-                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
-                              value={row.grossWeight || ''}
-                              min="0"
-                              onChange={(e) => {
-                                const newTripShipments = [...tripShipments];
-                                newTripShipments[index].grossWeight = Number(e.target.value);
-                                setTripShipments(newTripShipments);
-                              }}
-                            />
-                          </td>
-                          <td className="p-2 text-center">
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                if (tripShipments.length > 1) {
-                                  setTripShipments(tripShipments.filter((_, i) => i !== index));
-                                }
-                              }}
-                              className="text-gray-400 hover:text-red-600 transition-colors font-bold text-lg"
-                              title="Rimuovi riga"
-                            >
-                              ×
-                            </button>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="p-2">
+                              <input 
+                                type="number" 
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
+                                value={row.grossWeight || ''}
+                                min="0"
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].grossWeight = Number(e.target.value);
+                                  setTripShipments(newTripShipments);
+                                }}
+                              />
+                            </td>
+                            <td className="p-2 text-center">
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  if (tripShipments.length > 1) {
+                                    setTripShipments(tripShipments.filter((_, i) => i !== index));
+                                  }
+                                }}
+                                className="text-gray-400 hover:text-red-600 transition-colors font-bold text-lg"
+                                title="Rimuovi riga"
+                              >
+                                ×
+                              </button>
+                            </td>
+                          </tr>
+                          <tr className="border-b border-black/10 bg-gray-50/50">
+                            <td></td>
+                            <td colSpan={4} className="p-2">
+                              <div className="flex gap-4 items-center">
+                                <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={row.isAdr || false}
+                                    onChange={(e) => {
+                                      const newTripShipments = [...tripShipments];
+                                      newTripShipments[index].isAdr = e.target.checked;
+                                      setTripShipments(newTripShipments);
+                                    }}
+                                    className="rounded text-blue-600"
+                                  />
+                                  <span>⚠️ Merce ADR</span>
+                                </label>
+                                <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={row.requiresTailLift || false}
+                                    onChange={(e) => {
+                                      const newTripShipments = [...tripShipments];
+                                      newTripShipments[index].requiresTailLift = e.target.checked;
+                                      setTripShipments(newTripShipments);
+                                    }}
+                                    className="rounded text-blue-600"
+                                  />
+                                  <span>🚛 Sponda Idraulica</span>
+                                </label>
+                                <input 
+                                  type="text" 
+                                  placeholder="Info varie, annotazioni o riferimenti aggiuntivi..."
+                                  value={row.noteVarie || ''}
+                                  onChange={(e) => {
+                                    const newTripShipments = [...tripShipments];
+                                    newTripShipments[index].noteVarie = e.target.value;
+                                    setTripShipments(newTripShipments);
+                                  }}
+                                  className="flex-1 border border-black/10 rounded p-1 text-[10px] focus:ring-1 focus:ring-blue-500 outline-none"
+                                />
+                              </div>
+                            </td>
+                            <td></td>
+                          </tr>
+                        </React.Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -4776,7 +4832,7 @@ export const MonitorYard: React.FC = () => {
                     {isOverLimit && (
                       <div className="mt-4 pt-4 border-t border-orange-200/50 animate-fade-in">
                         <label className="text-[10px] font-mono font-bold uppercase text-red-600 mb-1.5 flex items-center gap-1.5">
-                          ⚠️ Nota Giustificativa Obbligatoria (Sforamento Limiti) *
+                          Ã¢Å¡Â Ã¯Â¸Â Nota Giustificativa Obbligatoria (Sforamento Limiti) *
                         </label>
                         <input
                           type="text"
@@ -4822,7 +4878,7 @@ export const MonitorYard: React.FC = () => {
                 onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); }}
                 className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
               >
-                ×
+                Ãƒâ€”
               </button>
             </div>
             <div className="p-6 space-y-4">
@@ -4910,7 +4966,7 @@ export const MonitorYard: React.FC = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full border border-black/10 overflow-hidden my-8">
             <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4 flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <span className="text-lg">⚠️</span>
+                <span className="text-lg">Ã¢Å¡Â Ã¯Â¸Â</span>
                 <h3 className="font-bold text-sm uppercase tracking-wide">
                   Risoluzione Rapida / Revisione Import Spedizioni
                 </h3>
@@ -4919,14 +4975,14 @@ export const MonitorYard: React.FC = () => {
                 onClick={() => { setIsQuickResolutionModalOpen(false); setSelectedResolutionIds([]); }}
                 className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
               >
-                ×
+                Ãƒâ€”
               </button>
             </div>
             
             <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs leading-relaxed">
-                Le seguenti spedizioni presentano tratte geografiche ambigue (es. più hub nella stessa zona) o inserite da importazione CSV con dati incompleti.
-                Conferma l'hub suggerito o assegna manualmente l'hub corretto verificando la disponibilità delle baie in tempo reale.
+                Le seguenti spedizioni presentano tratte geografiche ambigue (es. piÃƒÂ¹ hub nella stessa zona) o inserite da importazione CSV con dati incompleti.
+                Conferma l'hub suggerito o assegna manualmente l'hub corretto verificando la disponibilitÃƒÂ  delle baie in tempo reale.
               </div>
 
               {/* Barra delle azioni massive */}
@@ -5016,7 +5072,7 @@ export const MonitorYard: React.FC = () => {
                           />
                         </th>
                         <th className="p-3">Ordine / Committente</th>
-                        <th className="p-3">Provenienza Reale ➡️ Destinazione Reale</th>
+                        <th className="p-3">Provenienza Reale Ã¢Å¾Â¡Ã¯Â¸Â Destinazione Reale</th>
                         <th className="p-3">Nota Calcolata</th>
                         <th className="p-3">Hub Suggerito</th>
                         <th className="p-3 text-right">Risoluzione Rapida</th>
@@ -5051,7 +5107,7 @@ export const MonitorYard: React.FC = () => {
                             <td className="p-3 leading-relaxed">
                               <div className="font-medium text-gray-700">
                                 {s.realOriginCity || 'N/D'} <span className="text-[10px] text-gray-400">({s.realOriginProvince || '-'})</span>
-                                <span className="text-gray-400 mx-1.5">➡️</span>
+                                <span className="text-gray-400 mx-1.5">Ã¢Å¾Â¡Ã¯Â¸Â</span>
                                 {s.realDestinationCity || 'N/D'} <span className="text-[10px] text-gray-400">({s.realDestinationProvince || '-'})</span>
                               </div>
                               {s.address && <span className="text-[10px] text-gray-400 block">{s.address}</span>}
@@ -5077,7 +5133,7 @@ export const MonitorYard: React.FC = () => {
                                   }}
                                   className="font-bold text-[10px] cursor-pointer"
                                 >
-                                  ✓ Accetta Suggerito
+                                  Ã¢Å“â€œ Accetta Suggerito
                                 </Button>
 
                                 <select
@@ -5153,3 +5209,4 @@ const getBookingStatusBadge = (status: Booking['status']) => {
       return null;
   }
 };
+

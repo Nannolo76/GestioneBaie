@@ -206,6 +206,9 @@ export interface Shipment {
   deliveryNotes?: string; // Note per la consegna
   internalNotes?: string; // Note interne di gestione
   tripId?: string; // Identificativo del Viaggio (Trip) che raggruppa più spedizioni
+  isAdr?: boolean; // Merce pericolosa
+  requiresTailLift?: boolean; // Richiede sponda idraulica
+  noteVarie?: string; // Informazioni varie aggiuntive
 }
 
 export interface PalletReturn {
