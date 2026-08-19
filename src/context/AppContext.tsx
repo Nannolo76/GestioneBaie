@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog, Client, PalletType, Shipment, ComuneItaliano } from '../types';
+import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog, Client, PalletType, Shipment, ComuneItaliano, SystemParameter } from '../types';
 
 interface AppContextType {
   depots: Depot[];
@@ -14,6 +14,7 @@ interface AppContextType {
   bayUsages: BayUsage[];
   anomalies: AnomalyLog[];
   comuni: ComuneItaliano[];
+  systemParameters: SystemParameter[];
   currentRole: 'ADMIN' | 'GUARDIA' | 'VETTORE' | 'PREPOSTO' | null;
   currentUser: User | null;
   currentCarrierId: string;
@@ -315,6 +316,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [users, setUsers] = useState<User[]>(defaultUsers);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [comuni, setComuni] = useState<ComuneItaliano[]>([]);
+  const [systemParameters, setSystemParameters] = useState<SystemParameter[]>([]);
   const [simulatedEmails, setSimulatedEmails] = useState<{ userId: string; userName: string; userEmail: string; confirmLink: string }[]>([]);
 
   const clearSimulatedEmail = (userId: string) => {
@@ -362,6 +364,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (data.users && data.users.length > 0) setUsers(data.users);
         if (data.shipments) setShipments(data.shipments);
         if (data.comuni) setComuni(data.comuni);
+        if (data.systemParameters) setSystemParameters(data.systemParameters);
       } catch (err) {
         console.error('Errore durante il caricamento dal database:', err);
       }
@@ -1615,6 +1618,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         bayUsages,
         anomalies,
         comuni,
+        systemParameters,
         currentRole,
         currentUser,
         currentCarrierId,

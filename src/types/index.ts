@@ -191,6 +191,8 @@ export interface Shipment {
   tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND' | 'TRANSITO';
   routingStatus?: 'CONFERMATO' | 'DA_CONFERMARE';
   routingNotes?: string;
+  sequence?: number; // Sequenza di carico/scarico nel Viaggio
+  justificationNote?: string; // Nota giustificativa per sforamento limiti (es. peso/pallet)
 
   // Nuovi campi per anagrafica geografica e dettagli spedizione (legacy)
   subjectName?: string; // Nome (Mittente o Destinatario)
@@ -203,6 +205,7 @@ export interface Shipment {
   grossWeight?: number; // Peso lordo in kg
   deliveryNotes?: string; // Note per la consegna
   internalNotes?: string; // Note interne di gestione
+  tripId?: string; // Identificativo del Viaggio (Trip) che raggruppa più spedizioni
 }
 
 export interface PalletReturn {
@@ -249,8 +252,16 @@ export interface User {
   status: 'PENDING_CONFIRMATION' | 'FIRST_ACCESS' | 'ACTIVE';
 }
 
+export interface SystemParameter {
+  key: string;
+  value: string;
+  description?: string;
+  type: 'NUMBER' | 'STRING' | 'BOOLEAN';
+}
+
 export interface ComuneItaliano {
   comune: string;
   cap: string;
   provincia: string;
 }
+

@@ -60,7 +60,8 @@ function readDb() {
     pallet_types: [],
     users: [],
     shipments: [],
-    anagrafica_comuni: []
+    anagrafica_comuni: [],
+    system_parameters: []
   };
   return inMemoryDb;
 }
@@ -428,6 +429,15 @@ async function initializeDb() {
   `);
 
   await sql(`
+    CREATE TABLE IF NOT EXISTS system_parameters (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      description TEXT,
+      type TEXT NOT NULL
+    )
+  `);
+
+  await sql(`
     CREATE TABLE IF NOT EXISTS shipments (
       id TEXT PRIMARY KEY,
       client_id TEXT NOT NULL,
@@ -454,7 +464,9 @@ async function initializeDb() {
       country TEXT,
       gross_weight DOUBLE PRECISION,
       delivery_notes TEXT,
-      internal_notes TEXT
+      internal_notes TEXT,
+      sequence INTEGER,
+      justification_note TEXT
     )
   `);
 
@@ -477,6 +489,8 @@ async function initializeDb() {
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS gross_weight DOUBLE PRECISION`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS delivery_notes TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS internal_notes TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS sequence INTEGER`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS justification_note TEXT`);
 
   // Nuovi campi per anagrafica geografica strutturata reale e routing del network
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS real_origin_name TEXT`);
@@ -509,6 +523,20 @@ async function initializeDb() {
     await sql("UPDATE users SET depot_ids = '[\"depot-milano\",\"depot-roma\",\"depot-bari\"]' WHERE id = 'user-1'");
   } catch (err) {
     console.error("Errore durante aggiornamento depotIds admin:", err);
+  }
+
+  // SEED SYSTEM PARAMETERS
+  const checkSysParams = await sql('SELECT count(*) as count FROM system_parameters');
+  if (parseInt(checkSysParams[0].count) === 0) {
+    const defaultParams = [
+      { key: 'MAX_POSTI_PALLET_STANDARD', value: '33', description: 'Capacità massima pallet standard per viaggio', type: 'NUMBER' },
+      { key: 'MAX_PESO_LORDO_KG', value: '28000', description: 'Peso massimo consentito in kg per viaggio', type: 'NUMBER' },
+      { key: 'DWELL_TIME_STANDARD_MIN', value: '120', description: 'Tempo di sosta standard (minuti)', type: 'NUMBER' },
+      { key: 'TOLLERANZA_SLOT_MIN', value: '15', description: 'Tolleranza massima ritardo (minuti) prima di non conformità', type: 'NUMBER' },
+    ];
+    for (const p of defaultParams) {
+      await sql('INSERT INTO system_parameters (key, value, description, type) VALUES ($1, $2, $3, $4)', [p.key, p.value, p.description, p.type]);
+    }
   }
 
   // Se non ci sono plant inseriti, eseguiamo il seed iniziale
@@ -924,7 +952,8 @@ export default async function handler(req: any, res: any) {
         palletTypes,
         users,
         shipments,
-        comuni
+        comuni,
+        systemParameters
       ] = await Promise.all([
         sql('SELECT * FROM depots'),
         sql('SELECT * FROM warehouse_modules'),
@@ -941,6 +970,7 @@ export default async function handler(req: any, res: any) {
         sql('SELECT * FROM users ORDER BY name ASC'),
         sql('SELECT * FROM shipments ORDER BY order_number ASC'),
         sql('SELECT * FROM anagrafica_comuni ORDER BY comune ASC'),
+        sql('SELECT * FROM system_parameters')
       ]);
 
       // Mappiamo i campi snake_case in camelCase per mantenere la compatibilità col frontend e parse dei campi JSON
@@ -1122,7 +1152,8 @@ export default async function handler(req: any, res: any) {
         palletTypes,
         users: parsedUsers,
         shipments: parsedShipments,
-        comuni
+        comuni,
+        systemParameters
       });
     }
 
@@ -1435,8 +1466,8 @@ export default async function handler(req: any, res: any) {
               subject_name, address, city, cap, province, region, country, gross_weight, delivery_notes, internal_notes,
               real_origin_name, real_origin_address, real_origin_city, real_origin_cap, real_origin_province, real_origin_country,
               real_destination_name, real_destination_address, real_destination_city, real_destination_cap, real_destination_province, real_destination_country,
-              hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub, routing_status, routing_notes
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43)
+              hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub, routing_status, routing_notes, sequence, justification_note
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)
           `, [
             payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
             payload.activityType, payload.palletPlaces, payload.status, payload.expectedDate, payload.expectedTime || null,
@@ -1446,7 +1477,7 @@ export default async function handler(req: any, res: any) {
             payload.realOriginName || null, payload.realOriginAddress || null, payload.realOriginCity || null, payload.realOriginCap || null, payload.realOriginProvince || null, payload.realOriginCountry || null,
             payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
             payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
-            payload.routingStatus || null, payload.routingNotes || null
+            payload.routingStatus || null, payload.routingNotes || null, payload.sequence || null, payload.justificationNote || null
           ]);
           break;
  
@@ -1465,8 +1496,8 @@ export default async function handler(req: any, res: any) {
                real_origin_name = $23, real_origin_address = $24, real_origin_city = $25, real_origin_cap = $26, real_origin_province = $27, real_origin_country = $28,
                real_destination_name = $29, real_destination_address = $30, real_destination_city = $31, real_destination_cap = $32, real_destination_province = $33, real_destination_country = $34,
                hub_origine_operativo = $35, hub_destinazione_operativo = $36, tipo_operazione_hub = $37,
-               routing_status = $38, routing_notes = $39
-             WHERE id = $40
+               routing_status = $38, routing_notes = $39, sequence = $40, justification_note = $41
+             WHERE id = $42
            `, [
              payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
              payload.activityType, payload.palletPlaces, payload.expectedDate, payload.expectedTime || null,
@@ -1476,7 +1507,7 @@ export default async function handler(req: any, res: any) {
              payload.realOriginName || null, payload.realOriginAddress || null, payload.realOriginCity || null, payload.realOriginCap || null, payload.realOriginProvince || null, payload.realOriginCountry || null,
              payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
              payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
-             payload.routingStatus || null, payload.routingNotes || null,
+             payload.routingStatus || null, payload.routingNotes || null, payload.sequence || null, payload.justificationNote || null,
              payload.id
            ]);
            break;

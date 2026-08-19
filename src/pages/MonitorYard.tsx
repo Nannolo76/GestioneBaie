@@ -5,7 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
-import { TerritoryAutocomplete } from '../components/TerritoryAutocomplete';
+
 import type { Booking, Bay, BookingNote, Shipment } from '../types';
 import { calculateSmartRouting } from '../utils/geo';
 
@@ -42,7 +42,8 @@ export const MonitorYard: React.FC = () => {
     deleteShipments,
     bindShipmentsToBooking,
     unbindShipmentFromBooking,
-    updateShipment
+    updateShipment,
+    systemParameters
   } = useApp();
 
   // Stato navigazione sottomenu a sinistra (Opzione A)
@@ -58,46 +59,51 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormId, setShipmentFormId] = useState('');
   const [shipmentFormClient, setShipmentFormClient] = useState('');
   const [shipmentFormCarrier, setShipmentFormCarrier] = useState('');
-  const [shipmentFormOrder, setShipmentFormOrder] = useState('');
-  const [shipmentFormOrder2, setShipmentFormOrder2] = useState('');
+  
+  
+  
+  // Trip Builder states
+  const [tripShipments, setTripShipments] = useState<Partial<Shipment>[]>([{ id: `tmp-${Date.now()}` }]);
+  const [tripJustificationNote, setTripJustificationNote] = useState('');
+
   const [shipmentFormType, setShipmentFormType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
-  const [shipmentFormPallets, setShipmentFormPallets] = useState<number>(24);
+  
   const [shipmentFormExpectedDate, setShipmentFormExpectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [shipmentFormExpectedTime, setShipmentFormExpectedTime] = useState('');
-  const [shipmentFormOriginDest, setShipmentFormOriginDest] = useState('');
-  const [shipmentFormGoods, setShipmentFormGoods] = useState('');
+  
+  
   const [shipmentFormDeliveryDate, setShipmentFormDeliveryDate] = useState('');
   const [selectedModuleFilter, setSelectedModuleFilter] = useState('');
 
   // Nuovi stati per spedizioni estese (mittente/destinatario e logistica)
-  const [shipmentFormSubjectName, setShipmentFormSubjectName] = useState('');
-  const [shipmentFormAddress, setShipmentFormAddress] = useState('');
-  const [shipmentFormCity, setShipmentFormCity] = useState('');
-  const [shipmentFormCap, setShipmentFormCap] = useState('');
-  const [shipmentFormProvince, setShipmentFormProvince] = useState('');
-  const [shipmentFormRegion, setShipmentFormRegion] = useState('');
-  const [shipmentFormCountry, setShipmentFormCountry] = useState('');
-  const [shipmentFormGrossWeight, setShipmentFormGrossWeight] = useState('');
-  const [shipmentFormDeliveryNotes, setShipmentFormDeliveryNotes] = useState('');
-  const [shipmentFormInternalNotes, setShipmentFormInternalNotes] = useState('');
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
   // Nuovi stati per anagrafica geografica strutturata reale e routing del network
   const [shipmentFormRealOriginName, setShipmentFormRealOriginName] = useState('');
-  const [shipmentFormRealOriginAddress, setShipmentFormRealOriginAddress] = useState('');
+  
   const [shipmentFormRealOriginCity, setShipmentFormRealOriginCity] = useState('');
   const [shipmentFormRealOriginCap, setShipmentFormRealOriginCap] = useState('');
   const [shipmentFormRealOriginProvince, setShipmentFormRealOriginProvince] = useState('');
-  const [shipmentFormRealOriginCountry, setShipmentFormRealOriginCountry] = useState('');
+  
   const [shipmentFormRealDestinationName, setShipmentFormRealDestinationName] = useState('');
-  const [shipmentFormRealDestinationAddress, setShipmentFormRealDestinationAddress] = useState('');
+  
   const [shipmentFormRealDestinationCity, setShipmentFormRealDestinationCity] = useState('');
   const [shipmentFormRealDestinationCap, setShipmentFormRealDestinationCap] = useState('');
   const [shipmentFormRealDestinationProvince, setShipmentFormRealDestinationProvince] = useState('');
-  const [shipmentFormRealDestinationCountry, setShipmentFormRealDestinationCountry] = useState('');
+  
   const [shipmentFormHubOrigineOperativo, setShipmentFormHubOrigineOperativo] = useState('');
   const [shipmentFormHubDestinazioneOperativo, setShipmentFormHubDestinazioneOperativo] = useState('');
   const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND' | 'TRANSITO'>('OUTBOUND');
-  const [isRoutingAutoCalculated, setIsRoutingAutoCalculated] = useState(false);
+  
   const [isRoutingAmbiguous, setIsRoutingAmbiguous] = useState(false);
   const [isAutoRoutingEnabled, setIsAutoRoutingEnabled] = useState(true);
   const [shipmentFormRoutingNotes, setShipmentFormRoutingNotes] = useState('Instradamento confermato');
@@ -113,7 +119,7 @@ export const MonitorYard: React.FC = () => {
   const [filterReference, setFilterReference] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [smartSearchQuery, setSmartSearchQuery] = useState('');
-  const [matchedShipmentForGate, setMatchedShipmentForGate] = useState<Shipment | null>(null);
+  const [matchedShipmentsForGate, setMatchedShipmentsForGate] = useState<Shipment[]>([]);
   const [shipmentsFilterTab, setShipmentsFilterTab] = useState<'all' | 'unbound' | 'bound'>('all');
   const [filterProvince, setFilterProvince] = useState('');
   const [filterCountry, setFilterCountry] = useState('');
@@ -361,7 +367,7 @@ export const MonitorYard: React.FC = () => {
     setSmartSearchQuery(query);
     const trimmed = query.trim().toLowerCase();
     if (!trimmed) {
-      setMatchedShipmentForGate(null);
+      setMatchedShipmentsForGate([]);
       return;
     }
 
@@ -377,12 +383,17 @@ export const MonitorYard: React.FC = () => {
     });
 
     if (match) {
-      setMatchedShipmentForGate(match);
+      // Trova tutte le spedizioni dello stesso Viaggio (Trip), oppure solo quella trovata se non ha tripId
+      const tripShipmentsMatch = match.tripId 
+        ? shipments.filter(s => s.tripId === match.tripId)
+        : [match];
+
+      setMatchedShipmentsForGate(tripShipmentsMatch);
       setManualCarrierId(match.carrierId);
       if (match.licensePlate) setManualPlate(match.licensePlate);
       setManualOrderNumber(match.orderNumber);
       setManualOrderNumber2(match.orderNumber2 || '');
-      setManualPallets(match.palletPlaces);
+      setManualPallets(tripShipmentsMatch.reduce((sum, s) => sum + s.palletPlaces, 0));
       setManualActivityCode(match.activityType);
       
       const clientUsage = bayUsages.find(u => u.name.toLowerCase() === match.clientId.toLowerCase() || u.id === match.clientId);
@@ -390,13 +401,13 @@ export const MonitorYard: React.FC = () => {
         setManualClientUsageId(clientUsage.id);
       }
     } else {
-      setMatchedShipmentForGate(null);
+      setMatchedShipmentsForGate([]);
     }
   };
 
   const handleConfirmSmartCheckIn = () => {
-    if (!matchedShipmentForGate) return;
-    const s = matchedShipmentForGate;
+    if (matchedShipmentsForGate.length === 0) return;
+    const s = matchedShipmentsForGate[0];
     
     const todayStr = new Date().toISOString().split('T')[0];
     const newBId = addBooking(
@@ -406,8 +417,8 @@ export const MonitorYard: React.FC = () => {
       manualPlate.toUpperCase() || s.licensePlate?.toUpperCase() || 'TARGA',
       manualDriver || 'Autista Autocompilato',
       manualPhone || undefined,
-      manualNotes || `Smart Check-In per ordine ${s.orderNumber}`,
-      s.palletPlaces,
+      manualNotes || `Smart Check-In per ordine/i ${matchedShipmentsForGate.map(ship => ship.orderNumber).join(', ')}`,
+      matchedShipmentsForGate.reduce((sum, ship) => sum + ship.palletPlaces, 0),
       manualDriverLicense || 'DOCUMENTO',
       manualDriverLicenseRelease || undefined,
       s.orderNumber,
@@ -417,10 +428,10 @@ export const MonitorYard: React.FC = () => {
       s.orderNumber2
     );
 
-    bindShipmentsToBooking([s.id], newBId);
+    bindShipmentsToBooking(matchedShipmentsForGate.map(ship => ship.id), newBId);
 
     setSmartSearchQuery('');
-    setMatchedShipmentForGate(null);
+    setMatchedShipmentsForGate([]);
     setManualPlate('');
     setManualPlateTrailer('');
     setManualDriver('');
@@ -662,42 +673,44 @@ export const MonitorYard: React.FC = () => {
   };
 
   const resetShipmentForm = () => {
+    setTripShipments([{ id: `tmp-${Date.now()}` }]);
+    setTripJustificationNote('');
     setShipmentFormId('');
-    setShipmentFormOrder('');
-    setShipmentFormOrder2('');
-    setShipmentFormPallets(24);
+
+
+
     setShipmentFormExpectedTime('');
-    setShipmentFormOriginDest('');
-    setShipmentFormGoods('');
+
+
     setShipmentFormDeliveryDate('');
-    setShipmentFormSubjectName('');
-    setShipmentFormAddress('');
-    setShipmentFormCity('');
-    setShipmentFormCap('');
-    setShipmentFormProvince('');
-    setShipmentFormRegion('');
-    setShipmentFormCountry('');
-    setShipmentFormGrossWeight('');
-    setShipmentFormDeliveryNotes('');
-    setShipmentFormInternalNotes('');
+
+
+
+
+
+
+
+
+
+
     
     // Nuovi campi
     setShipmentFormRealOriginName('');
-    setShipmentFormRealOriginAddress('');
+
     setShipmentFormRealOriginCity('');
     setShipmentFormRealOriginCap('');
     setShipmentFormRealOriginProvince('');
-    setShipmentFormRealOriginCountry('');
+
     setShipmentFormRealDestinationName('');
-    setShipmentFormRealDestinationAddress('');
+
     setShipmentFormRealDestinationCity('');
     setShipmentFormRealDestinationCap('');
     setShipmentFormRealDestinationProvince('');
-    setShipmentFormRealDestinationCountry('');
+
     setShipmentFormHubOrigineOperativo('');
     setShipmentFormHubDestinazioneOperativo('');
     setShipmentFormTipoOperazioneHub('OUTBOUND');
-    setIsRoutingAutoCalculated(false);
+
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(true);
   };
@@ -706,43 +719,46 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormId(s.id);
     setShipmentFormClient(s.clientId);
     setShipmentFormCarrier(s.carrierId);
-    setShipmentFormOrder(s.orderNumber);
-    setShipmentFormOrder2(s.orderNumber2 || '');
+
+
     setShipmentFormType(s.activityType);
-    setShipmentFormPallets(s.palletPlaces);
+
     setShipmentFormExpectedDate(s.expectedDate);
     setShipmentFormExpectedTime(s.expectedTime || '');
-    setShipmentFormOriginDest(s.originOrDestination || '');
-    setShipmentFormGoods(s.goodsType || '');
+
+
     setShipmentFormDeliveryDate(s.expectedDeliveryDate || '');
-    setShipmentFormSubjectName(s.subjectName || '');
-    setShipmentFormAddress(s.address || '');
-    setShipmentFormCity(s.city || '');
-    setShipmentFormCap(s.cap || '');
-    setShipmentFormProvince(s.province || '');
-    setShipmentFormRegion(s.region || '');
-    setShipmentFormCountry(s.country || '');
-    setShipmentFormGrossWeight(s.grossWeight ? String(s.grossWeight) : '');
-    setShipmentFormDeliveryNotes(s.deliveryNotes || '');
-    setShipmentFormInternalNotes(s.internalNotes || '');
+
+
+
+
+
+
+
+
+
+
+    
+    setTripShipments([s]);
+    setTripJustificationNote(s.justificationNote || '');
 
     // Nuovi campi
     setShipmentFormRealOriginName(s.realOriginName || '');
-    setShipmentFormRealOriginAddress(s.realOriginAddress || '');
+
     setShipmentFormRealOriginCity(s.realOriginCity || '');
     setShipmentFormRealOriginCap(s.realOriginCap || '');
     setShipmentFormRealOriginProvince(s.realOriginProvince || '');
-    setShipmentFormRealOriginCountry(s.realOriginCountry || '');
+
     setShipmentFormRealDestinationName(s.realDestinationName || '');
-    setShipmentFormRealDestinationAddress(s.realDestinationAddress || '');
+
     setShipmentFormRealDestinationCity(s.realDestinationCity || '');
     setShipmentFormRealDestinationCap(s.realDestinationCap || '');
     setShipmentFormRealDestinationProvince(s.realDestinationProvince || '');
-    setShipmentFormRealDestinationCountry(s.realDestinationCountry || '');
+
     setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
     setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
     setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'OUTBOUND');
-    setIsRoutingAutoCalculated(false);
+
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(false);
 
@@ -785,11 +801,11 @@ export const MonitorYard: React.FC = () => {
         setShipmentFormHubDestinazioneOperativo(routing.hubDestinazioneOperativo);
       }
 
-      setIsRoutingAutoCalculated(true);
+
       setIsRoutingAmbiguous(routing.isAmbiguous);
       setShipmentFormRoutingNotes(routing.routingNotes);
     } else {
-      setIsRoutingAutoCalculated(false);
+
       setIsRoutingAmbiguous(false);
       setShipmentFormRoutingNotes('Instradamento confermato');
     }
@@ -812,55 +828,63 @@ export const MonitorYard: React.FC = () => {
     e.preventDefault();
     const cId = shipmentFormClient || clients[0]?.id;
     const carrId = shipmentFormCarrier || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
-    if (!cId || !carrId || !shipmentFormOrder) return;
+    if (!cId || !carrId) return;
 
-    const payloadUpdates = {
-      clientId: cId,
-      carrierId: carrId,
-      depotId: selectedDepotId,
-      orderNumber: shipmentFormOrder,
-      orderNumber2: shipmentFormOrder2 || undefined,
-      activityType: shipmentFormType,
-      palletPlaces: shipmentFormPallets,
-      expectedDate: shipmentFormExpectedDate,
-      expectedTime: shipmentFormExpectedTime || undefined,
-      originOrDestination: shipmentFormOriginDest || '',
-      goodsType: shipmentFormGoods || undefined,
-      expectedDeliveryDate: shipmentFormDeliveryDate || undefined,
-      subjectName: shipmentFormSubjectName || undefined,
-      address: shipmentFormAddress || undefined,
-      city: shipmentFormCity || undefined,
-      cap: shipmentFormCap || undefined,
-      province: shipmentFormProvince || undefined,
-      region: shipmentFormRegion || undefined,
-      country: shipmentFormCountry || undefined,
-      grossWeight: shipmentFormGrossWeight ? Number(shipmentFormGrossWeight) : undefined,
-      deliveryNotes: shipmentFormDeliveryNotes || undefined,
-      internalNotes: shipmentFormInternalNotes || undefined,
-      realOriginName: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.name : (shipmentFormRealOriginName || undefined),
-      realOriginAddress: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.address : (shipmentFormRealOriginAddress || undefined),
-      realOriginCity: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.city : (shipmentFormRealOriginCity || undefined),
-      realOriginCap: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.cap : (shipmentFormRealOriginCap || undefined),
-      realOriginProvince: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.province : (shipmentFormRealOriginProvince || undefined),
-      realOriginCountry: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.country : (shipmentFormRealOriginCountry || undefined),
-      realDestinationName: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.name : (shipmentFormRealDestinationName || undefined),
-      realDestinationAddress: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.address : (shipmentFormRealDestinationAddress || undefined),
-      realDestinationCity: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.city : (shipmentFormRealDestinationCity || undefined),
-      realDestinationCap: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.cap : (shipmentFormRealDestinationCap || undefined),
-      realDestinationProvince: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.province : (shipmentFormRealDestinationProvince || undefined),
-      realDestinationCountry: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.country : (shipmentFormRealDestinationCountry || undefined),
-      hubOrigineOperativo: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? selectedDepotId : (shipmentFormHubOrigineOperativo || undefined),
-      hubDestinazioneOperativo: shipmentFormTipoOperazioneHub === 'INBOUND' ? selectedDepotId : (shipmentFormHubDestinazioneOperativo || undefined),
-      tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
-      routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
-      routingNotes: shipmentFormRoutingNotes
-    };
+    // Preserva il tripId esistente o creane uno nuovo per questo blocco di spedizioni
+    const commonTripId = tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
 
-    if (shipmentFormId) {
-      updateShipment(shipmentFormId, payloadUpdates);
-    } else {
-      addShipment(payloadUpdates);
-    }
+    tripShipments.forEach((row, index) => {
+      const payloadUpdates = {
+        tripId: commonTripId,
+        clientId: cId,
+        carrierId: carrId,
+        depotId: selectedDepotId,
+        orderNumber: row.orderNumber || `GEN-${Date.now()}-${index}`,
+        orderNumber2: row.orderNumber2 || undefined,
+        activityType: shipmentFormType,
+        palletPlaces: row.palletPlaces || 0,
+        expectedDate: shipmentFormExpectedDate,
+        expectedTime: shipmentFormExpectedTime || undefined,
+        originOrDestination: row.originOrDestination || '',
+        goodsType: row.goodsType || undefined,
+        expectedDeliveryDate: shipmentFormDeliveryDate || undefined,
+        subjectName: row.subjectName || undefined,
+        address: row.address || undefined,
+        city: row.city || undefined,
+        cap: row.cap || undefined,
+        province: row.province || undefined,
+        region: row.region || undefined,
+        country: row.country || undefined,
+        grossWeight: row.grossWeight ? Number(row.grossWeight) : undefined,
+        deliveryNotes: row.deliveryNotes || undefined,
+        internalNotes: row.internalNotes || undefined,
+        realOriginName: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.name : (row.realOriginName || undefined),
+        realOriginAddress: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.address : (row.realOriginAddress || undefined),
+        realOriginCity: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.city : (row.realOriginCity || undefined),
+        realOriginCap: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.cap : (row.realOriginCap || undefined),
+        realOriginProvince: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.province : (row.realOriginProvince || undefined),
+        realOriginCountry: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.country : (row.realOriginCountry || undefined),
+        realDestinationName: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.name : (row.realDestinationName || undefined),
+        realDestinationAddress: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.address : (row.realDestinationAddress || undefined),
+        realDestinationCity: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.city : (row.realDestinationCity || undefined),
+        realDestinationCap: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.cap : (row.realDestinationCap || undefined),
+        realDestinationProvince: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.province : (row.realDestinationProvince || undefined),
+        realDestinationCountry: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.country : (row.realDestinationCountry || undefined),
+        hubOrigineOperativo: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? selectedDepotId : (shipmentFormHubOrigineOperativo || undefined),
+        hubDestinazioneOperativo: shipmentFormTipoOperazioneHub === 'INBOUND' ? selectedDepotId : (shipmentFormHubDestinazioneOperativo || undefined),
+        tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
+        routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
+        routingNotes: shipmentFormRoutingNotes,
+        sequence: index + 1,
+        justificationNote: tripJustificationNote
+      };
+
+      if (row.id && !row.id.startsWith('tmp-')) {
+        updateShipment(row.id, payloadUpdates);
+      } else {
+        addShipment(payloadUpdates as any);
+      }
+    });
 
     resetShipmentForm();
     setIsNewShipmentModalOpen(false);
@@ -2655,7 +2679,7 @@ export const MonitorYard: React.FC = () => {
                         {smartSearchQuery && (
                           <button
                             type="button"
-                            onClick={() => { setSmartSearchQuery(''); setMatchedShipmentForGate(null); }}
+                            onClick={() => { setSmartSearchQuery(''); setMatchedShipmentsForGate([]); }}
                             className="bg-blue-200 hover:bg-blue-300 text-blue-800 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer font-mono"
                           >
                             Reset
@@ -2663,21 +2687,21 @@ export const MonitorYard: React.FC = () => {
                         )}
                       </div>
 
-                      {matchedShipmentForGate && (
+                      {matchedShipmentsForGate.length > 0 && (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-3 animate-fade-in text-xs">
                           <div className="text-emerald-800 font-bold flex items-center gap-1.5">
-                            <span>✅ Spedizione Corrispondente Trovata!</span>
+                            <span>✅ Viaggio Corrispondente Trovato! ({matchedShipmentsForGate.length} spedizioni)</span>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-emerald-900 bg-white/50 p-2 rounded-md">
-                            <div><strong>Rif Ordine 1:</strong> {matchedShipmentForGate.orderNumber}</div>
-                            {matchedShipmentForGate.orderNumber2 && <div><strong>Rif Ordine 2:</strong> {matchedShipmentForGate.orderNumber2}</div>}
-                            <div><strong>Tipo Flusso:</strong> {matchedShipmentForGate.activityType === 'CARICO' ? 'CARICO (Partenza)' : 'SCARICO (Arrivo)'}</div>
-                            <div><strong>Posti Pallet:</strong> {matchedShipmentForGate.palletPlaces} PL</div>
-                            <div><strong>Vettore:</strong> {carriers.find(c => c.id === matchedShipmentForGate.carrierId)?.name || matchedShipmentForGate.carrierId}</div>
-                            <div><strong>Cliente:</strong> {clients.find(c => c.id === matchedShipmentForGate.clientId)?.name || matchedShipmentForGate.clientId}</div>
-                            <div><strong>Partenza Reale:</strong> {matchedShipmentForGate.realOriginCity || '-'} ({matchedShipmentForGate.realOriginProvince || '-'})</div>
-                            <div><strong>Destinazione Reale:</strong> {matchedShipmentForGate.realDestinationCity || '-'} ({matchedShipmentForGate.realDestinationProvince || '-'})</div>
-                            <div><strong>Tipo Tratta Network:</strong> {matchedShipmentForGate.tipoOperazioneHub || '-'}</div>
+                            <div><strong>Rif Ordine 1:</strong> {matchedShipmentsForGate.map(s => s.orderNumber).join(', ')}</div>
+                            {matchedShipmentsForGate.some(s => s.orderNumber2) && <div><strong>Rif Ordine 2:</strong> {matchedShipmentsForGate.map(s => s.orderNumber2).filter(Boolean).join(', ')}</div>}
+                            <div><strong>Tipo Flusso:</strong> {matchedShipmentsForGate[0].activityType === 'CARICO' ? 'CARICO (Partenza)' : 'SCARICO (Arrivo)'}</div>
+                            <div><strong>Posti Pallet Totali:</strong> {matchedShipmentsForGate.reduce((sum, s) => sum + s.palletPlaces, 0)} PL</div>
+                            <div><strong>Vettore:</strong> {carriers.find(c => c.id === matchedShipmentsForGate[0].carrierId)?.name || matchedShipmentsForGate[0].carrierId}</div>
+                            <div><strong>Cliente:</strong> {clients.find(c => c.id === matchedShipmentsForGate[0].clientId)?.name || matchedShipmentsForGate[0].clientId}</div>
+                            <div><strong>Partenza Reale:</strong> {matchedShipmentsForGate[0].realOriginCity || '-'} ({matchedShipmentsForGate[0].realOriginProvince || '-'})</div>
+                            <div><strong>Destinazione Reale:</strong> {matchedShipmentsForGate[0].realDestinationCity || '-'} ({matchedShipmentsForGate[0].realDestinationProvince || '-'})</div>
+                            <div><strong>Tipo Tratta Network:</strong> {matchedShipmentsForGate[0].tipoOperazioneHub || '-'}</div>
                           </div>
                           
                           <div className="border-t border-emerald-200 pt-3 space-y-2">
@@ -2719,14 +2743,14 @@ export const MonitorYard: React.FC = () => {
                               disabled={!manualDriver}
                               className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-md transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed uppercase font-mono mt-2"
                             >
-                              Conferma Check-in e Collega Spedizione
+                              Conferma Check-in Viaggio
                             </button>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {!matchedShipmentForGate && (
+                    {matchedShipmentsForGate.length === 0 && (
                       <form onSubmit={handleRegisterManualArrival} className="space-y-4 text-xs font-sans max-w-xl mx-auto p-2 bg-gray-50/50 rounded-xl">
                     <Select
                       label="Vettore Selezionato *"
@@ -4514,7 +4538,7 @@ export const MonitorYard: React.FC = () => {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full border border-black/10 overflow-hidden my-8">
             <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-sm uppercase tracking-wide">
-                {shipmentFormId ? "Modifica Spedizione Manuale" : "Nuova Spedizione Manuale"}
+                {shipmentFormId ? "Modifica Spedizione Manuale" : "Nuovo Viaggio / Inserimento Spedizioni"}
               </h3>
               <button 
                 onClick={() => { resetShipmentForm(); setIsNewShipmentModalOpen(false); }}
@@ -4604,259 +4628,169 @@ export const MonitorYard: React.FC = () => {
                 />
               </div>
 
-              {/* SEZIONE 2: ANAGRAFICA ORIGINE REALE (Nascosta se OUTBOUND) */}
-              {shipmentFormTipoOperazioneHub !== 'OUTBOUND' && (
+              {/* TRIP BUILDER: LISTA SPEDIZIONI */}
               <div className="border-t border-black/5 pt-4">
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Carico Reale (Origine Mittente)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input
-                    label="Ragione Sociale Mittente *"
-                    placeholder="Nome mittente"
-                    value={shipmentFormRealOriginName}
-                    onChange={(e) => setShipmentFormRealOriginName(e.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Indirizzo Mittente"
-                    placeholder="Via, civico"
-                    value={shipmentFormRealOriginAddress}
-                    onChange={(e) => setShipmentFormRealOriginAddress(e.target.value)}
-                  />
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Località (Città) Mittente *</label>
-                    <TerritoryAutocomplete
-                      value={shipmentFormRealOriginCity}
-                      onChange={(val: string, record: any) => {
-                        setShipmentFormRealOriginCity(val);
-                        if (record) {
-                          setShipmentFormRealOriginCap(record.cap);
-                          setShipmentFormRealOriginProvince(record.provincia_sigla);
-                          setShipmentFormRealOriginCountry('Italia');
-                        }
-                      }}
-                      placeholder="Milano, Torino..."
-                    />
-                  </div>
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">Spedizioni del Viaggio</h4>
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    variant="secondary"
+                    onClick={() => setTripShipments([...tripShipments, { id: `tmp-${Date.now()}` }])}
+                  >
+                    + Aggiungi Spedizione
+                  </Button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  <div className="relative">
-                    <Input
-                      label="CAP Mittente"
-                      placeholder="Es. 20100"
-                      value={shipmentFormRealOriginCap}
-                      onChange={(e) => setShipmentFormRealOriginCap(e.target.value)}
-                    />
-                  </div>
-                  <Input
-                    label="Provincia Mittente"
-                    placeholder="MI, TO..."
-                    value={shipmentFormRealOriginProvince}
-                    onChange={(e) => setShipmentFormRealOriginProvince(e.target.value.toUpperCase())}
-                  />
-                  <Input
-                    label="Nazione Mittente"
-                    placeholder="Es. Italia"
-                    value={shipmentFormRealOriginCountry}
-                    onChange={(e) => setShipmentFormRealOriginCountry(e.target.value)}
-                  />
+                
+                <div className="overflow-x-auto border border-black/10 rounded-lg">
+                  <table className="w-full text-left border-collapse text-xs font-sans">
+                    <thead>
+                      <tr className="bg-gray-100 border-b border-black/10">
+                        <th className="p-2 w-10 text-center text-[10px] font-mono text-gray-500 uppercase">Seq</th>
+                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">Rif / Ordine *</th>
+                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Destinazione (Città)' : 'Origine (Città)'}</th>
+                        <th className="p-2 w-20 text-[10px] font-mono text-gray-500 uppercase text-center">Pallet</th>
+                        <th className="p-2 w-24 text-[10px] font-mono text-gray-500 uppercase text-center">Peso (kg)</th>
+                        <th className="p-2 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/5">
+                      {tripShipments.map((row, index) => (
+                        <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="p-2 text-center font-mono font-bold text-gray-400">{index + 1}</td>
+                          <td className="p-2">
+                            <input 
+                              type="text" 
+                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
+                              placeholder="Es. ORD-123"
+                              value={row.orderNumber || ''}
+                              onChange={(e) => {
+                                const newTripShipments = [...tripShipments];
+                                newTripShipments[index].orderNumber = e.target.value;
+                                setTripShipments(newTripShipments);
+                              }}
+                              required
+                            />
+                          </td>
+                          <td className="p-2">
+                            {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? (
+                              <input 
+                                type="text" 
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
+                                placeholder="Città Destinazione"
+                                value={row.realDestinationCity || ''}
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].realDestinationCity = e.target.value;
+                                  setTripShipments(newTripShipments);
+                                }}
+                              />
+                            ) : (
+                              <input 
+                                type="text" 
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
+                                placeholder="Città Origine"
+                                value={row.realOriginCity || ''}
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].realOriginCity = e.target.value;
+                                  setTripShipments(newTripShipments);
+                                }}
+                              />
+                            )}
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              type="number" 
+                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
+                              value={row.palletPlaces || ''}
+                              min="0"
+                              onChange={(e) => {
+                                const newTripShipments = [...tripShipments];
+                                newTripShipments[index].palletPlaces = Number(e.target.value);
+                                setTripShipments(newTripShipments);
+                              }}
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              type="number" 
+                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
+                              value={row.grossWeight || ''}
+                              min="0"
+                              onChange={(e) => {
+                                const newTripShipments = [...tripShipments];
+                                newTripShipments[index].grossWeight = Number(e.target.value);
+                                setTripShipments(newTripShipments);
+                              }}
+                            />
+                          </td>
+                          <td className="p-2 text-center">
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                if (tripShipments.length > 1) {
+                                  setTripShipments(tripShipments.filter((_, i) => i !== index));
+                                }
+                              }}
+                              className="text-gray-400 hover:text-red-600 transition-colors font-bold text-lg"
+                              title="Rimuovi riga"
+                            >
+                              ×
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-              )}
 
-              {/* SEZIONE 3: ANAGRAFICA DESTINAZIONE REALE (Nascosta se INBOUND) */}
-              {shipmentFormTipoOperazioneHub !== 'INBOUND' && (
-              <div className="border-t border-black/5 pt-4">
-                <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600 mb-2">Luogo di Destinazione Reale (Destinatario)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input
-                    label="Ragione Sociale Destinatario *"
-                    placeholder="Nome destinatario"
-                    value={shipmentFormRealDestinationName}
-                    onChange={(e) => setShipmentFormRealDestinationName(e.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Indirizzo Destinatario"
-                    placeholder="Via, civico"
-                    value={shipmentFormRealDestinationAddress}
-                    onChange={(e) => setShipmentFormRealDestinationAddress(e.target.value)}
-                  />
-                  <div className="relative">
-                    <label className="block text-xs font-bold text-gray-700 mb-1">Località (Città) Destinatario *</label>
-                    <TerritoryAutocomplete
-                      value={shipmentFormRealDestinationCity}
-                      onChange={(val: string, record: any) => {
-                        setShipmentFormRealDestinationCity(val);
-                        if (record) {
-                          setShipmentFormRealDestinationCap(record.cap);
-                          setShipmentFormRealDestinationProvince(record.provincia_sigla);
-                          setShipmentFormRealDestinationCountry('Italia');
-                        }
-                      }}
-                      placeholder="Roma, Bari..."
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  <div className="relative">
-                    <Input
-                      label="CAP Destinatario"
-                      placeholder="Es. 00100"
-                      value={shipmentFormRealDestinationCap}
-                      onChange={(e) => setShipmentFormRealDestinationCap(e.target.value)}
-                    />
-                  </div>
-                  <Input
-                    label="Provincia Destinatario"
-                    placeholder="RM, BA..."
-                    value={shipmentFormRealDestinationProvince}
-                    onChange={(e) => setShipmentFormRealDestinationProvince(e.target.value.toUpperCase())}
-                  />
-                  <Input
-                    label="Nazione Destinatario"
-                    placeholder="Es. Italia"
-                    value={shipmentFormRealDestinationCountry}
-                    onChange={(e) => setShipmentFormRealDestinationCountry(e.target.value)}
-                  />
-                </div>
-              </div>
-              )}
+              {/* CONTROLLO LIMITI */}
+              {(() => {
+                const currentTotalPallets = tripShipments.reduce((sum, s) => sum + (Number(s.palletPlaces) || 0), 0);
+                const currentTotalWeight = tripShipments.reduce((sum, s) => sum + (Number(s.grossWeight) || 0), 0);
+                const maxPalletsParam = systemParameters.find(p => p.key === 'MAX_POSTI_PALLET_STANDARD')?.value;
+                const maxWeightParam = systemParameters.find(p => p.key === 'MAX_PESO_LORDO_KG')?.value;
+                const maxPallets = maxPalletsParam ? Number(maxPalletsParam) : 33;
+                const maxWeight = maxWeightParam ? Number(maxWeightParam) : 28000;
+                const isOverLimit = currentTotalPallets > maxPallets || currentTotalWeight > maxWeight;
 
-              {/* SEZIONE 1: ROUTING DI RETE */}
-              <div className="border-t border-black/5 pt-4 bg-gray-50/50 p-4 rounded-xl space-y-3">
-                <div className="flex justify-between items-center">
-                  <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">
-                    Routing di Rete (Assisted Routing)
-                  </h4>
-                </div>
-
-                {isRoutingAutoCalculated && (
-                  <div className="animate-fade-in">
-                    {isRoutingAmbiguous ? (
-                      <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-1 rounded-md font-medium block">
-                        ⚠️ **Instradamento Ambiguo:** Il sistema non ha trovato un match univoco per l'Hub suggerito. Verifica manualmente la selezione.
-                      </span>
-                    ) : (
-                      <span className="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md font-medium block">
-                        ✨ **Assisted Routing Attivo:** L'Hub è stato suggerito in base alla località {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'di destinazione' : 'di provenienza'}.
-                      </span>
+                return (
+                  <div className={`border rounded-xl p-4 transition-colors ${isOverLimit ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-black/5'}`}>
+                    <div className="flex justify-between items-center text-xs font-mono">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-gray-500 uppercase tracking-wider text-[9px]">Totale Pallet</span>
+                        <span className={`text-lg font-bold ${currentTotalPallets > maxPallets ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {currentTotalPallets} <span className="text-xs font-medium text-gray-400">/ {maxPallets} PL</span>
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1 text-right">
+                        <span className="text-gray-500 uppercase tracking-wider text-[9px]">Totale Peso Lordo</span>
+                        <span className={`text-lg font-bold ${currentTotalWeight > maxWeight ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {currentTotalWeight} <span className="text-xs font-medium text-gray-400">/ {maxWeight} kg</span>
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {isOverLimit && (
+                      <div className="mt-4 pt-4 border-t border-orange-200/50 animate-fade-in">
+                        <label className="text-[10px] font-mono font-bold uppercase text-red-600 mb-1.5 flex items-center gap-1.5">
+                          ⚠️ Nota Giustificativa Obbligatoria (Sforamento Limiti) *
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full border border-orange-300 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none bg-white shadow-sm"
+                          placeholder="Inserisci giustificazione autorizzata per il sovraccarico..."
+                          value={tripJustificationNote}
+                          onChange={(e) => setTripJustificationNote(e.target.value)}
+                          required
+                        />
+                      </div>
                     )}
                   </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Select
-                    label="Hub Origine Operativo *"
-                    options={depots.map(d => ({ value: d.id, label: d.name }))}
-                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? activeDepot?.name : (depots.find(d => d.id === shipmentFormHubOrigineOperativo)?.name || '')}
-                    onChange={(e) => {
-                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
-                      if (found) {
-                        setShipmentFormHubOrigineOperativo(found.id);
-                        setIsAutoRoutingEnabled(false);
-                      }
-                    }}
-                    required
-                    disabled={shipmentFormTipoOperazioneHub === 'OUTBOUND'}
-                  />
-                  <Select
-                    label="Hub Destinazione Operativo *"
-                    options={depots.map(d => ({ value: d.id, label: d.name }))}
-                    value={shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.name : (depots.find(d => d.id === shipmentFormHubDestinazioneOperativo)?.name || '')}
-                    onChange={(e) => {
-                      const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
-                      if (found) {
-                        setShipmentFormHubDestinazioneOperativo(found.id);
-                        setIsAutoRoutingEnabled(false);
-                      }
-                    }}
-                    required
-                    disabled={shipmentFormTipoOperazioneHub === 'INBOUND'}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 border-t border-black/5 pt-4">
-                <Input
-                  label="Data Prevista Slot *"
-                  type="date"
-                  value={shipmentFormExpectedDate}
-                  onChange={(e) => setShipmentFormExpectedDate(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-black/5 pt-4">
-                <Input
-                  label="Riferimento 1 *"
-                  placeholder="Ordine / Rif 1"
-                  value={shipmentFormOrder}
-                  onChange={(e) => setShipmentFormOrder(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Riferimento 2"
-                  placeholder="DDT / Rif 2"
-                  value={shipmentFormOrder2}
-                  onChange={(e) => setShipmentFormOrder2(e.target.value)}
-                />
-                <Input
-                  label="Ora Prevista"
-                  placeholder="Es. 09:30"
-                  value={shipmentFormExpectedTime}
-                  onChange={(e) => setShipmentFormExpectedTime(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Input
-                  label="Posti Pallet *"
-                  type="number"
-                  value={shipmentFormPallets}
-                  onChange={(e) => setShipmentFormPallets(Number(e.target.value))}
-                  required
-                />
-                <Input
-                  label="Peso Lordo (kg) *"
-                  type="number"
-                  value={shipmentFormGrossWeight}
-                  onChange={(e) => setShipmentFormGrossWeight(e.target.value)}
-                  required
-                />
-                <Input
-                  label="Tipologia Merce"
-                  placeholder="Alimentare / Secco / Fresco"
-                  value={shipmentFormGoods}
-                  onChange={(e) => setShipmentFormGoods(e.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 border-t border-black/5 pt-4">
-                <div>
-                  <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
-                    Note Consegna
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={shipmentFormDeliveryNotes}
-                    onChange={(e) => setShipmentFormDeliveryNotes(e.target.value)}
-                    placeholder="Specifiche e note di consegna..."
-                    className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 block mb-1">
-                    Note Interne
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={shipmentFormInternalNotes}
-                    onChange={(e) => setShipmentFormInternalNotes(e.target.value)}
-                    placeholder="Note interne di yard / guardiola..."
-                    className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none resize-none font-sans"
-                  />
-                </div>
-              </div>
+                );
+              })()}
 
               <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50 -mx-6 -mb-6">
                 <Button 
