@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Card } from '../components/ui/Card';
 import { TerritoryAutocomplete } from '../components/TerritoryAutocomplete';
 import { Input, Select } from '../components/ui/Input';
@@ -60,6 +61,16 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormId, setShipmentFormId] = useState('');
   const [shipmentFormClient, setShipmentFormClient] = useState('');
   const [shipmentFormCarrier, setShipmentFormCarrier] = useState('');
+  
+  const [confirmDialogState, setConfirmDialogState] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Conferma',
+    isDanger: false,
+    isAlert: false,
+    onConfirm: () => {},
+  });
   
   
   
@@ -850,6 +861,10 @@ export const MonitorYard: React.FC = () => {
       alert(`Il numero di delivery "${duplicateDelivery.orderNumber}" è già esistente per questo committente. Deve essere univoco.`);
       return;
     }
+
+    // Memorizza la scelta per i successivi inserimenti
+    setShipmentFormClient(cId);
+    setShipmentFormCarrier(carrId);
 
     // Preserva il tripId esistente o creane uno nuovo per questo blocco di spedizioni se esplicitato, altrimenti uniscili al form.
     const commonTripId = shipmentFormTripNumber || tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
@@ -1952,13 +1967,14 @@ export const MonitorYard: React.FC = () => {
                     </div>
                   </Card>
 
-                  {/* Spedizioni associate attive */}
-                  <Card title="Spedizioni già associate ai viaggi in corso" accent="green">
+                  {/* Spedizioni associate attive (Mezzi fisici) */}
+                  <Card title="Mezzi fisici" accent="green">
                     <div className="space-y-4 max-h-[350px] overflow-y-auto">
                       {shipments
                         .filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO')
                         .map(s => {
                           const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                          const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Vettore';
                           const booking = bookings.find(b => b.id === s.bookingId);
 
                           return (
@@ -1967,7 +1983,7 @@ export const MonitorYard: React.FC = () => {
                                 <div>
                                   <span className="font-bold font-mono text-emerald-600 text-xs block">{s.orderNumber}</span>
                                   <span className="text-[10px] font-sans text-gray-700 block mt-0.5">
-                                    Cliente: <span className="font-bold">{clientName}</span> | {s.palletPlaces} PLT | {s.activityType}
+                                    Cliente: <span className="font-bold">{clientName}</span> | Vettore: <span className="font-bold">{carrierName}</span>
                                   </span>
                                   <span className="text-[10px] font-mono text-gray-400 block mt-1">
                                     Veicolo: <span className="font-bold text-ticket-accent">{booking?.ticketNumber || 'Sconosciuto'}</span> ({booking?.licensePlate})
@@ -1999,7 +2015,12 @@ export const MonitorYard: React.FC = () => {
             {guardiolaView === ('shipments' as any) && (
               <div className="lg:col-span-3 space-y-6 animate-fade-in font-sans">
                 
-                {/* BARRA DELLE AZIONI PRINCIPALI (BOTTONI MANUALE & IMPORT E BATCH DELETE) */}
+                <div className="bg-gradient-to-r from-[#004B97] to-[#003366] p-4 rounded-xl text-white shadow-lg mb-6">
+                  <h2 className="text-xl font-bold">Gestione Hub: {depots.find(d => d.id === selectedDepotId)?.name || 'Seleziona Hub'}</h2>
+                  <p className="text-xs text-blue-100 opacity-80">Operatività giornaliera e pianificazione spedizioni</p>
+                </div>
+
+                {/* BARRA DELLE AZIONI PRINCIPALI */}
                 <div className="flex flex-wrap gap-3 items-center justify-between bg-white border border-black/10 p-4 rounded-xl shadow-xs">
                   <div className="flex gap-2">
                     <Button 
@@ -2023,7 +2044,7 @@ export const MonitorYard: React.FC = () => {
                     </Button>
                   </div>
 
-                  {/* AZIONI MASSIVE (Solo se ci sono elementi selezionati) */}
+                  {/* AZIONI MASSIVE */}
                   {selectedShipmentIds.length > 0 && (
                     <div className="flex items-center gap-2 bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-lg animate-fade-in">
                       <span className="text-[10px] font-mono text-rose-700 font-bold">
@@ -2033,10 +2054,35 @@ export const MonitorYard: React.FC = () => {
                         size="sm"
                         variant="danger"
                         onClick={() => {
-                          if (confirm(`Sei sicuro di voler eliminare permanentemente queste ${selectedShipmentIds.length} spedizioni?`)) {
-                            deleteShipments(selectedShipmentIds);
-                            setSelectedShipmentIds([]);
+                          const shipmentsToDelete = shipments.filter(s => selectedShipmentIds.includes(s.id));
+                          const assignedShipments = shipmentsToDelete.filter(s => s.bookingId || s.status !== 'DA_PIANIFICARE');
+                          
+                          if (assignedShipments.length > 0) {
+                            setConfirmDialogState({
+                              isOpen: true,
+                              title: 'Azione non consentita',
+                              message: `Impossibile eliminare: ${assignedShipments.length} delle spedizioni selezionate sono già associate a un veicolo o hanno operazioni in corso.`,
+                              confirmLabel: 'OK',
+                              isDanger: true,
+                              isAlert: true,
+                              onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })),
+                            });
+                            return;
                           }
+                          
+                          setConfirmDialogState({
+                            isOpen: true,
+                            title: 'Conferma Eliminazione',
+                            message: `Sei sicuro di voler eliminare permanentemente queste ${selectedShipmentIds.length} spedizioni?`,
+                            confirmLabel: 'Elimina Selezionate',
+                            isDanger: true,
+                            isAlert: false,
+                            onConfirm: () => {
+                              deleteShipments(selectedShipmentIds);
+                              setSelectedShipmentIds([]);
+                              setConfirmDialogState(prev => ({ ...prev, isOpen: false }));
+                            }
+                          });
                         }}
                         className="py-1 text-[9px] uppercase font-bold"
                       >
@@ -2343,9 +2389,30 @@ export const MonitorYard: React.FC = () => {
                               Modifica
                             </Button>
                             <Button size="sm" variant="danger" onClick={() => {
-                              if (confirm('Sei sicuro di voler eliminare questa spedizione?')) {
-                                deleteShipment(s.id);
+                              if (s.bookingId || s.status !== 'DA_PIANIFICARE') {
+                                setConfirmDialogState({
+                                  isOpen: true,
+                                  title: 'Azione non consentita',
+                                  message: 'Impossibile eliminare questa spedizione perché è già associata a un veicolo o ha operazioni in corso.',
+                                  confirmLabel: 'OK',
+                                  isDanger: true,
+                                  isAlert: true,
+                                  onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })),
+                                });
+                                return;
                               }
+                              setConfirmDialogState({
+                                isOpen: true,
+                                title: 'Conferma Eliminazione',
+                                message: 'Sei sicuro di voler eliminare questa spedizione?',
+                                confirmLabel: 'Elimina',
+                                isDanger: true,
+                                isAlert: false,
+                                onConfirm: () => {
+                                  deleteShipment(s.id);
+                                  setConfirmDialogState(prev => ({ ...prev, isOpen: false }));
+                                }
+                              });
                             }}>
                               Rimuovi
                             </Button>
@@ -4612,6 +4679,16 @@ export const MonitorYard: React.FC = () => {
             </div>
             <form onSubmit={handleSaveShipmentForm} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               
+              <div className="bg-gray-50 p-4 rounded-xl border border-black/10 flex flex-col items-center justify-center mb-4 text-center">
+                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">
+                  {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Hub di Partenza' : 
+                   shipmentFormTipoOperazioneHub === 'INBOUND' ? 'Hub di Arrivo' : 'Hub di Transito'}
+                </span>
+                <span className="text-xl font-black text-[#004B97] uppercase tracking-wide">
+                  {depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO'}
+                </span>
+              </div>
+
               {/* DISTINZIONE NETTA ARRIVO / PARTENZA */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
@@ -4916,7 +4993,7 @@ export const MonitorYard: React.FC = () => {
                     size="sm" 
                     variant="secondary"
                     className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                    onClick={() => setTripShipments([...tripShipments, { id: `tmp-${Date.now()}` }])}
+                    onClick={() => setTripShipments([{ id: `tmp-${Date.now()}` }, ...tripShipments])}
                   >
                     + Salva Spedizione e Aggiungi Nuova Riga
                   </Button>
@@ -5305,6 +5382,11 @@ export const MonitorYard: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog 
+        {...confirmDialogState} 
+        onCancel={() => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))} 
+      />
     </div>
   );
 };
