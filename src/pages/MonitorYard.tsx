@@ -2961,11 +2961,8 @@ export const MonitorYard: React.FC = () => {
                     <Select
                       label="Vettore Selezionato *"
                       options={carriers.filter(c => c.status === 'APPROVATO').map((c) => ({ value: c.id, label: c.name }))}
-                      value={carriers.find(c => c.id === manualCarrierId)?.name || manualCarrierId}
-                      onChange={(e) => {
-                        const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
-                        if (found) setManualCarrierId(found.id);
-                      }}
+                      value={manualCarrierId}
+                      onChange={(e) => setManualCarrierId(e.target.value)}
                     />
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
@@ -3010,11 +3007,8 @@ export const MonitorYard: React.FC = () => {
                       <Select
                         label="Riferimento Cliente / Uso Baia"
                         options={[{ value: '', label: 'Nessuno specifico' }, ...bayUsages.map(u => ({ value: u.id, label: u.name }))]}
-                        value={bayUsages.find(u => u.id === manualClientUsageId)?.name || manualClientUsageId}
-                        onChange={(e) => {
-                          const found = bayUsages.find(u => u.name === e.target.value || u.id === e.target.value);
-                          setManualClientUsageId(found ? found.id : e.target.value);
-                        }}
+                        value={manualClientUsageId}
+                        onChange={(e) => setManualClientUsageId(e.target.value)}
                       />
                       <Input
                         label="Telefono Autista"
@@ -4825,21 +4819,15 @@ export const MonitorYard: React.FC = () => {
                 <Select
                   label="Cliente Committente *"
                   options={clients.map(c => ({ value: c.id, label: c.name }))}
-                  value={clients.find(c => c.id === shipmentFormClient)?.name || (clients[0]?.name || '')}
-                  onChange={(e) => {
-                    const found = clients.find(c => c.name === e.target.value || c.id === e.target.value);
-                    if (found) setShipmentFormClient(found.id);
-                  }}
+                  value={shipmentFormClient}
+                  onChange={(e) => setShipmentFormClient(e.target.value)}
                   required
                 />
                 <Select
                   label="Vettore Assegnato *"
                   options={carriers.filter(c => c.status === 'APPROVATO').map(c => ({ value: c.id, label: c.name }))}
-                  value={carriers.find(c => c.id === shipmentFormCarrier)?.name || (carriers.filter(c => c.status === 'APPROVATO')[0]?.name || '')}
-                  onChange={(e) => {
-                    const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
-                    if (found) setShipmentFormCarrier(found.id);
-                  }}
+                  value={shipmentFormCarrier}
+                  onChange={(e) => setShipmentFormCarrier(e.target.value)}
                   required
                 />
                 <Input

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import territoryData from '../data/territory.json';
 
 export interface TerritoryRecord {
   regione: string;
@@ -45,6 +44,15 @@ export function TerritoryAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const [territoryData, setTerritoryData] = useState<TerritoryRecord[]>([]);
+
+  useEffect(() => {
+    // Dynamic import to avoid blocking the main thread during initial load
+    import('../data/territory.json').then((module) => {
+      setTerritoryData(module.default as TerritoryRecord[]);
+    }).catch(console.error);
+  }, []);
+
   // Combina i dati statici con quelli inseriti manualmente e salvati nel localStorage
   const allTerritories = useMemo(() => {
     const customStr = localStorage.getItem('custom_territories');
@@ -53,7 +61,7 @@ export function TerritoryAutocomplete({
       try { custom = JSON.parse(customStr); } catch (e) {}
     }
     return [...custom, ...territoryData];
-  }, []);
+  }, [territoryData]);
 
   // Filtra i record in base alla ricerca (massimo 50 per performance)
   const filteredRecords = useMemo(() => {

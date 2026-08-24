@@ -5,7 +5,6 @@ import { Card } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Input';
 import { Table } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
-import territoryData from '../data/territory.json';
 
 
 
@@ -63,7 +62,12 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     deleteShipment
   } = useApp();
 
-  const comuni = territoryData;
+  const [comuni, setComuni] = useState<any[]>([]);
+  useEffect(() => {
+    import('../data/territory.json').then((m) => {
+      setComuni(m.default);
+    }).catch(console.error);
+  }, []);
 
   const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments' | 'comuni'>(defaultTab);
 
