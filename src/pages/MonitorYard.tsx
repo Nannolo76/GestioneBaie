@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -138,6 +138,111 @@ export const MonitorYard: React.FC = () => {
   const [shipmentsFilterTab, setShipmentsFilterTab] = useState<'all' | 'unbound' | 'bound'>('all');
   const [filterProvince, setFilterProvince] = useState('');
   const [filterCountry, setFilterCountry] = useState('');
+
+  // Performance optimizations: Pagination and Date Filter
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+  const [dateFilter, setDateFilter] = useState<'ALL' | '7_DAYS' | 'TODAY'>('7_DAYS');
+
+  // Performance optimizations: O(1) Lookups (HashMaps)
+  const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
+  const carrierMap = useMemo(() => new Map(carriers.map(c => [c.id, c.name])), [carriers]);
+  const bookingMap = useMemo(() => new Map(bookings.map(b => [b.id, b])), [bookings]);
+
+  // Derived state for the main grid
+  const filteredShipments = useMemo(() => {
+    return shipments.filter(s => {
+      // Base logic: DA_CONFERMARE excluded, must belong to depot
+      if (s.routingStatus === 'DA_CONFERMARE') return false;
+      if (s.depotId !== selectedDepotId && s.hubOrigineOperativo !== selectedDepotId && s.hubDestinazioneOperativo !== selectedDepotId) return false;
+
+      // Filtro Stato Associazione
+      if (shipmentsFilterTab === 'unbound' && s.bookingId) return false;
+      if (shipmentsFilterTab === 'bound' && !s.bookingId) return false;
+
+      // Date Filter
+      if (dateFilter === '7_DAYS' && s.expectedDate) {
+        const shipmentDate = new Date(s.expectedDate);
+        const today = new Date();
+        const diffTime = today.getTime() - shipmentDate.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24); 
+        if (diffDays > 7 || diffDays < -30) return false; // Show from last 7 days up to 30 days in future
+      }
+      if (dateFilter === 'TODAY' && s.expectedDate) {
+        const shipmentDate = new Date(s.expectedDate).toISOString().split('T')[0];
+        const today = new Date().toISOString().split('T')[0];
+        if (shipmentDate !== today) return false;
+      }
+
+      // Riferimenti
+      if (filterReference.trim()) {
+        const query = filterReference.trim().toLowerCase();
+        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+        if (terms.length > 0) {
+          const matchesAny = terms.some(term => 
+            s.orderNumber.toLowerCase() === term || 
+            (s.orderNumber2 && s.orderNumber2.toLowerCase() === term) ||
+            (s.tripId && s.tripId.toLowerCase().includes(term))
+          );
+          if (!matchesAny) return false;
+        }
+      }
+
+      // Ricerca Libera
+      if (filterSearch.trim()) {
+        const query = filterSearch.trim().toLowerCase();
+        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+        if (terms.length > 0) {
+          const matchesAny = terms.some(term => {
+            const sName = (s.subjectName || '').toLowerCase();
+            const sCity = (s.city || '').toLowerCase();
+            const sProv = (s.province || '').toLowerCase();
+            const sCountry = (s.country || '').toLowerCase();
+            const sOriginDest = (s.originOrDestination || '').toLowerCase();
+            return sName.includes(term) || 
+                   sCity.includes(term) || 
+                   sProv.includes(term) || 
+                   sCountry.includes(term) ||
+                   sOriginDest.includes(term);
+          });
+          if (!matchesAny) return false;
+        }
+      }
+
+      // Provincia
+      if (filterProvince.trim()) {
+        const query = filterProvince.trim().toLowerCase();
+        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+        if (terms.length > 0) {
+          const matchesAny = terms.some(term => (s.province || '').toLowerCase() === term);
+          if (!matchesAny) return false;
+        }
+      }
+
+      // Nazione
+      if (filterCountry.trim()) {
+        const query = filterCountry.trim().toLowerCase();
+        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
+        if (terms.length > 0) {
+          const matchesAny = terms.some(term => (s.country || '').toLowerCase() === term);
+          if (!matchesAny) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [shipments, selectedDepotId, shipmentsFilterTab, filterReference, filterSearch, filterProvince, filterCountry, dateFilter]);
+
+  const totalPages = Math.ceil(filteredShipments.length / ITEMS_PER_PAGE);
+  const paginatedShipments = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredShipments.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredShipments, currentPage, ITEMS_PER_PAGE]);
+
+  // Optimized counts for tabs
+  const countAll = useMemo(() => shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && s.routingStatus !== 'DA_CONFERMARE').length, [shipments, selectedDepotId]);
+  const countUnbound = useMemo(() => shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length, [shipments, selectedDepotId]);
+  const countBound = useMemo(() => shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !!s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length, [shipments, selectedDepotId]);
 
   // Stati Importazione da file/testo
   const [importText, setImportText] = useState('');
@@ -1875,7 +1980,7 @@ export const MonitorYard: React.FC = () => {
                           );
                         })
                         .map(s => {
-                          const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                          const clientName = clientMap.get(s.clientId) || s.clientId || 'Generico';
                           const isLinking = activeLinkingShipmentId === s.id;
                           
                           // Filtra i mezzi attivi presenti in Yard
@@ -1973,9 +2078,9 @@ export const MonitorYard: React.FC = () => {
                       {shipments
                         .filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO')
                         .map(s => {
-                          const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
-                          const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Vettore';
-                          const booking = bookings.find(b => b.id === s.bookingId);
+                          const clientName = clientMap.get(s.clientId) || s.clientId || 'Generico';
+                          const carrierName = carrierMap.get(s.carrierId) || s.carrierId || 'Vettore';
+                          const booking = bookingMap.get(s.bookingId || '');
 
                           return (
                             <div key={s.id} className="p-3 bg-white border border-emerald-100 rounded-xl space-y-2 shadow-xs">
@@ -2148,105 +2253,51 @@ export const MonitorYard: React.FC = () => {
                 <Card
                   title="Viaggi e Spedizioni Daily Program"
                   headerAction={
-                    <div className="flex gap-2 font-mono">
+                    <div className="flex gap-2 font-mono items-center">
+                      <select 
+                        value={dateFilter} 
+                        onChange={(e) => { setDateFilter(e.target.value as any); setCurrentPage(1); }}
+                        className="bg-white border border-black/10 text-xs px-2 py-1.5 rounded-lg outline-none font-bold text-gray-700 mr-2"
+                      >
+                        <option value="TODAY">Oggi</option>
+                        <option value="7_DAYS">Ultimi 7 Giorni</option>
+                        <option value="ALL">Tutte le date</option>
+                      </select>
                       <button
-                        onClick={() => setShipmentsFilterTab('all')}
+                        onClick={() => { setShipmentsFilterTab('all'); setCurrentPage(1); }}
                         className={`px-3 py-1.5 font-mono text-[10px] font-bold uppercase transition-all rounded-lg cursor-pointer border ${
                           shipmentsFilterTab === 'all'
                             ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
                         }`}
                       >
-                        Tutte ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && s.routingStatus !== 'DA_CONFERMARE').length})
+                        Tutte ({countAll})
                       </button>
                       <button
-                        onClick={() => setShipmentsFilterTab('unbound')}
+                        onClick={() => { setShipmentsFilterTab('unbound'); setCurrentPage(1); }}
                         className={`px-3 py-1.5 font-mono text-[10px] font-bold uppercase transition-all rounded-lg cursor-pointer border ${
                           shipmentsFilterTab === 'unbound'
                             ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
                         }`}
                       >
-                        Da Associare ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length})
+                        Da Associare ({countUnbound})
                       </button>
                       <button
-                        onClick={() => setShipmentsFilterTab('bound')}
+                        onClick={() => { setShipmentsFilterTab('bound'); setCurrentPage(1); }}
                         className={`px-3 py-1.5 font-mono text-[10px] font-bold uppercase transition-all rounded-lg cursor-pointer border ${
                           shipmentsFilterTab === 'bound'
                             ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black'
                         }`}
                       >
-                        Già Associate ({shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && !!s.bookingId && s.routingStatus !== 'DA_CONFERMARE').length})
+                        Già Associate ({countBound})
                       </button>
                     </div>
                   }
                 >
                   <Table
-                    data={shipments.filter(s => {
-                      if (s.routingStatus === 'DA_CONFERMARE') return false;
-                      if (s.depotId !== selectedDepotId && s.hubOrigineOperativo !== selectedDepotId && s.hubDestinazioneOperativo !== selectedDepotId) return false;
-
-                      // Filtro Stato Associazione
-                      if (shipmentsFilterTab === 'unbound' && s.bookingId) return false;
-                      if (shipmentsFilterTab === 'bound' && !s.bookingId) return false;
-
-                      // Riferimenti
-                      if (filterReference.trim()) {
-                        const query = filterReference.trim().toLowerCase();
-                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
-                        if (terms.length > 0) {
-                          const matchesAny = terms.some(term => 
-                            s.orderNumber.toLowerCase() === term || 
-                            (s.orderNumber2 && s.orderNumber2.toLowerCase() === term)
-                          );
-                          if (!matchesAny) return false;
-                        }
-                      }
-
-                      // Ricerca Libera
-                      if (filterSearch.trim()) {
-                        const query = filterSearch.trim().toLowerCase();
-                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
-                        if (terms.length > 0) {
-                          const matchesAny = terms.some(term => {
-                            const sName = (s.subjectName || '').toLowerCase();
-                            const sCity = (s.city || '').toLowerCase();
-                            const sProv = (s.province || '').toLowerCase();
-                            const sCountry = (s.country || '').toLowerCase();
-                            const sOriginDest = (s.originOrDestination || '').toLowerCase();
-                            return sName.includes(term) || 
-                                   sCity.includes(term) || 
-                                   sProv.includes(term) || 
-                                   sCountry.includes(term) ||
-                                   sOriginDest.includes(term);
-                          });
-                          if (!matchesAny) return false;
-                        }
-                      }
-
-                      // Provincia
-                      if (filterProvince.trim()) {
-                        const query = filterProvince.trim().toLowerCase();
-                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
-                        if (terms.length > 0) {
-                          const matchesAny = terms.some(term => (s.province || '').toLowerCase() === term);
-                          if (!matchesAny) return false;
-                        }
-                      }
-
-                      // Nazione
-                      if (filterCountry.trim()) {
-                        const query = filterCountry.trim().toLowerCase();
-                        const terms = query.split('&').map(t => t.trim()).filter(Boolean);
-                        if (terms.length > 0) {
-                          const matchesAny = terms.some(term => (s.country || '').toLowerCase() === term);
-                          if (!matchesAny) return false;
-                        }
-                      }
-
-                      return true;
-                    })}
+                    data={paginatedShipments}
                     emptyMessage="Nessun viaggio commissionato corrisponde ai filtri impostati."
                     columns={[
                       {
@@ -2254,13 +2305,12 @@ export const MonitorYard: React.FC = () => {
                           <input
                             type="checkbox"
                             checked={
-                              shipments.filter(s => s.depotId === selectedDepotId).length > 0 &&
-                              selectedShipmentIds.length === shipments.filter(s => s.depotId === selectedDepotId).length
+                              filteredShipments.length > 0 &&
+                              selectedShipmentIds.length === filteredShipments.length
                             }
                             onChange={(e) => {
-                              const deptShips = shipments.filter(s => s.depotId === selectedDepotId);
                               if (e.target.checked) {
-                                setSelectedShipmentIds(deptShips.map(s => s.id));
+                                setSelectedShipmentIds(filteredShipments.map(s => s.id));
                               } else {
                                 setSelectedShipmentIds([]);
                               }
@@ -2317,8 +2367,8 @@ export const MonitorYard: React.FC = () => {
                       {
                         header: 'Committente / Soggetto & Tratta',
                         accessor: (s) => {
-                          const clientName = clients.find(c => c.id === s.clientId)?.name || 'Sconosciuto';
-                          const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Sconosciuto';
+                          const clientName = clientMap.get(s.clientId) || s.clientId || 'Sconosciuto';
+                          const carrierName = carrierMap.get(s.carrierId) || s.carrierId || 'Sconosciuto';
                           return (
                             <div className="text-xs font-sans space-y-0.5">
                               <div><span className="text-[9px] text-gray-400 font-mono">Client:</span> <span className="font-bold">{clientName}</span></div>
@@ -2421,6 +2471,32 @@ export const MonitorYard: React.FC = () => {
                       }
                     ]}
                   />
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between p-4 border-t border-black/5 bg-gray-50 rounded-b-xl">
+                      <span className="text-xs font-mono text-gray-500">
+                        Pagina {currentPage} di {totalPages} ({filteredShipments.length} risultati totali)
+                      </span>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        >
+                          Precedente
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        >
+                          Successiva
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </Card>
               </div>
             )}
