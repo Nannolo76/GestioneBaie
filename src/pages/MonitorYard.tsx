@@ -4611,7 +4611,7 @@ export const MonitorYard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Select
                   label="Cliente Committente *"
                   options={clients.map(c => ({ value: c.id, label: c.name }))}
@@ -4631,6 +4631,12 @@ export const MonitorYard: React.FC = () => {
                     if (found) setShipmentFormCarrier(found.id);
                   }}
                   required
+                />
+                <Input
+                  label="Rif. Viaggio (Opzionale)"
+                  value={shipmentFormTripNumber}
+                  onChange={(e) => setShipmentFormTripNumber(e.target.value)}
+                  placeholder="Es. V-10029"
                 />
               </div>
 
@@ -4653,7 +4659,7 @@ export const MonitorYard: React.FC = () => {
                     <thead>
                       <tr className="bg-gray-100 border-b border-black/10">
                         <th className="p-2 w-10 text-center text-[10px] font-mono text-gray-500 uppercase">Seq</th>
-                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">Rif / Ordine *</th>
+                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">Riferimenti Delivery *</th>
                         <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Dati Destinatario' : 'Dati Mittente'}</th>
                         <th className="p-2 w-20 text-[10px] font-mono text-gray-500 uppercase text-center">Pallet</th>
                         <th className="p-2 w-24 text-[10px] font-mono text-gray-500 uppercase text-center">Peso (kg)</th>
@@ -4664,19 +4670,43 @@ export const MonitorYard: React.FC = () => {
                       {tripShipments.map((row, index) => (
                         <tr key={row.id} className="hover:bg-gray-50 transition-colors">
                           <td className="p-2 text-center font-mono font-bold text-gray-400">{index + 1}</td>
-                          <td className="p-2">
-                            <input 
-                              type="text" 
-                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
-                              placeholder="Es. ORD-123"
-                              value={row.orderNumber || ''}
-                              onChange={(e) => {
-                                const newTripShipments = [...tripShipments];
-                                newTripShipments[index].orderNumber = e.target.value;
-                                setTripShipments(newTripShipments);
-                              }}
-                              required
-                            />
+                          <td className="p-2 align-top">
+                            <div className="space-y-2">
+                              <input 
+                                type="text" 
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none" 
+                                placeholder="Nr. Delivery (Obbligatorio)"
+                                value={row.orderNumber || ''}
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].orderNumber = e.target.value;
+                                  setTripShipments(newTripShipments);
+                                }}
+                                required
+                              />
+                              <input 
+                                type="text" 
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
+                                placeholder="Numero DDT (Opzionale)"
+                                value={row.orderNumber2 || ''}
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].orderNumber2 = e.target.value;
+                                  setTripShipments(newTripShipments);
+                                }}
+                              />
+                              <input 
+                                type="text" 
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
+                                placeholder="Rif. Destinatario Finale (Opzionale)"
+                                value={row.deliveryNotes || ''}
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].deliveryNotes = e.target.value;
+                                  setTripShipments(newTripShipments);
+                                }}
+                              />
+                            </div>
                           </td>
                           <td className="p-2 min-w-[300px] align-top">
                             <div className="space-y-2">
