@@ -833,6 +833,22 @@ export const MonitorYard: React.FC = () => {
     const carrId = shipmentFormCarrier || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
     if (!cId || !carrId) return;
 
+    // Controllo univocità Numero Delivery (orderNumber) per Committente
+    const duplicateDelivery = tripShipments.find(row => {
+      if (!row.orderNumber) return false;
+      return shipments.some(s => 
+        s.clientId === cId && 
+        s.orderNumber.toLowerCase() === row.orderNumber?.toLowerCase() &&
+        s.id !== row.id &&
+        (!shipmentFormId || s.id !== shipmentFormId)
+      );
+    });
+
+    if (duplicateDelivery) {
+      alert(`Il numero di delivery "${duplicateDelivery.orderNumber}" è già esistente per questo committente. Deve essere univoco.`);
+      return;
+    }
+
     // Preserva il tripId esistente o creane uno nuovo per questo blocco di spedizioni se esplicitato, altrimenti uniscili al form.
     const commonTripId = shipmentFormTripNumber || tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
 
@@ -4541,7 +4557,7 @@ export const MonitorYard: React.FC = () => {
       {/* MODALE DI INSERIMENTO / MODIFICA SPEDIZIONE MANUALE */}
       {isNewShipmentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full border border-black/10 overflow-hidden my-8">
+          <div className="bg-white rounded-xl shadow-xl max-w-5xl lg:max-w-6xl w-full border border-black/10 overflow-hidden my-8">
             <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white p-4 flex justify-between items-center">
               <h3 className="font-bold text-sm uppercase tracking-wide">
                 {shipmentFormId ? "Modifica Spedizione Manuale" : "Nuovo Viaggio / Inserimento Spedizioni"}
@@ -4644,14 +4660,6 @@ export const MonitorYard: React.FC = () => {
               <div className="border-t border-black/5 pt-4">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">Spedizioni del Viaggio</h4>
-                  <Button 
-                    type="button" 
-                    size="sm" 
-                    variant="secondary"
-                    onClick={() => setTripShipments([...tripShipments, { id: `tmp-${Date.now()}` }])}
-                  >
-                    + Aggiungi Spedizione
-                  </Button>
                 </div>
                 
                 <div className="overflow-x-auto border border-black/10 rounded-lg">
@@ -4659,11 +4667,11 @@ export const MonitorYard: React.FC = () => {
                     <thead>
                       <tr className="bg-gray-100 border-b border-black/10">
                         <th className="p-2 w-10 text-center text-[10px] font-mono text-gray-500 uppercase">Seq</th>
-                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">Riferimenti Delivery *</th>
-                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Dati Destinatario' : 'Dati Mittente'}</th>
-                        <th className="p-2 w-20 text-[10px] font-mono text-gray-500 uppercase text-center">Pallet</th>
-                        <th className="p-2 w-24 text-[10px] font-mono text-gray-500 uppercase text-center">Peso (kg)</th>
-                        <th className="p-2 w-10"></th>
+                        <th className="p-2 w-64 text-[10px] font-mono text-gray-500 uppercase">Riferimenti Delivery *</th>
+                        <th className="p-2 min-w-[300px] text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Dati Destinatario' : 'Dati Mittente'}</th>
+                        <th className="p-2 w-20 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-l border-orange-200 uppercase text-center">Pallet</th>
+                        <th className="p-2 w-24 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-r border-orange-200 uppercase text-center">Peso (kg)</th>
+                        <th className="p-2 w-16"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-black/5">
@@ -4807,24 +4815,70 @@ export const MonitorYard: React.FC = () => {
                               }}
                             />
                           </td>
-                          <td className="p-2 text-center">
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                if (tripShipments.length > 1) {
-                                  setTripShipments(tripShipments.filter((_, i) => i !== index));
-                                }
-                              }}
-                              className="text-gray-400 hover:text-red-600 transition-colors font-bold text-lg"
-                              title="Rimuovi riga"
-                            >
-                              ×
-                            </button>
+                          <td className="p-2 align-middle">
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  if (index > 0) {
+                                    const newTripShipments = [...tripShipments];
+                                    const temp = newTripShipments[index - 1];
+                                    newTripShipments[index - 1] = newTripShipments[index];
+                                    newTripShipments[index] = temp;
+                                    setTripShipments(newTripShipments);
+                                  }
+                                }}
+                                className={`text-gray-400 hover:text-blue-600 transition-colors font-bold text-lg leading-none ${index === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                title="Sposta su"
+                              >
+                                ↑
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  if (tripShipments.length > 1) {
+                                    setTripShipments(tripShipments.filter((_, i) => i !== index));
+                                  }
+                                }}
+                                className={`text-gray-400 hover:text-red-600 transition-colors font-bold text-2xl leading-none ${tripShipments.length === 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                title="Rimuovi riga"
+                              >
+                                ×
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => {
+                                  if (index < tripShipments.length - 1) {
+                                    const newTripShipments = [...tripShipments];
+                                    const temp = newTripShipments[index + 1];
+                                    newTripShipments[index + 1] = newTripShipments[index];
+                                    newTripShipments[index] = temp;
+                                    setTripShipments(newTripShipments);
+                                  }
+                                }}
+                                className={`text-gray-400 hover:text-blue-600 transition-colors font-bold text-lg leading-none ${index === tripShipments.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                title="Sposta giù"
+                              >
+                                ↓
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+                
+                <div className="mt-3 flex justify-end">
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    variant="secondary"
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                    onClick={() => setTripShipments([...tripShipments, { id: `tmp-${Date.now()}` }])}
+                  >
+                    + Salva Spedizione e Aggiungi Nuova Riga
+                  </Button>
                 </div>
               </div>
 
