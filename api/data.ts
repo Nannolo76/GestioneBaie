@@ -952,7 +952,6 @@ export default async function handler(req: any, res: any) {
         palletTypes,
         users,
         shipments,
-        comuni,
         systemParameters
       ] = await Promise.all([
         sql('SELECT * FROM depots'),
@@ -969,7 +968,6 @@ export default async function handler(req: any, res: any) {
         sql('SELECT * FROM pallet_types ORDER BY name ASC'),
         sql('SELECT * FROM users ORDER BY name ASC'),
         sql('SELECT * FROM shipments ORDER BY order_number ASC'),
-        sql('SELECT * FROM anagrafica_comuni ORDER BY comune ASC'),
         sql('SELECT * FROM system_parameters')
       ]);
 
@@ -1152,7 +1150,6 @@ export default async function handler(req: any, res: any) {
         palletTypes,
         users: parsedUsers,
         shipments: parsedShipments,
-        comuni,
         systemParameters
       });
     }

@@ -321,6 +321,7 @@ export const MonitorYard: React.FC = () => {
 
   // Stato Modali
   const [checkInBooking, setCheckInBooking] = useState<Booking | null>(null);
+  const [plateConflictData, setPlateConflictData] = useState<{ plate: string, conflictingShipments: Shipment[] } | null>(null);
   const [checkInPhone, setCheckInPhone] = useState('');
   const [checkInNotes, setCheckInNotes] = useState('');
   const [checkInLicense, setCheckInLicense] = useState('');
@@ -568,9 +569,21 @@ export const MonitorYard: React.FC = () => {
     setGuardiolaView('gate');
   };
 
-  const handleRegisterManualArrival = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegisterManualArrival = (e: React.FormEvent | null, skipConflictCheck = false) => {
+    if (e) e.preventDefault();
     if (!manualPlate || !manualDriver || !manualOrderNumber) return;
+
+    if (!skipConflictCheck && selectedShipmentIdsForCheckIn.length > 0) {
+      const selectedShipments = shipments.filter(s => selectedShipmentIdsForCheckIn.includes(s.id));
+      const conflictingShipments = selectedShipments.filter(s => 
+        s.licensePlate && 
+        s.licensePlate.toUpperCase().replace(/\s+/g, '') !== manualPlate.toUpperCase().replace(/\s+/g, '')
+      );
+      if (conflictingShipments.length > 0) {
+        setPlateConflictData({ plate: manualPlate.toUpperCase(), conflictingShipments });
+        return;
+      }
+    }
 
     const todayStr = new Date().toISOString().split('T')[0];
     const newBId = addBooking(
@@ -5441,6 +5454,52 @@ export const MonitorYard: React.FC = () => {
                 className="text-xs font-bold font-mono uppercase cursor-pointer"
               >
                 Chiudi Risoluzione Rapida
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP CONFLITTO TARGA SPEDIZIONE/CHECK-IN */}
+      {plateConflictData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in print:hidden">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border-4 border-amber-500 overflow-hidden">
+            <div className="bg-amber-500 text-white p-4">
+              <h3 className="font-extrabold text-sm uppercase tracking-wide flex items-center gap-2">
+                ⚠️ AVVISO CONFLITTO TARGA
+              </h3>
+            </div>
+            <div className="p-5 space-y-4 font-sans text-sm text-gray-800">
+              <p>
+                Stai effettuando il check-in con la targa <strong className="text-amber-600 font-mono text-lg">{plateConflictData.plate}</strong>.
+              </p>
+              <p>
+                Tuttavia, le seguenti spedizioni selezionate hanno una targa precaricata differente:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                {plateConflictData.conflictingShipments.map(s => (
+                  <li key={s.id}>
+                    Ordine <strong>{s.orderNumber}</strong>: {s.licensePlate}
+                  </li>
+                ))}
+              </ul>
+              <p className="font-bold">
+                Vuoi forzare il check-in e proseguire associando queste spedizioni alla nuova targa?
+              </p>
+            </div>
+            <div className="bg-gray-100 p-4 border-t border-gray-200 flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setPlateConflictData(null)}>
+                Annulla
+              </Button>
+              <Button 
+                variant="success" 
+                className="bg-amber-500 hover:bg-amber-600 text-white font-bold"
+                onClick={() => {
+                  setPlateConflictData(null);
+                  handleRegisterManualArrival(null, true);
+                }}
+              >
+                Prosegui e Forza Targa
               </Button>
             </div>
           </div>
