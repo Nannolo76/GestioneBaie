@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { TerritoryAutocomplete } from '../components/TerritoryAutocomplete';
 import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
@@ -4653,7 +4654,7 @@ export const MonitorYard: React.FC = () => {
                       <tr className="bg-gray-100 border-b border-black/10">
                         <th className="p-2 w-10 text-center text-[10px] font-mono text-gray-500 uppercase">Seq</th>
                         <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">Rif / Ordine *</th>
-                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Destinazione (Città)' : 'Origine (Città)'}</th>
+                        <th className="p-2 text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Dati Destinatario' : 'Dati Mittente'}</th>
                         <th className="p-2 w-20 text-[10px] font-mono text-gray-500 uppercase text-center">Pallet</th>
                         <th className="p-2 w-24 text-[10px] font-mono text-gray-500 uppercase text-center">Peso (kg)</th>
                         <th className="p-2 w-10"></th>
@@ -4677,32 +4678,78 @@ export const MonitorYard: React.FC = () => {
                               required
                             />
                           </td>
-                          <td className="p-2">
-                            {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? (
+                          <td className="p-2 min-w-[300px] align-top">
+                            <div className="space-y-2">
                               <input 
                                 type="text" 
-                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
-                                placeholder="Città Destinazione"
-                                value={row.realDestinationCity || ''}
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold text-gray-800" 
+                                placeholder={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? "Nome Destinatario" : "Nome Mittente"}
+                                value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationName || '' : row.realOriginName || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  newTripShipments[index].realDestinationCity = e.target.value;
+                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationName = e.target.value;
+                                  else newTripShipments[index].realOriginName = e.target.value;
                                   setTripShipments(newTripShipments);
                                 }}
                               />
-                            ) : (
                               <input 
                                 type="text" 
                                 className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
-                                placeholder="Città Origine"
-                                value={row.realOriginCity || ''}
+                                placeholder="Indirizzo (es. Via Roma 1)"
+                                value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  newTripShipments[index].realOriginCity = e.target.value;
+                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationAddress = e.target.value;
+                                  else newTripShipments[index].realOriginAddress = e.target.value;
                                   setTripShipments(newTripShipments);
                                 }}
                               />
-                            )}
+                              <TerritoryAutocomplete
+                                value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCity || '' : row.realOriginCity || ''}
+                                onChange={(val, record) => {
+                                  const newTripShipments = [...tripShipments];
+                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
+                                    newTripShipments[index].realDestinationCity = record ? record.comune : val;
+                                    if (record) {
+                                      newTripShipments[index].realDestinationCap = record.cap;
+                                      newTripShipments[index].realDestinationProvince = record.provincia_sigla;
+                                      newTripShipments[index].realDestinationCountry = 'Italia';
+                                    }
+                                  } else {
+                                    newTripShipments[index].realOriginCity = record ? record.comune : val;
+                                    if (record) {
+                                      newTripShipments[index].realOriginCap = record.cap;
+                                      newTripShipments[index].realOriginProvince = record.provincia_sigla;
+                                      newTripShipments[index].realOriginCountry = 'Italia';
+                                    }
+                                  }
+                                  setTripShipments(newTripShipments);
+                                }}
+                              />
+                              <div className="flex gap-2">
+                                <input 
+                                  type="text" 
+                                  placeholder="CAP"
+                                  value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCap || '' : row.realOriginCap || ''}
+                                  readOnly
+                                  className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
+                                />
+                                <input 
+                                  type="text" 
+                                  placeholder="Prov"
+                                  value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationProvince || '' : row.realOriginProvince || ''}
+                                  readOnly
+                                  className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
+                                />
+                                <input 
+                                  type="text" 
+                                  placeholder="Nazione"
+                                  value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCountry || 'Italia' : row.realOriginCountry || 'Italia'}
+                                  readOnly
+                                  className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
+                                />
+                              </div>
+                            </div>
                           </td>
                           <td className="p-2">
                             <input 
