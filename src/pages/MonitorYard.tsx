@@ -97,6 +97,8 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormRealOriginProvince, setShipmentFormRealOriginProvince] = useState('');
   
   const [shipmentFormRealDestinationName, setShipmentFormRealDestinationName] = useState('');
+
+  const [unboundSearchTerm, setUnboundSearchTerm] = useState('');
   
   const [shipmentFormRealDestinationCity, setShipmentFormRealDestinationCity] = useState('');
   const [shipmentFormRealDestinationCap, setShipmentFormRealDestinationCap] = useState('');
@@ -1835,9 +1837,28 @@ export const MonitorYard: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Spedizioni da abbinare */}
                   <Card title="Spedizioni in attesa di abbinamento a camion fisici" accent="orange">
+                    <div className="mb-3 px-1">
+                      <input 
+                        type="text" 
+                        placeholder="Filtra per Delivery, Viaggio, DDT o Note Destinatario..." 
+                        className="w-full border border-black/10 rounded-lg p-2 text-xs focus:ring-1 focus:ring-blue-500 outline-none"
+                        value={unboundSearchTerm}
+                        onChange={(e) => setUnboundSearchTerm(e.target.value)}
+                      />
+                    </div>
                     <div className="space-y-4 max-h-[350px] overflow-y-auto">
                       {shipments
                         .filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO' && s.routingStatus !== 'DA_CONFERMARE')
+                        .filter(s => {
+                          if (!unboundSearchTerm) return true;
+                          const term = unboundSearchTerm.toLowerCase();
+                          return (
+                            (s.orderNumber && s.orderNumber.toLowerCase().includes(term)) ||
+                            (s.orderNumber2 && s.orderNumber2.toLowerCase().includes(term)) ||
+                            (s.tripId && s.tripId.toLowerCase().includes(term)) ||
+                            (s.deliveryNotes && s.deliveryNotes.toLowerCase().includes(term))
+                          );
+                        })
                         .map(s => {
                           const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
                           const isLinking = activeLinkingShipmentId === s.id;
@@ -1884,7 +1905,27 @@ export const MonitorYard: React.FC = () => {
                                       variant="success"
                                       disabled={!linkingBookingId}
                                       onClick={() => {
-                                        bindShipmentsToBooking([s.id], linkingBookingId);
+                                        const shipmentsToBind = [s.id];
+                                        
+                                        if (s.tripId) {
+                                          const relatedShipments = shipments.filter(
+                                            other => other.depotId === selectedDepotId && 
+                                                     !other.bookingId && 
+                                                     other.status !== 'COMPLETATO' && 
+                                                     other.routingStatus !== 'DA_CONFERMARE' &&
+                                                     other.tripId === s.tripId && 
+                                                     other.id !== s.id
+                                          );
+                                          
+                                          if (relatedShipments.length > 0) {
+                                            const confirmMsg = `Questa spedizione fa parte del viaggio "${s.tripId}" assieme ad altre ${relatedShipments.length} spedizioni in attesa.\n\nVuoi collegare anche tutte le altre spedizioni dello stesso viaggio a questo veicolo?`;
+                                            if (window.confirm(confirmMsg)) {
+                                              shipmentsToBind.push(...relatedShipments.map(r => r.id));
+                                            }
+                                          }
+                                        }
+                                        
+                                        bindShipmentsToBooking(shipmentsToBind, linkingBookingId);
                                         setActiveLinkingShipmentId(null);
                                         setLinkingBookingId('');
                                       }}
