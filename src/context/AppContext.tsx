@@ -1574,7 +1574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShipments((prev) =>
       prev.map((s) =>
         s.id === shipmentId
-          ? { ...s, bookingId: undefined, licensePlate: undefined }
+          ? { ...s, bookingId: undefined, licensePlate: undefined, status: 'DA_PIANIFICARE' }
           : s
       )
     );

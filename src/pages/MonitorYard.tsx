@@ -2617,7 +2617,7 @@ export const MonitorYard: React.FC = () => {
                               Modifica
                             </Button>
                             <Button size="sm" variant="danger" onClick={() => {
-                              const canDelete = g.shipments.every(s => !s.bookingId && s.status === 'DA_PIANIFICARE');
+                              const canDelete = g.shipments.every(s => !s.bookingId);
                               if (!canDelete) {
                                 setConfirmDialogState({
                                   isOpen: true,
@@ -5103,6 +5103,7 @@ export const MonitorYard: React.FC = () => {
                     onClick={() => {
                       setShipmentFormTipoOperazioneHub('TRANSITO');
                       setShipmentFormType('CARICO');
+                      setShipmentFormHubOrigineOperativo(selectedDepotId);
                     }}
                     className={`flex-1 py-2 px-1 text-center text-xs font-bold rounded-lg transition-all cursor-pointer leading-tight ${
                       shipmentFormTipoOperazioneHub === 'TRANSITO'
@@ -5142,6 +5143,24 @@ export const MonitorYard: React.FC = () => {
                         Movimentazione Interna (Aziendale)
                       </label>
                     </div>
+                  </div>
+                )}
+                {shipmentFormTipoOperazioneHub === 'TRANSITO' && (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-orange-50 p-3 rounded-lg border border-orange-200">
+                    <Select
+                      label="Hub di Partenza *"
+                      options={depots.map(d => ({ value: d.id, label: d.name }))}
+                      value={shipmentFormHubOrigineOperativo}
+                      onChange={(e) => setShipmentFormHubOrigineOperativo(e.target.value)}
+                      required
+                    />
+                    <Select
+                      label="Hub di Arrivo *"
+                      options={depots.map(d => ({ value: d.id, label: d.name }))}
+                      value={shipmentFormHubDestinazioneOperativo}
+                      onChange={(e) => setShipmentFormHubDestinazioneOperativo(e.target.value)}
+                      required
+                    />
                   </div>
                 )}
               </div>
