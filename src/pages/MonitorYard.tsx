@@ -9,6 +9,22 @@ import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 
 import type { Booking, Bay, BookingNote, Shipment } from '../types';
+
+export interface TripGroup {
+  id: string;
+  tripId: string;
+  isMasterTrip: boolean;
+  activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER';
+  carrierId: string;
+  totalPallets: number;
+  totalGrossWeight: number;
+  status: Shipment['status'];
+  origin: string;
+  destination: string;
+  expectedDate?: string;
+  expectedTime?: string;
+  shipments: Shipment[];
+}
 import { calculateSmartRouting } from '../utils/geo';
 
 export const MonitorYard: React.FC = () => {
@@ -253,11 +269,57 @@ export const MonitorYard: React.FC = () => {
     });
   }, [shipments, selectedDepotId, shipmentsFilterTab, filterReference, filterSearch, filterProvince, filterCountry, dateFilter, sortConfig]);
 
-  const totalPages = Math.ceil(filteredShipments.length / ITEMS_PER_PAGE);
-  const paginatedShipments = useMemo(() => {
+  const filteredTripGroups = useMemo(() => {
+    const groups = new Map<string, TripGroup>();
+    filteredShipments.forEach(s => {
+      const tripKey = s.tripId || s.id;
+      if (!groups.has(tripKey)) {
+        groups.set(tripKey, {
+          id: tripKey,
+          tripId: s.tripId || '',
+          isMasterTrip: !!s.tripId,
+          activityType: s.activityType,
+          carrierId: s.carrierId,
+          totalPallets: 0,
+          totalGrossWeight: 0,
+          status: s.status || 'DA_PIANIFICARE',
+          origin: s.realOriginName || s.originOrDestination || '',
+          destination: s.realDestinationName || s.originOrDestination || '',
+          expectedDate: s.expectedDate,
+          expectedTime: s.expectedTime,
+          shipments: []
+        });
+      }
+      
+      const group = groups.get(tripKey)!;
+      group.shipments.push(s);
+      group.totalPallets += s.palletPlaces || 0;
+      group.totalGrossWeight += s.grossWeight || 0;
+      
+      if (group.shipments.length > 1) {
+        if (s.tipoOperazioneHub === 'OUTBOUND') {
+          group.destination = 'Destinazioni Multiple';
+        } else if (s.tipoOperazioneHub === 'INBOUND') {
+          group.origin = 'Origini Multiple';
+        } else if (s.tipoOperazioneHub === 'TRANSITO') {
+          group.origin = s.realOriginName || group.origin;
+          group.destination = s.realDestinationName || group.destination;
+        }
+      }
+      
+      if (s.status !== 'DA_PIANIFICARE') {
+        group.status = s.status;
+      }
+    });
+    
+    return Array.from(groups.values());
+  }, [filteredShipments]);
+
+  const totalPages = Math.ceil(filteredTripGroups.length / ITEMS_PER_PAGE);
+  const paginatedTripGroups = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredShipments.slice(start, start + ITEMS_PER_PAGE);
-  }, [filteredShipments, currentPage, ITEMS_PER_PAGE]);
+    return filteredTripGroups.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredTripGroups, currentPage, ITEMS_PER_PAGE]);
 
   const SortableHeader = ({ label, sortKey }: { label: string, sortKey: string }) => (
     <button 
@@ -366,7 +428,7 @@ export const MonitorYard: React.FC = () => {
 
   // Dettaglio Baia
   const [activeBayDetail, setActiveBayDetail] = useState<{ bay: Bay; booking: Booking } | null>(null);
-  const [modalTab, setModalTab] = useState<'info' | 'checklist' | 'reso' | 'edit' | 'move'>('info');
+  const [modalTab, setModalTab] = useState<'info' | 'checklist' | 'reso' | 'edit' | 'move' | 'manifesto'>('info');
   const [palletType, setPalletType] = useState<string>('EPAL');
   const [palletQuantity, setPalletQuantity] = useState<number | ''>('');
   const [palletCondition, setPalletCondition] = useState<'BUONO' | 'ROTTO'>('BUONO');
@@ -1001,10 +1063,21 @@ export const MonitorYard: React.FC = () => {
     const clientTripNum = shipmentFormTripNumber || undefined;
 
     // Filtro le righe vuote (se orderNumber è assente)
-    const validTripShipments = tripShipments.filter(row => row.orderNumber && row.orderNumber.trim() !== '');
+    let validTripShipments = tripShipments.filter(row => row.orderNumber && row.orderNumber.trim() !== '');
+    
+    // FTL Bypass per Transito: se non ci sono righe valide, ma siamo in TRANSITO, creiamo una riga master FTL
     if (validTripShipments.length === 0) {
-      alert('Non hai inserito nessuna spedizione valida (manca il Nr. Delivery).');
-      return;
+      if (shipmentFormTipoOperazioneHub === 'TRANSITO') {
+        const firstRow = tripShipments[0] || {};
+        validTripShipments = [{
+          ...firstRow,
+          id: firstRow.id || `tmp-${Date.now()}-master`,
+          orderNumber: `FTL-${commonTripId}`,
+        }];
+      } else {
+        alert('Non hai inserito nessuna spedizione valida (manca il Nr. Delivery).');
+        return;
+      }
     }
 
     // Loop through all valid shipments in the Trip Builder
@@ -1141,6 +1214,9 @@ export const MonitorYard: React.FC = () => {
       let hubOrigineOperativo = parts[29] || '';
       let hubDestinazioneOperativo = parts[30] || '';
       let tipoOperazioneHub = parts[31]?.toUpperCase() || '';
+      const tripId = parts[32] || undefined;
+      const sequence = parts[33] ? Number(parts[33]) : undefined;
+
       let finalInternalNotes = internalNotes;
       let routingStatus: 'CONFERMATO' | 'DA_CONFERMARE' = 'CONFERMATO';
       let routingNotes = 'Instradamento confermato';
@@ -1222,7 +1298,9 @@ export const MonitorYard: React.FC = () => {
         hubDestinazioneOperativo,
         tipoOperazioneHub: tipoOperazioneHub as any,
         routingStatus,
-        routingNotes
+        routingNotes,
+        tripId,
+        sequence
       });
       successCount++;
     });
@@ -2334,20 +2412,68 @@ export const MonitorYard: React.FC = () => {
                   }
                 >
                   <Table
-                    data={paginatedShipments}
+                    data={paginatedTripGroups}
                     emptyMessage="Nessun viaggio commissionato corrisponde ai filtri impostati."
+                    expandableContent={(group) => {
+                      if (group.shipments.length <= 1 && !group.isMasterTrip) return null; // No need to expand single shipments if they aren't part of an explicit multi-stop trip
+                      if (group.shipments.length === 0) {
+                        return (
+                          <div className="p-4 text-center text-gray-500 font-mono text-xs">
+                            Tratta Line-Haul FTL: Nessun dettaglio colli/destinazioni specificato (Viaggio Diretto).
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="bg-gray-50 p-4 border-t border-b border-black/5">
+                          <h4 className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <span>Itinerario (Stops)</span>
+                            <span className="h-px bg-gray-200 flex-1"></span>
+                          </h4>
+                          <table className="w-full text-left border-collapse text-xs bg-white rounded-lg overflow-hidden shadow-xs border border-black/5">
+                            <thead>
+                              <tr className="bg-gray-100/50 border-b border-black/10 text-[9px] font-mono text-gray-400 uppercase tracking-widest">
+                                <th className="p-2 w-10 text-center">Seq</th>
+                                <th className="p-2">Delivery</th>
+                                <th className="p-2">Cliente/Destinazione</th>
+                                <th className="p-2 text-right">Pallet</th>
+                                <th className="p-2 text-right">Peso</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.shipments.map((s, idx) => {
+                                const clientName = clientMap.get(s.clientId) || s.clientId || 'Sconosciuto';
+                                return (
+                                  <tr key={s.id} className="border-b border-black/5 last:border-0 hover:bg-gray-50/50">
+                                    <td className="p-2 text-center font-mono text-gray-400">{idx + 1}</td>
+                                    <td className="p-2 font-mono text-ticket-accent font-bold">{s.orderNumber}</td>
+                                    <td className="p-2">
+                                      <div className="font-bold">{clientName}</div>
+                                      <div className="text-[10px] text-gray-500 truncate max-w-[200px]">
+                                        {s.city || s.originOrDestination || 'N/D'} {s.province && `(${s.province})`}
+                                      </div>
+                                    </td>
+                                    <td className="p-2 text-right font-mono font-bold">{s.palletPlaces}</td>
+                                    <td className="p-2 text-right font-mono text-gray-500">{s.grossWeight || '-'} kg</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    }}
                     columns={[
                       {
                         header: (
                           <input
                             type="checkbox"
                             checked={
-                              filteredShipments.length > 0 &&
-                              selectedShipmentIds.length === filteredShipments.length
+                              filteredTripGroups.length > 0 &&
+                              selectedShipmentIds.length === filteredTripGroups.length
                             }
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedShipmentIds(filteredShipments.map(s => s.id));
+                                setSelectedShipmentIds(filteredTripGroups.map(g => g.id));
                               } else {
                                 setSelectedShipmentIds([]);
                               }
@@ -2356,15 +2482,15 @@ export const MonitorYard: React.FC = () => {
                           />
                         ),
                         className: "w-10 text-center",
-                        accessor: (s) => (
+                        accessor: (g) => (
                           <input
                             type="checkbox"
-                            checked={selectedShipmentIds.includes(s.id)}
+                            checked={selectedShipmentIds.includes(g.id)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedShipmentIds(prev => [...prev, s.id]);
+                                setSelectedShipmentIds(prev => [...prev, g.id]);
                               } else {
-                                setSelectedShipmentIds(prev => prev.filter(id => id !== s.id));
+                                setSelectedShipmentIds(prev => prev.filter(id => id !== g.id));
                               }
                             }}
                             className="rounded border-black/10 text-[#004B97] focus:ring-[#004B97] cursor-pointer"
@@ -2373,22 +2499,22 @@ export const MonitorYard: React.FC = () => {
                       },
                       {
                         header: <SortableHeader label="Flusso" sortKey="activityType" />,
-                        accessor: (s) => (
+                        accessor: (g) => (
                           <div className="space-y-1">
-                            <Badge variant={['SCARICO', 'RESO'].includes(s.activityType) ? 'info' : 'success'}>
-                              {['SCARICO', 'RESO'].includes(s.activityType) ? 'ARRIVO PLANT' : 'PARTENZA PLANT'}
+                            <Badge variant={['SCARICO', 'RESO'].includes(g.activityType) ? 'info' : 'success'}>
+                              {['SCARICO', 'RESO'].includes(g.activityType) ? 'ARRIVO PLANT' : 'PARTENZA PLANT'}
                             </Badge>
-                            <span className="block text-[8px] text-gray-400 font-bold uppercase tracking-wider">{s.activityType}</span>
+                            <span className="block text-[8px] text-gray-400 font-bold uppercase tracking-wider">{g.activityType}</span>
                           </div>
                         )
                       },
                       {
                         header: <SortableHeader label="Viaggio Int." sortKey="tripId" />,
-                        accessor: (s) => (
+                        accessor: (g) => (
                           <div className="font-mono text-xs">
-                            {s.tripId ? (
+                            {g.tripId ? (
                               <span className="text-amber-600 font-mono text-[10px] font-bold block bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 w-max">
-                                {s.tripId}
+                                {g.tripId}
                               </span>
                             ) : (
                               <span className="text-gray-400 text-[9px] italic">-</span>
@@ -2398,43 +2524,41 @@ export const MonitorYard: React.FC = () => {
                       },
                       {
                         header: <SortableHeader label="Riferimenti" sortKey="orderNumber" />,
-                        accessor: (s) => (
-                          <div className="font-mono text-xs">
-                            <span className="font-bold text-ticket-accent block">{s.orderNumber}</span>
-                            {s.orderNumber2 && <span className="text-gray-400 text-[10px] block">Rif 2: {s.orderNumber2}</span>}
-                            {s.clientTripNumber && <span className="text-blue-600 font-mono text-[9px] block bg-blue-50 border border-blue-200 rounded px-1 w-max mt-0.5">V. Comm: {s.clientTripNumber}</span>}
-                            {s.deliveryNotes && (
-                              <span className="inline-block mt-1 text-[9px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.deliveryNotes}>
-                                🏷️ {s.deliveryNotes}
-                              </span>
-                            )}
-                            {s.internalNotes && (
-                              <span className="inline-block mt-1 text-[9px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.internalNotes}>
-                                📝 {s.internalNotes}
-                              </span>
-                            )}
-                          </div>
-                        )
+                        accessor: (g) => {
+                          const firstShipment = g.shipments[0];
+                          if (g.shipments.length > 1) {
+                            return (
+                              <div className="font-mono text-xs">
+                                <span className="font-bold text-ticket-accent block">Multi-Drop/Pickup</span>
+                                <span className="text-gray-400 text-[10px] block">{g.shipments.length} Tappe (Stops)</span>
+                              </div>
+                            );
+                          }
+                          return firstShipment ? (
+                            <div className="font-mono text-xs">
+                              <span className="font-bold text-ticket-accent block">{firstShipment.orderNumber}</span>
+                              {firstShipment.orderNumber2 && <span className="text-gray-400 text-[10px] block">Rif 2: {firstShipment.orderNumber2}</span>}
+                              {firstShipment.clientTripNumber && <span className="text-blue-600 font-mono text-[9px] block bg-blue-50 border border-blue-200 rounded px-1 w-max mt-0.5">V. Comm: {firstShipment.clientTripNumber}</span>}
+                            </div>
+                          ) : (
+                            <div className="font-mono text-xs">
+                              <span className="font-bold text-gray-400 italic block">Transito Diretto</span>
+                            </div>
+                          );
+                        }
                       },
                       {
                         header: <SortableHeader label="Committente" sortKey="clientId" />,
-                        accessor: (s) => {
-                          const clientName = clientMap.get(s.clientId) || s.clientId || 'Sconosciuto';
-                          const carrierName = carrierMap.get(s.carrierId) || s.carrierId || 'Sconosciuto';
+                        accessor: (g) => {
+                          const carrierName = carrierMap.get(g.carrierId) || g.carrierId || 'Sconosciuto';
+                          const clientName = g.shipments.length === 1 ? (clientMap.get(g.shipments[0].clientId) || g.shipments[0].clientId) : 'Multi-Committente';
                           return (
                             <div className="text-xs font-sans space-y-0.5">
                               <div><span className="text-[9px] text-gray-400 font-mono">Client:</span> <span className="font-bold">{clientName}</span></div>
-                              {s.subjectName && (
-                                <div>
-                                  <span className="text-[9px] text-gray-400 font-mono">Soggetto:</span> <span className="font-semibold text-ticket-accent">{s.subjectName}</span>
-                                </div>
-                              )}
                               <div className="text-[10px] text-gray-500 font-semibold mt-1">
-                                📍 {s.city || s.originOrDestination || 'N/D'} 
-                                {s.province && ` (${s.province})`}
-                                {s.country && ` - ${s.country}`}
+                                Da: {g.origin || 'N/D'}<br/>
+                                A: {g.destination || 'N/D'}
                               </div>
-                              {s.address && <div className="text-[9px] text-gray-400 italic">via {s.address}</div>}
                               <div className="text-gray-500 text-[9px] mt-1 italic">Vettore: {carrierName}</div>
                             </div>
                           );
@@ -2442,32 +2566,34 @@ export const MonitorYard: React.FC = () => {
                       },
                       {
                         header: 'Data / Ora Slot',
-                        accessor: (s) => (
+                        accessor: (g) => (
                           <div className="text-xs font-mono">
-                            <span className="font-bold">{s.expectedDate}</span>
-                            {s.expectedTime && <span className="block text-ticket-accent">[{s.expectedTime}]</span>}
+                            <span className="font-bold">{g.expectedDate || g.shipments[0]?.expectedDate}</span>
+                            {(g.expectedTime || g.shipments[0]?.expectedTime) && <span className="block text-ticket-accent">[{g.expectedTime || g.shipments[0]?.expectedTime}]</span>}
                           </div>
                         )
                       },
                       {
                         header: 'Carico',
-                        accessor: (s) => (
+                        accessor: (g) => (
                           <div className="text-xs font-mono">
-                            <span className="block font-bold">{s.palletPlaces} PLT</span>
-                            {s.grossWeight !== undefined && <span className="block text-[10px] text-gray-500">{s.grossWeight} kg</span>}
-                            {s.goodsType && <span className="block text-[9px] text-gray-400 truncate max-w-[100px]">{s.goodsType}</span>}
+                            <span className="block font-bold">{g.totalPallets} PLT</span>
+                            <span className="block text-[10px] text-gray-500">{g.totalGrossWeight} kg</span>
+                            {g.shipments.length === 1 && g.shipments[0].goodsType && <span className="block text-[9px] text-gray-400 truncate max-w-[100px]">{g.shipments[0].goodsType}</span>}
                           </div>
                         )
                       },
                       {
                         header: 'Viaggio',
-                        accessor: (s) => {
-                          if (s.bookingId) {
-                            const booking = bookings.find(b => b.id === s.bookingId);
+                        accessor: (g) => {
+                          // Check if any shipment is booked
+                          const bookedShipment = g.shipments.find(s => s.bookingId);
+                          if (bookedShipment && bookedShipment.bookingId) {
+                            const booking = bookings.find(b => b.id === bookedShipment.bookingId);
                             return (
                               <div className="text-xs font-mono">
                                 <span className="font-bold text-emerald-600 block">{booking?.ticketNumber || 'Abbinato'}</span>
-                                {s.licensePlate && <span className="text-gray-400 text-[10px] block">Targa: {s.licensePlate}</span>}
+                                {bookedShipment.licensePlate && <span className="text-gray-400 text-[10px] block">Targa: {bookedShipment.licensePlate}</span>}
                               </div>
                             );
                           }
@@ -2476,26 +2602,27 @@ export const MonitorYard: React.FC = () => {
                       },
                       {
                         header: 'Stato',
-                        accessor: (s) => (
-                          <Badge variant={s.status === 'COMPLETATO' ? 'success' : s.status === 'PIANIFICATO' ? 'info' : 'warning'}>
-                            {s.status.replace('_', ' ')}
+                        accessor: (g) => (
+                          <Badge variant={g.status === 'COMPLETATO' ? 'success' : g.status === 'PIANIFICATO' ? 'info' : 'warning'}>
+                            {g.status.replace('_', ' ')}
                           </Badge>
                         )
                       },
                       {
                         header: 'Azioni',
                         className: "w-28 text-center",
-                        accessor: (s) => (
+                        accessor: (g) => (
                           <div className="flex gap-1 justify-center">
-                            <Button size="sm" variant="secondary" onClick={() => handleEditShipmentClick(s)}>
+                            <Button size="sm" variant="secondary" onClick={() => handleEditShipmentClick(g.shipments[0])} disabled={g.shipments.length === 0}>
                               Modifica
                             </Button>
                             <Button size="sm" variant="danger" onClick={() => {
-                              if (s.bookingId || s.status !== 'DA_PIANIFICARE') {
+                              const canDelete = g.shipments.every(s => !s.bookingId && s.status === 'DA_PIANIFICARE');
+                              if (!canDelete) {
                                 setConfirmDialogState({
                                   isOpen: true,
                                   title: 'Azione non consentita',
-                                  message: 'Impossibile eliminare questa spedizione perché è già associata a un veicolo o ha operazioni in corso.',
+                                  message: 'Impossibile eliminare questo viaggio perché alcune spedizioni sono già associate a un veicolo.',
                                   confirmLabel: 'OK',
                                   isDanger: true,
                                   isAlert: true,
@@ -2505,13 +2632,13 @@ export const MonitorYard: React.FC = () => {
                               }
                               setConfirmDialogState({
                                 isOpen: true,
-                                title: 'Conferma Eliminazione',
-                                message: 'Sei sicuro di voler eliminare questa spedizione?',
+                                title: 'Conferma Eliminazione Viaggio',
+                                message: `Sei sicuro di voler eliminare questo viaggio${g.shipments.length > 1 ? ` (e i suoi ${g.shipments.length} stop)` : ''}?`,
                                 confirmLabel: 'Elimina',
                                 isDanger: true,
                                 isAlert: false,
                                 onConfirm: () => {
-                                  deleteShipment(s.id);
+                                  g.shipments.forEach(s => deleteShipment(s.id));
                                   setConfirmDialogState(prev => ({ ...prev, isOpen: false }));
                                 }
                               });
@@ -2527,7 +2654,7 @@ export const MonitorYard: React.FC = () => {
                   {totalPages > 1 && (
                     <div className="flex items-center justify-between p-4 border-t border-black/5 bg-gray-50 rounded-b-xl">
                       <span className="text-xs font-mono text-gray-500">
-                        Pagina {currentPage} di {totalPages} ({filteredShipments.length} risultati totali)
+                        Pagina {currentPage} di {totalPages} ({filteredTripGroups.length} viaggi totali)
                       </span>
                       <div className="flex gap-2">
                         <Button 
@@ -4246,7 +4373,80 @@ export const MonitorYard: React.FC = () => {
                     🔄 Sposta Baia
                   </button>
                 )}
+                <button
+                  onClick={() => { setModalTab('manifesto'); setShowChecklistForm(false); }}
+                  className={`flex-1 text-center py-2 font-bold rounded-md transition-all cursor-pointer ${
+                    modalTab === 'manifesto' ? 'bg-[#004B97] text-white shadow-2xs' : 'text-gray-500 hover:text-black'
+                  }`}
+                >
+                  📄 Manifesto
+                </button>
               </div>
+
+              {/* VISTA: MANIFESTO DI CARICO */}
+              {modalTab === 'manifesto' && (
+                <div className="space-y-4 animate-fade-in">
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-[10px] uppercase font-mono tracking-widest text-[#11BCEC] border-b border-black/5 pb-1">
+                      Manifesto di Carico (Cargo Manifest)
+                    </h4>
+                    
+                    {(() => {
+                      const manifestShipments = shipments.filter(s => s.bookingId === activeBayDetail.booking.id);
+                      if (manifestShipments.length === 0) {
+                        return <div className="p-4 text-center text-gray-400 italic bg-gray-50 rounded-lg">Nessuna spedizione abbinata a questo veicolo.</div>;
+                      }
+
+                      // Check if any shipment has a justification note
+                      const justificationNotes = manifestShipments.filter(s => s.justificationNote).map(s => s.justificationNote);
+                      const uniqueJustifications = Array.from(new Set(justificationNotes));
+
+                      return (
+                        <div className="space-y-3">
+                          {uniqueJustifications.length > 0 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                              <h5 className="text-amber-800 font-bold text-[10px] uppercase mb-1">⚠️ Deroghe / Giustificazioni</h5>
+                              <ul className="list-disc pl-4 text-amber-700 space-y-1">
+                                {uniqueJustifications.map((note, idx) => (
+                                  <li key={idx}>{note}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          <div className="border border-black/10 rounded-lg overflow-hidden bg-white shadow-xs">
+                            <table className="w-full text-left border-collapse text-[10px] font-mono">
+                              <thead>
+                                <tr className="bg-gray-100/50 border-b border-black/10 text-gray-400 text-[9px] uppercase">
+                                  <th className="p-2 w-8 text-center">#</th>
+                                  <th className="p-2">Delivery</th>
+                                  <th className="p-2">Destinazione</th>
+                                  <th className="p-2 text-right">Pallet</th>
+                                  <th className="p-2 text-right">Peso</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-black/5">
+                                {manifestShipments.map((s, idx) => (
+                                  <tr key={s.id} className="hover:bg-gray-50/50">
+                                    <td className="p-2 text-center text-gray-400">{idx + 1}</td>
+                                    <td className="p-2 font-bold text-ticket-accent">{s.orderNumber || `FTL-${s.tripId}`}</td>
+                                    <td className="p-2">
+                                      <div className="font-bold text-gray-800">{clientMap.get(s.clientId) || s.clientId || 'Sconosciuto'}</div>
+                                      <div className="text-[9px] text-gray-500">{s.city || s.originOrDestination || 'N/D'} {s.province && `(${s.province})`}</div>
+                                    </td>
+                                    <td className="p-2 text-right font-bold">{s.palletPlaces} PLT</td>
+                                    <td className="p-2 text-right text-gray-500">{s.grossWeight || '-'} kg</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
 
               {/* VISTA: INFO & NOTE */}
               {modalTab === 'info' && (
