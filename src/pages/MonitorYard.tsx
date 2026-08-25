@@ -143,6 +143,7 @@ export const MonitorYard: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
   const [dateFilter, setDateFilter] = useState<'ALL' | '7_DAYS' | 'TODAY'>('7_DAYS');
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'tripId', direction: 'desc' });
 
   // Performance optimizations: O(1) Lookups (HashMaps)
   const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
@@ -259,7 +260,7 @@ export const MonitorYard: React.FC = () => {
 
   const SortableHeader = ({ label, sortKey }: { label: string, sortKey: string }) => (
     <button 
-      onClick={() => setSortConfig(prev => ({ key: sortKey, direction: prev.key === sortKey && prev.direction === 'asc' ? 'desc' : 'asc' }))}
+      onClick={() => setSortConfig((prev: { key: string, direction: 'asc' | 'desc' }) => ({ key: sortKey, direction: prev.key === sortKey && prev.direction === 'asc' ? 'desc' : 'asc' }))}
       className="flex items-center gap-1 hover:text-black transition-colors uppercase cursor-pointer"
     >
       {label}
