@@ -1856,7 +1856,7 @@ export const MonitorYard: React.FC = () => {
                         {
                           header: 'Cliente Committente',
                           accessor: (s) => {
-                            const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                            const clientName = clients.find(c => c.id === s.clientId)?.name || 'Generico';
                             const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Vettore';
                             return (
                               <div className="text-xs font-sans">
@@ -1929,7 +1929,7 @@ export const MonitorYard: React.FC = () => {
                         {
                           header: 'Cliente Committente',
                           accessor: (s) => {
-                            const clientName = bayUsages.find(c => c.id === s.clientId)?.name || 'Generico';
+                            const clientName = clients.find(c => c.id === s.clientId)?.name || 'Generico';
                             const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Vettore';
                             return (
                               <div className="text-xs font-sans">
@@ -2753,7 +2753,12 @@ export const MonitorYard: React.FC = () => {
                       header: 'Vettore / Veicolo',
                       accessor: (b) => {
                         const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
-                        const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                        const linkedShipments = shipments.filter(s => s.bookingId === b.id);
+                        let usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                        if (linkedShipments.length > 0) {
+                          const clientNames = Array.from(new Set(linkedShipments.map(s => clients.find(c => c.id === s.clientId)?.name || s.clientId)));
+                          usageName = clientNames.join(', ');
+                        }
                         return (
                           <div className="text-xs font-sans">
                             <div className="font-bold text-black">{cName}</div>
@@ -2867,7 +2872,12 @@ export const MonitorYard: React.FC = () => {
                       header: 'Dettagli Richiesta',
                       accessor: (b) => {
                         const cName = carriers.find(c => c.id === b.carrierId)?.name || 'Vettore';
-                        const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                        const linkedShipments = shipments.filter(s => s.bookingId === b.id);
+                        let usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                        if (linkedShipments.length > 0) {
+                          const clientNames = Array.from(new Set(linkedShipments.map(s => clients.find(c => c.id === s.clientId)?.name || s.clientId)));
+                          usageName = clientNames.join(', ');
+                        }
                         return (
                           <div className="text-xs">
                             <div className="font-bold text-black">{cName}</div>
@@ -3115,7 +3125,7 @@ export const MonitorYard: React.FC = () => {
                                   (manualPlate && s.licensePlate?.toUpperCase().replace(/\s+/g, '') === manualPlate.toUpperCase().replace(/\s+/g, ''))
                                 )
                               ).map(s => {
-                                const clientName = bayUsages.find(u => u.id === s.clientId)?.name || 'Cliente';
+                                const clientName = clients.find(c => c.id === s.clientId)?.name || 'Cliente';
                                 const isChecked = selectedShipmentIdsForCheckIn.includes(s.id);
                                 return (
                                   <label key={s.id} className="flex items-center gap-2 bg-white border p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-all select-none border-black/5">
@@ -3332,7 +3342,12 @@ export const MonitorYard: React.FC = () => {
                       {
                         header: 'Autista',
                         accessor: (b) => {
-                          const usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                          const linkedShipments = shipments.filter(s => s.bookingId === b.id);
+                          let usageName = bayUsages.find(u => u.id === b.clientUsageId)?.name || 'Generico';
+                          if (linkedShipments.length > 0) {
+                            const clientNames = Array.from(new Set(linkedShipments.map(s => clients.find(c => c.id === s.clientId)?.name || s.clientId)));
+                            usageName = clientNames.join(', ');
+                          }
                           return (
                             <div className="text-xs font-sans">
                               <div className="font-bold">{b.driverName}</div>
@@ -4010,7 +4025,7 @@ export const MonitorYard: React.FC = () => {
                             (checkInBooking?.licensePlate && s.licensePlate?.toUpperCase().replace(/\s+/g, '') === checkInBooking.licensePlate.toUpperCase().replace(/\s+/g, ''))
                           )
                         ).map(s => {
-                          const clientName = bayUsages.find(u => u.id === s.clientId)?.name || 'Cliente';
+                          const clientName = clients.find(c => c.id === s.clientId)?.name || 'Cliente';
                           const isChecked = selectedShipmentIdsForCheckIn.includes(s.id);
                           return (
                             <label key={s.id} className="flex items-center gap-2 bg-white border p-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-all select-none border-black/5">
@@ -4820,6 +4835,23 @@ export const MonitorYard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
+                      if (shipmentFormTipoOperazioneHub !== 'OUTBOUND') {
+                        setTripShipments(prev => prev.map(row => ({
+                          ...row,
+                          realDestinationName: row.realOriginName,
+                          realDestinationAddress: row.realOriginAddress,
+                          realDestinationCity: row.realOriginCity,
+                          realDestinationCap: row.realOriginCap,
+                          realDestinationProvince: row.realOriginProvince,
+                          realDestinationCountry: row.realOriginCountry,
+                          realOriginName: row.realDestinationName,
+                          realOriginAddress: row.realDestinationAddress,
+                          realOriginCity: row.realDestinationCity,
+                          realOriginCap: row.realDestinationCap,
+                          realOriginProvince: row.realDestinationProvince,
+                          realOriginCountry: row.realDestinationCountry
+                        })));
+                      }
                       setShipmentFormTipoOperazioneHub('OUTBOUND');
                       setShipmentFormType('CARICO');
                       setShipmentFormHubOrigineOperativo(selectedDepotId);
@@ -4836,6 +4868,23 @@ export const MonitorYard: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => {
+                      if (shipmentFormTipoOperazioneHub !== 'INBOUND') {
+                        setTripShipments(prev => prev.map(row => ({
+                          ...row,
+                          realOriginName: row.realDestinationName,
+                          realOriginAddress: row.realDestinationAddress,
+                          realOriginCity: row.realDestinationCity,
+                          realOriginCap: row.realDestinationCap,
+                          realOriginProvince: row.realDestinationProvince,
+                          realOriginCountry: row.realDestinationCountry,
+                          realDestinationName: row.realOriginName,
+                          realDestinationAddress: row.realOriginAddress,
+                          realDestinationCity: row.realOriginCity,
+                          realDestinationCap: row.realOriginCap,
+                          realDestinationProvince: row.realOriginProvince,
+                          realDestinationCountry: row.realOriginCountry
+                        })));
+                      }
                       setShipmentFormTipoOperazioneHub('INBOUND');
                       setShipmentFormType('SCARICO');
                       setShipmentFormHubDestinazioneOperativo(selectedDepotId);
@@ -5005,75 +5054,83 @@ export const MonitorYard: React.FC = () => {
                           </td>
                           <td className="p-4 min-w-[300px] align-top border-r border-black/5">
                             <div className="space-y-2">
-                              <input 
-                                type="text" 
-                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold text-gray-800" 
-                                placeholder={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? "Nome Destinatario" : "Nome Mittente"}
-                                value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationName || '' : row.realOriginName || ''}
-                                onChange={(e) => {
-                                  const newTripShipments = [...tripShipments];
-                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationName = e.target.value.toUpperCase();
-                                  else newTripShipments[index].realOriginName = e.target.value.toUpperCase();
-                                  setTripShipments(newTripShipments);
-                                }}
-                              />
-                              <input 
-                                type="text" 
-                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
-                                placeholder="Indirizzo (es. Via Roma 1)"
-                                value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
-                                onChange={(e) => {
-                                  const newTripShipments = [...tripShipments];
-                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationAddress = e.target.value.toUpperCase();
-                                  else newTripShipments[index].realOriginAddress = e.target.value.toUpperCase();
-                                  setTripShipments(newTripShipments);
-                                }}
-                              />
-                              <TerritoryAutocomplete
-                                value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCity || '' : row.realOriginCity || ''}
-                                onChange={(val, record) => {
-                                  const newTripShipments = [...tripShipments];
-                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
-                                    newTripShipments[index].realDestinationCity = record ? record.comune : val;
-                                    if (record) {
-                                      newTripShipments[index].realDestinationCap = record.cap;
-                                      newTripShipments[index].realDestinationProvince = record.provincia_sigla;
-                                      newTripShipments[index].realDestinationCountry = 'Italia';
-                                    }
-                                  } else {
-                                    newTripShipments[index].realOriginCity = record ? record.comune : val;
-                                    if (record) {
-                                      newTripShipments[index].realOriginCap = record.cap;
-                                      newTripShipments[index].realOriginProvince = record.provincia_sigla;
-                                      newTripShipments[index].realOriginCountry = 'Italia';
-                                    }
-                                  }
-                                  setTripShipments(newTripShipments);
-                                }}
-                              />
-                              <div className="flex gap-2">
-                                <input 
-                                  type="text" 
-                                  placeholder="CAP"
-                                  value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCap || '' : row.realOriginCap || ''}
-                                  readOnly
-                                  className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
-                                />
-                                <input 
-                                  type="text" 
-                                  placeholder="Prov"
-                                  value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationProvince || '' : row.realOriginProvince || ''}
-                                  readOnly
-                                  className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
-                                />
-                                <input 
-                                  type="text" 
-                                  placeholder="Nazione"
-                                  value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCountry || 'Italia' : row.realOriginCountry || 'Italia'}
-                                  readOnly
-                                  className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
-                                />
-                              </div>
+                              {shipmentFormTipoOperazioneHub === 'TRANSITO' ? (
+                                <div className="flex items-center justify-center h-full text-[10px] text-gray-400 font-mono italic bg-gray-50 rounded-lg p-2 border border-black/5">
+                                  Dati Hub Partenza/Arrivo impostati a livello di viaggio
+                                </div>
+                              ) : (
+                                <>
+                                  <input 
+                                    type="text" 
+                                    className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold text-gray-800" 
+                                    placeholder={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? "Nome Destinatario" : "Nome Mittente"}
+                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationName || '' : row.realOriginName || ''}
+                                    onChange={(e) => {
+                                      const newTripShipments = [...tripShipments];
+                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationName = e.target.value.toUpperCase();
+                                      else newTripShipments[index].realOriginName = e.target.value.toUpperCase();
+                                      setTripShipments(newTripShipments);
+                                    }}
+                                  />
+                                  <input 
+                                    type="text" 
+                                    className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
+                                    placeholder="Indirizzo (es. Via Roma 1)"
+                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
+                                    onChange={(e) => {
+                                      const newTripShipments = [...tripShipments];
+                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationAddress = e.target.value.toUpperCase();
+                                      else newTripShipments[index].realOriginAddress = e.target.value.toUpperCase();
+                                      setTripShipments(newTripShipments);
+                                    }}
+                                  />
+                                  <TerritoryAutocomplete
+                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCity || '' : row.realOriginCity || ''}
+                                    onChange={(val, record) => {
+                                      const newTripShipments = [...tripShipments];
+                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
+                                        newTripShipments[index].realDestinationCity = record ? record.comune : val;
+                                        if (record) {
+                                          newTripShipments[index].realDestinationCap = record.cap;
+                                          newTripShipments[index].realDestinationProvince = record.provincia_sigla;
+                                          newTripShipments[index].realDestinationCountry = 'Italia';
+                                        }
+                                      } else {
+                                        newTripShipments[index].realOriginCity = record ? record.comune : val;
+                                        if (record) {
+                                          newTripShipments[index].realOriginCap = record.cap;
+                                          newTripShipments[index].realOriginProvince = record.provincia_sigla;
+                                          newTripShipments[index].realOriginCountry = 'Italia';
+                                        }
+                                      }
+                                      setTripShipments(newTripShipments);
+                                    }}
+                                  />
+                                  <div className="flex gap-2">
+                                    <input 
+                                      type="text" 
+                                      placeholder="CAP"
+                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCap || '' : row.realOriginCap || ''}
+                                      readOnly
+                                      className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
+                                    />
+                                    <input 
+                                      type="text" 
+                                      placeholder="Prov"
+                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationProvince || '' : row.realOriginProvince || ''}
+                                      readOnly
+                                      className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
+                                    />
+                                    <input 
+                                      type="text" 
+                                      placeholder="Nazione"
+                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCountry || 'Italia' : row.realOriginCountry || 'Italia'}
+                                      readOnly
+                                      className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
+                                    />
+                                  </div>
+                                </>
+                              )}
                             </div>
                           </td>
                           <td className="p-4 align-top border-r border-black/5">
@@ -5095,9 +5152,10 @@ export const MonitorYard: React.FC = () => {
                               className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
                               value={row.grossWeight || ''}
                               min="0"
+                              step="0.01"
                               onChange={(e) => {
                                 const newTripShipments = [...tripShipments];
-                                newTripShipments[index].grossWeight = Number(e.target.value);
+                                newTripShipments[index].grossWeight = parseFloat(e.target.value);
                                 setTripShipments(newTripShipments);
                               }}
                             />
