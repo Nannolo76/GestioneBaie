@@ -20,7 +20,9 @@ export interface TripGroup {
   totalGrossWeight: number;
   status: Shipment['status'];
   origin: string;
+  originCity: string;
   destination: string;
+  destinationCity: string;
   expectedDate?: string;
   expectedTime?: string;
   shipments: Shipment[];
@@ -68,7 +70,7 @@ export const MonitorYard: React.FC = () => {
   const [guardiolaView, setGuardiolaView] = useState<'station' | 'bays' | 'gate' | 'expected' | 'rapid' | 'schedule' | 'anomalies'>('station');
   
   // Stati TMS Spedizioni / Viaggi
-  const [stationSubTab, setStationSubTab] = useState<'arrivi' | 'partenze'>('arrivi');
+  const [stationSubTab, setStationSubTab] = useState<'arrivi' | 'partenze'>('partenze');
   const [selectedShipmentIdsForCheckIn, setSelectedShipmentIdsForCheckIn] = useState<string[]>([]);
   const [activeLinkingShipmentId, setActiveLinkingShipmentId] = useState<string | null>(null);
   const [linkingBookingId, setLinkingBookingId] = useState<string>('');
@@ -283,8 +285,10 @@ export const MonitorYard: React.FC = () => {
           totalPallets: 0,
           totalGrossWeight: 0,
           status: s.status || 'DA_PIANIFICARE',
-          origin: s.realOriginName || s.originOrDestination || '',
-          destination: s.realDestinationName || s.originOrDestination || '',
+          origin: s.realOriginName || s.subjectName || 'Sconosciuto',
+          originCity: s.realOriginCity || s.originOrDestination || '',
+          destination: s.realDestinationName || s.subjectName || 'Sconosciuto',
+          destinationCity: s.realDestinationCity || s.originOrDestination || '',
           expectedDate: s.expectedDate,
           expectedTime: s.expectedTime,
           shipments: []
@@ -2556,8 +2560,8 @@ export const MonitorYard: React.FC = () => {
                             <div className="text-xs font-sans space-y-0.5">
                               <div><span className="text-[9px] text-gray-400 font-mono">Client:</span> <span className="font-bold">{clientName}</span></div>
                               <div className="text-[10px] text-gray-500 font-semibold mt-1">
-                                Da: {g.origin || 'N/D'}<br/>
-                                A: {g.destination || 'N/D'}
+                                Da: {g.origin} {g.originCity ? `(${g.originCity})` : ''}<br/>
+                                A: {g.destination} {g.destinationCity ? `(${g.destinationCity})` : ''}
                               </div>
                               <div className="text-gray-500 text-[9px] mt-1 italic">Vettore: {carrierName}</div>
                             </div>
@@ -5273,12 +5277,7 @@ export const MonitorYard: React.FC = () => {
                           </td>
                           <td className="p-4 min-w-[300px] align-top border-r border-black/5">
                             <div className="space-y-2">
-                              {shipmentFormTipoOperazioneHub === 'TRANSITO' ? (
-                                <div className="flex items-center justify-center h-full text-[10px] text-gray-400 font-mono italic bg-gray-50 rounded-lg p-2 border border-black/5">
-                                  Dati Hub Partenza/Arrivo impostati a livello di viaggio
-                                </div>
-                              ) : (
-                                <>
+                              <>
                                   <input 
                                     type="text" 
                                     className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold text-gray-800" 
@@ -5349,7 +5348,6 @@ export const MonitorYard: React.FC = () => {
                                     />
                                   </div>
                                 </>
-                              )}
                             </div>
                           </td>
                           <td className="p-4 align-top border-r border-black/5">
