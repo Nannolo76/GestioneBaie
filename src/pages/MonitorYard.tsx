@@ -151,7 +151,7 @@ export const MonitorYard: React.FC = () => {
 
   // Derived state for the main grid
   const filteredShipments = useMemo(() => {
-    return shipments.filter(s => {
+    const result = shipments.filter(s => {
       // Base logic: DA_CONFERMARE excluded, must belong to depot
       if (s.routingStatus === 'DA_CONFERMARE') return false;
       if (s.depotId !== selectedDepotId && s.hubOrigineOperativo !== selectedDepotId && s.hubDestinazioneOperativo !== selectedDepotId) return false;
@@ -231,13 +231,43 @@ export const MonitorYard: React.FC = () => {
 
       return true;
     });
-  }, [shipments, selectedDepotId, shipmentsFilterTab, filterReference, filterSearch, filterProvince, filterCountry, dateFilter]);
+
+    return result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = (a as any)[key] || '';
+      let valB: any = (b as any)[key] || '';
+      
+      if (key === 'expectedDate') {
+         valA = a.expectedDate ? new Date(`${a.expectedDate}T${a.expectedTime || '00:00'}`).getTime() : 0;
+         valB = b.expectedDate ? new Date(`${b.expectedDate}T${b.expectedTime || '00:00'}`).getTime() : 0;
+      }
+      
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+      
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [shipments, selectedDepotId, shipmentsFilterTab, filterReference, filterSearch, filterProvince, filterCountry, dateFilter, sortConfig]);
 
   const totalPages = Math.ceil(filteredShipments.length / ITEMS_PER_PAGE);
   const paginatedShipments = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredShipments.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredShipments, currentPage, ITEMS_PER_PAGE]);
+
+  const SortableHeader = ({ label, sortKey }: { label: string, sortKey: string }) => (
+    <button 
+      onClick={() => setSortConfig(prev => ({ key: sortKey, direction: prev.key === sortKey && prev.direction === 'asc' ? 'desc' : 'asc' }))}
+      className="flex items-center gap-1 hover:text-black transition-colors uppercase cursor-pointer"
+    >
+      {label}
+      {sortConfig.key === sortKey && (
+        <span className="text-[10px] text-blue-600 font-bold ml-1">{sortConfig.direction === 'asc' ? '↑' : '↓'}</span>
+      )}
+    </button>
+  );
 
   // Optimized counts for tabs
   const countAll = useMemo(() => shipments.filter(s => (s.depotId === selectedDepotId || s.hubOrigineOperativo === selectedDepotId || s.hubDestinazioneOperativo === selectedDepotId) && s.routingStatus !== 'DA_CONFERMARE').length, [shipments, selectedDepotId]);
@@ -963,7 +993,7 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormCarrier(carrId);
 
     // Preserva il tripId esistente o creane uno nuovo per questo blocco di spedizioni
-    const commonTripId = tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
+    const commonTripId = tripShipments[0]?.tripId || String(Math.floor(Date.now() / 1000));
     const clientTripNum = shipmentFormTripNumber || undefined;
 
     // Filtro le righe vuote (se orderNumber è assente)
@@ -2336,7 +2366,7 @@ export const MonitorYard: React.FC = () => {
                         )
                       },
                       {
-                        header: 'Flusso',
+                        header: <SortableHeader label="Flusso" sortKey="activityType" />,
                         accessor: (s) => (
                           <div className="space-y-1">
                             <Badge variant={['SCARICO', 'RESO'].includes(s.activityType) ? 'info' : 'success'}>
@@ -2347,12 +2377,25 @@ export const MonitorYard: React.FC = () => {
                         )
                       },
                       {
-                        header: 'Riferimenti',
+                        header: <SortableHeader label="Viaggio Int." sortKey="tripId" />,
+                        accessor: (s) => (
+                          <div className="font-mono text-xs">
+                            {s.tripId ? (
+                              <span className="text-amber-600 font-mono text-[10px] font-bold block bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 w-max">
+                                {s.tripId}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-[9px] italic">-</span>
+                            )}
+                          </div>
+                        )
+                      },
+                      {
+                        header: <SortableHeader label="Riferimenti" sortKey="orderNumber" />,
                         accessor: (s) => (
                           <div className="font-mono text-xs">
                             <span className="font-bold text-ticket-accent block">{s.orderNumber}</span>
                             {s.orderNumber2 && <span className="text-gray-400 text-[10px] block">Rif 2: {s.orderNumber2}</span>}
-                            {s.tripId && <span className="text-amber-600 font-mono text-[9px] block bg-amber-50 border border-amber-200 rounded px-1 w-max mt-1">V. Int: {s.tripId}</span>}
                             {s.clientTripNumber && <span className="text-blue-600 font-mono text-[9px] block bg-blue-50 border border-blue-200 rounded px-1 w-max mt-0.5">V. Comm: {s.clientTripNumber}</span>}
                             {s.deliveryNotes && (
                               <span className="inline-block mt-1 text-[9px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.deliveryNotes}>
@@ -2368,7 +2411,7 @@ export const MonitorYard: React.FC = () => {
                         )
                       },
                       {
-                        header: 'Committente / Soggetto & Tratta',
+                        header: <SortableHeader label="Committente" sortKey="clientId" />,
                         accessor: (s) => {
                           const clientName = clientMap.get(s.clientId) || s.clientId || 'Sconosciuto';
                           const carrierName = carrierMap.get(s.carrierId) || s.carrierId || 'Sconosciuto';
@@ -4860,11 +4903,11 @@ export const MonitorYard: React.FC = () => {
                         <th className="p-2 w-16"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-black/5">
+                    <tbody className="divide-y-8 divide-gray-200">
                       {tripShipments.map((row, index) => (
-                        <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="p-2 text-center font-mono font-bold text-gray-400">{index + 1}</td>
-                          <td className="p-2 align-top">
+                        <tr key={row.id} className={`transition-colors shadow-sm ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'} hover:bg-gray-100`}>
+                          <td className="p-4 text-center font-mono font-bold text-gray-400 border-r border-black/5 align-top">{index + 1}</td>
+                          <td className="p-4 align-top border-r border-black/5">
                             <div className="space-y-2">
                               <select
                                 className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none text-gray-700 font-bold bg-white"
@@ -4917,7 +4960,7 @@ export const MonitorYard: React.FC = () => {
                               />
                             </div>
                           </td>
-                          <td className="p-2 min-w-[300px] align-top">
+                          <td className="p-4 min-w-[300px] align-top border-r border-black/5">
                             <div className="space-y-2">
                               <input 
                                 type="text" 
@@ -4990,7 +5033,7 @@ export const MonitorYard: React.FC = () => {
                               </div>
                             </div>
                           </td>
-                          <td className="p-2">
+                          <td className="p-4 align-top border-r border-black/5">
                             <input 
                               type="number" 
                               className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
@@ -5003,7 +5046,7 @@ export const MonitorYard: React.FC = () => {
                               }}
                             />
                           </td>
-                          <td className="p-2">
+                          <td className="p-4 align-top border-r border-black/5">
                             <input 
                               type="number" 
                               className="w-full border border-black/10 rounded-lg p-1.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none" 
@@ -5016,7 +5059,7 @@ export const MonitorYard: React.FC = () => {
                               }}
                             />
                           </td>
-                          <td className="p-2 align-top">
+                          <td className="p-4 align-top border-r border-black/5">
                             <textarea 
                               className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none resize-none h-full min-h-[60px]" 
                               placeholder="Annotazioni spedizione..."
@@ -5028,7 +5071,7 @@ export const MonitorYard: React.FC = () => {
                               }}
                             />
                           </td>
-                          <td className="p-2 align-middle">
+                          <td className="p-4 align-middle bg-gray-50/50">
                             <div className="flex flex-col items-center justify-center space-y-2">
                               <button 
                                 type="button" 
