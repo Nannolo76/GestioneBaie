@@ -160,7 +160,6 @@ export interface Shipment {
   depotId: string; // Links to Depot
   orderNumber: string; // Riferimento 1
   orderNumber2?: string; // Riferimento 2
-  tripId?: string; // Numero viaggio interno univoco
   clientTripNumber?: string; // Numero viaggio del committente
   activityType: 'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER';
   palletPlaces: number;
