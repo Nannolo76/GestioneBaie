@@ -960,15 +960,15 @@ export const MonitorYard: React.FC = () => {
   ]);
   const handleSaveShipmentForm = (e: React.FormEvent) => {
     e.preventDefault();
-    const cId = shipmentFormClient || clients[0]?.id;
     const carrId = shipmentFormCarrier || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
-    if (!cId || !carrId) return;
+    if (!carrId) return;
 
     // Controllo univocità Numero Delivery (orderNumber) per Committente
     const duplicateDelivery = tripShipments.find(row => {
       if (!row.orderNumber) return false;
+      const rowClientId = row.clientId || shipmentFormClient || clients[0]?.id;
       return shipments.some(s => 
-        s.clientId === cId && 
+        s.clientId === rowClientId && 
         s.orderNumber.toLowerCase() === row.orderNumber?.toLowerCase() &&
         s.id !== row.id &&
         (!shipmentFormId || s.id !== shipmentFormId)
@@ -976,24 +976,26 @@ export const MonitorYard: React.FC = () => {
     });
 
     if (duplicateDelivery) {
-      alert(`Il numero di delivery "${duplicateDelivery.orderNumber}" è già esistente per questo committente. Deve essere univoco.`);
+      alert(`Il numero di delivery "${duplicateDelivery.orderNumber}" è già esistente per il committente selezionato. Deve essere univoco.`);
       return;
     }
 
     // Memorizza la scelta per i successivi inserimenti
-    setShipmentFormClient(cId);
     setShipmentFormCarrier(carrId);
 
-    // Preserva il tripId esistente o creane uno nuovo per questo blocco di spedizioni se esplicitato, altrimenti uniscili al form.
-    const commonTripId = shipmentFormTripNumber || tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
+    // Preserva il tripId esistente o creane uno nuovo per questo blocco di spedizioni
+    const commonTripId = tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
+    const clientTripNum = shipmentFormTripNumber || undefined;
 
     // Loop through all shipments in the Trip Builder
     for (let index = 0; index < tripShipments.length; index++) {
       const row = tripShipments[index];
+      const rowClientId = row.clientId || shipmentFormClient || clients[0]?.id;
       
       const payloadUpdates = {
         tripId: commonTripId,
-        clientId: cId,
+        clientTripNumber: clientTripNum,
+        clientId: rowClientId,
         carrierId: carrId,
         depotId: selectedDepotId,
         orderNumber: row.orderNumber || `GEN-${Date.now()}-${index}`,
@@ -4828,14 +4830,7 @@ export const MonitorYard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Select
-                  label="Cliente Committente *"
-                  options={clients.map(c => ({ value: c.id, label: c.name }))}
-                  value={shipmentFormClient}
-                  onChange={(e) => setShipmentFormClient(e.target.value)}
-                  required
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
                   label="Vettore Assegnato *"
                   options={carriers.filter(c => c.status === 'APPROVATO').map(c => ({ value: c.id, label: c.name }))}
@@ -4875,6 +4870,20 @@ export const MonitorYard: React.FC = () => {
                           <td className="p-2 text-center font-mono font-bold text-gray-400">{index + 1}</td>
                           <td className="p-2 align-top">
                             <div className="space-y-2">
+                              <select
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none text-gray-700 font-bold bg-white"
+                                value={row.clientId || shipmentFormClient || clients[0]?.id || ''}
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].clientId = e.target.value;
+                                  setTripShipments(newTripShipments);
+                                }}
+                                required
+                              >
+                                {clients.map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
                               <input 
                                 type="text" 
                                 className="w-full border border-black/10 rounded-lg p-1.5 text-xs font-bold focus:ring-1 focus:ring-blue-500 outline-none" 

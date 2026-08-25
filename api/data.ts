@@ -518,6 +518,8 @@ async function initializeDb() {
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS tipo_operazione_hub TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_status TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_notes TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS trip_id TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS client_trip_number TEXT`);
 
   // Nuovi campi geografici strutturati per i plant/depots
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS address TEXT`);
@@ -1476,8 +1478,9 @@ export default async function handler(req: any, res: any) {
               subject_name, address, city, cap, province, region, country, gross_weight, delivery_notes, internal_notes,
               real_origin_name, real_origin_address, real_origin_city, real_origin_cap, real_origin_province, real_origin_country,
               real_destination_name, real_destination_address, real_destination_city, real_destination_cap, real_destination_province, real_destination_country,
-              hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub, routing_status, routing_notes, sequence, justification_note
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)
+              hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub, routing_status, routing_notes, sequence, justification_note,
+              trip_id, client_trip_number
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47)
           `, [
             payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
             payload.activityType, payload.palletPlaces, payload.status, payload.expectedDate, payload.expectedTime || null,
@@ -1487,7 +1490,8 @@ export default async function handler(req: any, res: any) {
             payload.realOriginName || null, payload.realOriginAddress || null, payload.realOriginCity || null, payload.realOriginCap || null, payload.realOriginProvince || null, payload.realOriginCountry || null,
             payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
             payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
-            payload.routingStatus || null, payload.routingNotes || null, payload.sequence || null, payload.justificationNote || null
+            payload.routingStatus || null, payload.routingNotes || null, payload.sequence || null, payload.justificationNote || null,
+            payload.tripId || null, payload.clientTripNumber || null
           ]);
           break;
  
