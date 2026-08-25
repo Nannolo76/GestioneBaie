@@ -851,44 +851,23 @@ export const MonitorYard: React.FC = () => {
 
   const handleEditShipmentClick = (s: Shipment) => {
     setShipmentFormId(s.id);
-    setShipmentFormClient(s.clientId);
     setShipmentFormCarrier(s.carrierId);
-
-
     setShipmentFormType(s.activityType);
-
     setShipmentFormExpectedDate(s.expectedDate);
     setShipmentFormExpectedTime(s.expectedTime || '');
-
-
     setShipmentFormDeliveryDate(s.expectedDeliveryDate || '');
-
-
-
-
-
-
-
-
-
-
     
-    setTripShipments([s]);
-    setTripJustificationNote(s.justificationNote || '');
+    // Carica l'intero viaggio invece della singola spedizione
+    let relatedShipments = [s];
+    if (s.tripId) {
+      relatedShipments = shipments.filter(ship => ship.tripId === s.tripId);
+    }
+    
+    setTripShipments(relatedShipments);
+    setTripJustificationNote(relatedShipments[0]?.justificationNote || '');
+    setShipmentFormTripNumber(relatedShipments[0]?.clientTripNumber || '');
 
-    // Nuovi campi
-    setShipmentFormRealOriginName(s.realOriginName || '');
-
-    setShipmentFormRealOriginCity(s.realOriginCity || '');
-    setShipmentFormRealOriginCap(s.realOriginCap || '');
-    setShipmentFormRealOriginProvince(s.realOriginProvince || '');
-
-    setShipmentFormRealDestinationName(s.realDestinationName || '');
-
-    setShipmentFormRealDestinationCity(s.realDestinationCity || '');
-    setShipmentFormRealDestinationCap(s.realDestinationCap || '');
-    setShipmentFormRealDestinationProvince(s.realDestinationProvince || '');
-
+    // Resetting hub form state since we use row-level now mostly, or keep it for the modal top
     setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
     setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
     setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'OUTBOUND');
@@ -987,9 +966,16 @@ export const MonitorYard: React.FC = () => {
     const commonTripId = tripShipments[0]?.tripId || `TRIP-${Date.now()}`;
     const clientTripNum = shipmentFormTripNumber || undefined;
 
-    // Loop through all shipments in the Trip Builder
-    for (let index = 0; index < tripShipments.length; index++) {
-      const row = tripShipments[index];
+    // Filtro le righe vuote (se orderNumber è assente)
+    const validTripShipments = tripShipments.filter(row => row.orderNumber && row.orderNumber.trim() !== '');
+    if (validTripShipments.length === 0) {
+      alert('Non hai inserito nessuna spedizione valida (manca il Nr. Delivery).');
+      return;
+    }
+
+    // Loop through all valid shipments in the Trip Builder
+    for (let index = 0; index < validTripShipments.length; index++) {
+      const row = validTripShipments[index];
       const rowClientId = row.clientId || shipmentFormClient || clients[0]?.id;
       
       const payloadUpdates = {
@@ -2366,14 +2352,16 @@ export const MonitorYard: React.FC = () => {
                           <div className="font-mono text-xs">
                             <span className="font-bold text-ticket-accent block">{s.orderNumber}</span>
                             {s.orderNumber2 && <span className="text-gray-400 text-[10px] block">Rif 2: {s.orderNumber2}</span>}
+                            {s.tripId && <span className="text-amber-600 font-mono text-[9px] block bg-amber-50 border border-amber-200 rounded px-1 w-max mt-1">V. Int: {s.tripId}</span>}
+                            {s.clientTripNumber && <span className="text-blue-600 font-mono text-[9px] block bg-blue-50 border border-blue-200 rounded px-1 w-max mt-0.5">V. Comm: {s.clientTripNumber}</span>}
                             {s.deliveryNotes && (
                               <span className="inline-block mt-1 text-[9px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.deliveryNotes}>
-                                📝 {s.deliveryNotes}
+                                🏷️ {s.deliveryNotes}
                               </span>
                             )}
                             {s.internalNotes && (
                               <span className="inline-block mt-1 text-[9px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded max-w-[130px] truncate" title={s.internalNotes}>
-                                🔒 {s.internalNotes}
+                                📝 {s.internalNotes}
                               </span>
                             )}
                           </div>
@@ -4839,11 +4827,18 @@ export const MonitorYard: React.FC = () => {
                   required
                 />
                 <Input
-                  label="Rif. Viaggio (Opzionale)"
+                  label="Rif. Viaggio Committente (Opzionale)"
                   value={shipmentFormTripNumber}
-                  onChange={(e) => setShipmentFormTripNumber(e.target.value)}
+                  onChange={(e) => setShipmentFormTripNumber(e.target.value.toUpperCase())}
                   placeholder="Es. V-10029"
                 />
+              </div>
+
+              <div className="mt-2 text-[10px] font-mono text-gray-500 bg-gray-50 p-2 rounded-lg border border-black/5 flex items-center justify-between">
+                <span className="font-bold uppercase tracking-wider">Viaggio Interno di Sistema</span>
+                <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                  {tripShipments[0]?.tripId || 'Generato al salvataggio'}
+                </span>
               </div>
 
               {/* TRIP BUILDER: LISTA SPEDIZIONI */}
@@ -4861,6 +4856,7 @@ export const MonitorYard: React.FC = () => {
                         <th className="p-2 min-w-[300px] text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Dati Destinatario' : 'Dati Mittente'}</th>
                         <th className="p-2 w-20 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-l border-orange-200 uppercase text-center">Pallet</th>
                         <th className="p-2 w-24 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-r border-orange-200 uppercase text-center">Peso (kg)</th>
+                        <th className="p-2 w-32 text-[10px] font-mono text-gray-500 uppercase">Annotazioni</th>
                         <th className="p-2 w-16"></th>
                       </tr>
                     </thead>
@@ -4872,7 +4868,7 @@ export const MonitorYard: React.FC = () => {
                             <div className="space-y-2">
                               <select
                                 className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none text-gray-700 font-bold bg-white"
-                                value={row.clientId || shipmentFormClient || clients[0]?.id || ''}
+                                value={row.clientId || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
                                   newTripShipments[index].clientId = e.target.value;
@@ -4880,6 +4876,7 @@ export const MonitorYard: React.FC = () => {
                                 }}
                                 required
                               >
+                                <option value="" disabled>Seleziona Committente...</option>
                                 {clients.map(c => (
                                   <option key={c.id} value={c.id}>{c.name}</option>
                                 ))}
@@ -4891,7 +4888,7 @@ export const MonitorYard: React.FC = () => {
                                 value={row.orderNumber || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  newTripShipments[index].orderNumber = e.target.value;
+                                  newTripShipments[index].orderNumber = e.target.value.toUpperCase();
                                   setTripShipments(newTripShipments);
                                 }}
                                 required
@@ -4903,7 +4900,7 @@ export const MonitorYard: React.FC = () => {
                                 value={row.orderNumber2 || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  newTripShipments[index].orderNumber2 = e.target.value;
+                                  newTripShipments[index].orderNumber2 = e.target.value.toUpperCase();
                                   setTripShipments(newTripShipments);
                                 }}
                               />
@@ -4929,8 +4926,8 @@ export const MonitorYard: React.FC = () => {
                                 value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationName || '' : row.realOriginName || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationName = e.target.value;
-                                  else newTripShipments[index].realOriginName = e.target.value;
+                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationName = e.target.value.toUpperCase();
+                                  else newTripShipments[index].realOriginName = e.target.value.toUpperCase();
                                   setTripShipments(newTripShipments);
                                 }}
                               />
@@ -4941,8 +4938,8 @@ export const MonitorYard: React.FC = () => {
                                 value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
-                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationAddress = e.target.value;
-                                  else newTripShipments[index].realOriginAddress = e.target.value;
+                                  if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationAddress = e.target.value.toUpperCase();
+                                  else newTripShipments[index].realOriginAddress = e.target.value.toUpperCase();
                                   setTripShipments(newTripShipments);
                                 }}
                               />
@@ -5015,6 +5012,18 @@ export const MonitorYard: React.FC = () => {
                               onChange={(e) => {
                                 const newTripShipments = [...tripShipments];
                                 newTripShipments[index].grossWeight = Number(e.target.value);
+                                setTripShipments(newTripShipments);
+                              }}
+                            />
+                          </td>
+                          <td className="p-2 align-top">
+                            <textarea 
+                              className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none resize-none h-full min-h-[60px]" 
+                              placeholder="Annotazioni spedizione..."
+                              value={row.internalNotes || ''}
+                              onChange={(e) => {
+                                const newTripShipments = [...tripShipments];
+                                newTripShipments[index].internalNotes = e.target.value.toUpperCase();
                                 setTripShipments(newTripShipments);
                               }}
                             />
