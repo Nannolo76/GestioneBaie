@@ -337,6 +337,14 @@ async function initializeDb() {
     )
   `);
 
+  // Ensure all columns exist (for backward compatibility if they were added later)
+  await sql(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS order_number TEXT`);
+  await sql(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS order_number_2 TEXT`);
+  await sql(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS client_usage_id TEXT`);
+  await sql(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS client_id TEXT`);
+  await sql(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pallet_returns JSONB`);
+  await sql(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS pallet_voucher_number TEXT`);
+
   await sql(`
     CREATE TABLE IF NOT EXISTS anomalies (
       id TEXT PRIMARY KEY,
@@ -921,6 +929,8 @@ async function initializeDb() {
   }
 }
 
+let dbInitialized = false;
+
 export default async function handler(req: any, res: any) {
   // Permetti chiamate CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -932,8 +942,11 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Inizializza o migra il DB se vuoto
-    await initializeDb();
+    // Inizializza o migra il DB se vuoto (solo la prima volta che questa istanza Serverless viene chiamata)
+    if (!dbInitialized) {
+      await initializeDb();
+      dbInitialized = true;
+    }
 
     if (req.method === 'GET') {
       // Carica tutti i dati in parallelo
@@ -1249,16 +1262,16 @@ export default async function handler(req: any, res: any) {
             INSERT INTO bookings (
               id, carrier_id, depot_id, date, activity_type, status, bay_id, license_plate, license_plate_trailer,
               driver_name, driver_phone, notes, notes_history, checklist, pallet_places, ticket_number,
-              driver_license, driver_license_release, driver_license_expiry, client_usage_id, client_id, pallet_returns, pallet_voucher_number
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+              driver_license, driver_license_release, driver_license_expiry, order_number, order_number_2, client_usage_id, client_id, pallet_returns, pallet_voucher_number
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
           `, [
             payload.id, payload.carrierId, payload.depotId, payload.date, payload.activityType, payload.status, payload.bayId || null,
             payload.licensePlate, payload.licensePlateTrailer || null, payload.driverName, payload.driverPhone || null,
             payload.notes || null, payload.notesHistory ? JSON.stringify(payload.notesHistory) : null,
             payload.checklist ? JSON.stringify(payload.checklist) : null, payload.palletPlaces || null, payload.ticketNumber || null,
-            payload.driverLicense || null, payload.driverLicenseRelease || null, payload.driverLicenseExpiry || null, payload.clientUsageId || null,
-            payload.clientId || null,
-            payload.palletReturns ? JSON.stringify(payload.palletReturns) : null, payload.palletVoucherNumber || null
+            payload.driverLicense || null, payload.driverLicenseRelease || null, payload.driverLicenseExpiry || null,
+            payload.orderNumber || null, payload.orderNumber2 || null, payload.clientUsageId || null,
+            payload.clientId || null, payload.palletReturns ? JSON.stringify(payload.palletReturns) : null, payload.palletVoucherNumber || null
           ]);
           break;
 
