@@ -60,6 +60,7 @@ export const MonitorYard: React.FC = () => {
   // Stati Gestione Spedizioni Guardiola
   const [shipmentFormId, setShipmentFormId] = useState('');
   const [shipmentFormClient, setShipmentFormClient] = useState('');
+  const [shipmentFormTipoTransito, setShipmentFormTipoTransito] = useState<'COMMITTENTE' | 'INTERNO'>('COMMITTENTE');
   const [shipmentFormCarrier, setShipmentFormCarrier] = useState('');
   
   const [confirmDialogState, setConfirmDialogState] = useState({
@@ -874,6 +875,7 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo('');
     setShipmentFormHubDestinazioneOperativo('');
     setShipmentFormTipoOperazioneHub('OUTBOUND');
+    setShipmentFormTipoTransito('COMMITTENTE');
 
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(true);
@@ -902,6 +904,7 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
     setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
     setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'OUTBOUND');
+    setShipmentFormTipoTransito(s.tipoTransito || 'COMMITTENTE');
 
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(false);
@@ -1007,7 +1010,8 @@ export const MonitorYard: React.FC = () => {
     // Loop through all valid shipments in the Trip Builder
     for (let index = 0; index < validTripShipments.length; index++) {
       const row = validTripShipments[index];
-      const rowClientId = row.clientId || shipmentFormClient || clients[0]?.id;
+      const isInternalTransit = shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO';
+      const rowClientId = isInternalTransit ? 'INTERNO' : (row.clientId || shipmentFormClient || clients[0]?.id);
       
       const payloadUpdates = {
         tripId: commonTripId,
@@ -1049,6 +1053,7 @@ export const MonitorYard: React.FC = () => {
         hubOrigineOperativo: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? selectedDepotId : (shipmentFormHubOrigineOperativo || undefined),
         hubDestinazioneOperativo: shipmentFormTipoOperazioneHub === 'INBOUND' ? selectedDepotId : (shipmentFormHubDestinazioneOperativo || undefined),
         tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
+        tipoTransito: shipmentFormTipoOperazioneHub === 'TRANSITO' ? shipmentFormTipoTransito : undefined,
         routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
         routingNotes: shipmentFormRoutingNotes,
         sequence: index + 1,
@@ -4860,6 +4865,36 @@ export const MonitorYard: React.FC = () => {
                     Transito<br/>(Hub-to-Hub)
                   </button>
                 </div>
+
+                {shipmentFormTipoOperazioneHub === 'TRANSITO' && (
+                  <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-black/10">
+                    <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider block mb-2">Sotto-tipo Transito</span>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
+                        <input 
+                          type="radio" 
+                          name="tipoTransito" 
+                          value="COMMITTENTE" 
+                          checked={shipmentFormTipoTransito === 'COMMITTENTE'} 
+                          onChange={() => setShipmentFormTipoTransito('COMMITTENTE')} 
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Transito per Conto Terzi (Committente)
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
+                        <input 
+                          type="radio" 
+                          name="tipoTransito" 
+                          value="INTERNO" 
+                          checked={shipmentFormTipoTransito === 'INTERNO'} 
+                          onChange={() => setShipmentFormTipoTransito('INTERNO')} 
+                          className="text-blue-600 focus:ring-blue-500"
+                        />
+                        Movimentazione Interna (Aziendale)
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4911,19 +4946,26 @@ export const MonitorYard: React.FC = () => {
                           <td className="p-4 align-top border-r border-black/5">
                             <div className="space-y-2">
                               <select
-                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none text-gray-700 font-bold bg-white"
-                                value={row.clientId || ''}
+                                className={`w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold ${shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white text-gray-700'}`}
+                                value={shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO' ? 'INTERNO' : (row.clientId || '')}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
                                   newTripShipments[index].clientId = e.target.value;
                                   setTripShipments(newTripShipments);
                                 }}
                                 required
+                                disabled={shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO'}
                               >
-                                <option value="" disabled>Seleziona Committente...</option>
-                                {clients.map(c => (
-                                  <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
+                                {shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO' ? (
+                                  <option value="INTERNO">Movimentazione Interna (Aziendale)</option>
+                                ) : (
+                                  <>
+                                    <option value="" disabled>Seleziona Committente...</option>
+                                    {clients.map(c => (
+                                      <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                  </>
+                                )}
                               </select>
                               <input 
                                 type="text" 

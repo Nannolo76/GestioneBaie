@@ -190,6 +190,7 @@ export interface Shipment {
   hubOrigineOperativo?: string;
   hubDestinazioneOperativo?: string;
   tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND' | 'TRANSITO';
+  tipoTransito?: 'COMMITTENTE' | 'INTERNO';
   routingStatus?: 'CONFERMATO' | 'DA_CONFERMARE';
   routingNotes?: string;
   sequence?: number; // Sequenza di carico/scarico nel Viaggio
