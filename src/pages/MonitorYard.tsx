@@ -88,7 +88,7 @@ export const MonitorYard: React.FC = () => {
   // Stati Gestione Spedizioni Guardiola
   const [shipmentFormId, setShipmentFormId] = useState('');
   const [shipmentFormClient, setShipmentFormClient] = useState('');
-  const [shipmentFormTipoTransito, setShipmentFormTipoTransito] = useState<'FTL' | 'DETTAGLIATO'>('FTL');
+
   const [shipmentFormCarrier, setShipmentFormCarrier] = useState('');
   
   const [confirmDialogState, setConfirmDialogState] = useState({
@@ -107,8 +107,7 @@ export const MonitorYard: React.FC = () => {
   const [tripShipments, setTripShipments] = useState<Partial<Shipment>[]>([{ id: `tmp-${Date.now()}` }]);
   const [tripJustificationNote, setTripJustificationNote] = useState('');
   const [shipmentFormTripNumber, setShipmentFormTripNumber] = useState('');
-  const [ftlPallet, setFtlPallet] = useState<number>(0);
-  const [ftlWeight, setFtlWeight] = useState<number>(0);
+
 
   const [shipmentFormType, setShipmentFormType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
   
@@ -148,7 +147,7 @@ export const MonitorYard: React.FC = () => {
   
   const [shipmentFormHubOrigineOperativo, setShipmentFormHubOrigineOperativo] = useState('');
   const [shipmentFormHubDestinazioneOperativo, setShipmentFormHubDestinazioneOperativo] = useState('');
-  const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND' | 'TRANSITO'>('OUTBOUND');
+  const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND'>('OUTBOUND');
   
   const [isRoutingAmbiguous, setIsRoutingAmbiguous] = useState(false);
   const [isAutoRoutingEnabled, setIsAutoRoutingEnabled] = useState(true);
@@ -955,9 +954,7 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo('');
     setShipmentFormHubDestinazioneOperativo('');
     setShipmentFormTipoOperazioneHub('OUTBOUND');
-    setShipmentFormTipoTransito('FTL');
-    setFtlPallet(0);
-    setFtlWeight(0);
+
 
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(true);
@@ -986,9 +983,7 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
     setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
     setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'OUTBOUND');
-    setShipmentFormTipoTransito(s.tipoTransito || 'FTL');
-    setFtlPallet(relatedShipments.reduce((acc, row) => acc + (row.palletPlaces || 0), 0));
-    setFtlWeight(relatedShipments.reduce((acc, row) => acc + (row.grossWeight || 0), 0));
+
 
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(false);
@@ -1087,19 +1082,9 @@ export const MonitorYard: React.FC = () => {
     // Filtro le righe vuote (se orderNumber è assente)
     let validTripShipments = tripShipments.filter(row => row.orderNumber && row.orderNumber.trim() !== '');
     
-    // FTL Bypass per Transito: se non ci sono righe valide, ma siamo in TRANSITO, creiamo una riga master FTL
     if (validTripShipments.length === 0) {
-      if (shipmentFormTipoOperazioneHub === 'TRANSITO') {
-        const firstRow = tripShipments[0] || {};
-        validTripShipments = [{
-          ...firstRow,
-          id: firstRow.id || `tmp-${Date.now()}-master`,
-          orderNumber: `FTL-${commonTripId}`,
-        }];
-      } else {
-        alert('Non hai inserito nessuna spedizione valida (manca il Nr. Delivery).');
-        return;
-      }
+      alert('Non hai inserito nessuna spedizione valida (manca il Nr. Delivery).');
+      return;
     }
 
     // Loop through all valid shipments in the Trip Builder
@@ -1147,7 +1132,7 @@ export const MonitorYard: React.FC = () => {
         hubOrigineOperativo: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? selectedDepotId : (shipmentFormHubOrigineOperativo || undefined),
         hubDestinazioneOperativo: shipmentFormTipoOperazioneHub === 'INBOUND' ? selectedDepotId : (shipmentFormHubDestinazioneOperativo || undefined),
         tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
-        tipoTransito: shipmentFormTipoOperazioneHub === 'TRANSITO' ? shipmentFormTipoTransito : undefined,
+
         routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
         routingNotes: shipmentFormRoutingNotes,
         sequence: index + 1,
@@ -1244,8 +1229,9 @@ export const MonitorYard: React.FC = () => {
       const hubOrigineOperativo = parts[29] || '';
       const hubDestinazioneOperativo = parts[30] || '';
       const tipoOperazioneHub = parts[31]?.toUpperCase() || '';
-      const tripId = parts[32] || undefined;
-      const sequence = parts[33] ? Number(parts[33]) : undefined;
+      const tipoStop = parts[32]?.toUpperCase() || 'DIRETTA';
+      const tripId = parts[33] || undefined;
+      const sequence = parts[34] ? Number(parts[34]) : undefined;
 
       const row: PreviewRow = {
         index: idx,
@@ -1292,6 +1278,7 @@ export const MonitorYard: React.FC = () => {
           hubOrigineOperativo,
           hubDestinazioneOperativo,
           tipoOperazioneHub: tipoOperazioneHub as any,
+          tipoStop: tipoStop as any,
           routingStatus: 'CONFERMATO',
           routingNotes: 'Da file (Validato)',
           tripId,
@@ -1299,9 +1286,13 @@ export const MonitorYard: React.FC = () => {
         }
       };
 
-      if (!hubOrigineOperativo || !hubDestinazioneOperativo || !['OUTBOUND', 'INBOUND', 'TRANSITO'].includes(tipoOperazioneHub)) {
+      if (!['OUTBOUND', 'INBOUND'].includes(tipoOperazioneHub)) {
         row.hasError = true;
-        row.messages.push('Routing mancante o Tipo Operazione errato (OUTBOUND, INBOUND, TRANSITO)');
+        row.messages.push('Tipo Operazione errato (OUTBOUND, INBOUND)');
+      }
+      if (!['DIRETTA', 'HUB_TRANSIT', 'CORRISPONDENTE'].includes(tipoStop)) {
+        row.hasError = true;
+        row.messages.push('Natura dello Stop errata (DIRETTA, HUB_TRANSIT, CORRISPONDENTE)');
       }
 
       if (territoryData.length > 0) {
@@ -1953,7 +1944,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
                         }`}
                       >
-                        🛬 Arrivi / Accettazione ({shipments.filter(s => (s.hubOrigineOperativo === selectedDepotId && (s.tipoOperazioneHub === 'INBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO')).length})
+                        🛬 Arrivi / Accettazione ({shipments.filter(s => (s.hubOrigineOperativo === selectedDepotId && s.tipoOperazioneHub === 'INBOUND') || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO')).length})
                       </button>
                       <button
                         onClick={() => setStationSubTab('partenze')}
@@ -1963,7 +1954,7 @@ export const MonitorYard: React.FC = () => {
                             : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
                         }`}
                       >
-                        🛫 Partenze / Spedizioni ({shipments.filter(s => (s.hubDestinazioneOperativo === selectedDepotId && (s.tipoOperazioneHub === 'OUTBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO')).length})
+                        🛫 Partenze / Spedizioni ({shipments.filter(s => (s.hubDestinazioneOperativo === selectedDepotId && s.tipoOperazioneHub === 'OUTBOUND') || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO')).length})
                       </button>
                     </div>
                   }
@@ -1971,7 +1962,7 @@ export const MonitorYard: React.FC = () => {
                   {stationSubTab === 'arrivi' ? (
                     <Table
                       data={shipments
-                        .filter(s => (s.hubOrigineOperativo === selectedDepotId && (s.tipoOperazioneHub === 'INBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO'))
+                        .filter(s => (s.hubOrigineOperativo === selectedDepotId && s.tipoOperazioneHub === 'INBOUND') || (!s.hubOrigineOperativo && s.depotId === selectedDepotId && s.activityType !== 'CARICO'))
                         .sort((a, b) => {
                           const dateComp = (a.expectedDate || '').localeCompare(b.expectedDate || '');
                           if (dateComp !== 0) return dateComp;
@@ -2044,7 +2035,7 @@ export const MonitorYard: React.FC = () => {
                   ) : (
                     <Table
                       data={shipments
-                        .filter(s => (s.hubDestinazioneOperativo === selectedDepotId && (s.tipoOperazioneHub === 'OUTBOUND' || s.tipoOperazioneHub === 'TRANSITO')) || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO'))
+                        .filter(s => (s.hubDestinazioneOperativo === selectedDepotId && s.tipoOperazioneHub === 'OUTBOUND') || (!s.hubDestinazioneOperativo && s.depotId === selectedDepotId && s.activityType === 'CARICO'))
                         .sort((a, b) => {
                           const dateComp = (a.expectedDate || '').localeCompare(b.expectedDate || '');
                           if (dateComp !== 0) return dateComp;
@@ -4466,6 +4457,54 @@ export const MonitorYard: React.FC = () => {
                             </div>
                           )}
 
+                          <div className="bg-gray-50 p-4 rounded-xl border border-black/10 flex flex-col mb-2">
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 mb-2">
+                              Timeline Viaggio (Point-to-Point)
+                            </span>
+                            <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                              <div className="flex flex-col min-w-[120px]">
+                                <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Origine</span>
+                                <div className="bg-white border-2 border-[#004B97] rounded-lg p-2 text-center shadow-sm">
+                                  <span className="text-[10px] font-bold text-[#004B97] line-clamp-2">
+                                    {manifestShipments[0]?.tipoOperazioneHub === 'OUTBOUND' 
+                                      ? (depots.find(d => d.id === activeBayDetail.booking.depotId)?.name || 'HUB')
+                                      : (manifestShipments[0]?.tipoStop === 'HUB_TRANSIT' || manifestShipments[0]?.tipoStop === 'CORRISPONDENTE' 
+                                          ? depots.find(d => d.id === manifestShipments[0]?.realOriginCity)?.name || manifestShipments[0]?.realOriginName || 'DA DEFINIRE'
+                                          : manifestShipments[0]?.realOriginName || 'DA DEFINIRE')}
+                                  </span>
+                                </div>
+                              </div>
+                              {manifestShipments[0]?.tipoOperazioneHub === 'OUTBOUND' && manifestShipments.slice(0, -1).map((stop, idx) => (
+                                <React.Fragment key={`manifest-stop-${idx}`}>
+                                  <div className="text-gray-400 font-mono text-sm">➔</div>
+                                  <div className="flex flex-col min-w-[120px]">
+                                    <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Stop {idx + 1}</span>
+                                    <div className="bg-white border border-gray-300 rounded-lg p-2 text-center shadow-sm">
+                                      <span className="text-[10px] font-medium text-gray-700 line-clamp-2">
+                                        {stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE'
+                                          ? depots.find(d => d.id === stop.realDestinationCity)?.name || stop.realDestinationName || 'DA DEFINIRE'
+                                          : stop.realDestinationName || 'DA DEFINIRE'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </React.Fragment>
+                              ))}
+                              <div className="text-gray-400 font-mono text-sm">➔</div>
+                              <div className="flex flex-col min-w-[120px]">
+                                <span className="text-[9px] uppercase font-bold text-orange-500 mb-1">Destinazione Finale</span>
+                                <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 text-center shadow-sm">
+                                  <span className="text-[10px] font-bold text-orange-700 line-clamp-2">
+                                    {manifestShipments[0]?.tipoOperazioneHub === 'INBOUND'
+                                      ? (depots.find(d => d.id === activeBayDetail.booking.depotId)?.name || 'HUB')
+                                      : (manifestShipments[manifestShipments.length - 1]?.tipoStop === 'HUB_TRANSIT' || manifestShipments[manifestShipments.length - 1]?.tipoStop === 'CORRISPONDENTE'
+                                          ? depots.find(d => d.id === manifestShipments[manifestShipments.length - 1]?.realDestinationCity)?.name || manifestShipments[manifestShipments.length - 1]?.realDestinationName || 'DA DEFINIRE'
+                                          : manifestShipments[manifestShipments.length - 1]?.realDestinationName || 'DA DEFINIRE')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
                           <div className="border border-black/10 rounded-lg overflow-hidden bg-white shadow-xs">
                             <table className="w-full text-left border-collapse text-[10px] font-mono">
                               <thead>
@@ -5068,173 +5107,94 @@ export const MonitorYard: React.FC = () => {
             </div>
             <form onSubmit={handleSaveShipmentForm} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
               
-              <div className="bg-gray-50 p-4 rounded-xl border border-black/10 flex flex-col items-center justify-center mb-4 text-center">
-                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-widest mb-1">
-                  {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Hub di Partenza' : 
-                   shipmentFormTipoOperazioneHub === 'INBOUND' ? 'Hub di Arrivo' : 'Hub di Transito'}
-                </span>
-                <span className="text-xl font-black text-[#004B97] uppercase tracking-wide">
-                  {depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO'}
-                </span>
-              </div>
-
-              {/* DISTINZIONE NETTA ARRIVO / PARTENZA */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
-                  Tipologia Flusso Operativo
-                </label>
-                <div className="flex rounded-xl bg-gray-100 p-1 border border-black/5 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (shipmentFormTipoOperazioneHub !== 'OUTBOUND') {
-                        setTripShipments(prev => prev.map(row => ({
-                          ...row,
-                          realDestinationName: row.realOriginName,
-                          realDestinationAddress: row.realOriginAddress,
-                          realDestinationCity: row.realOriginCity,
-                          realDestinationCap: row.realOriginCap,
-                          realDestinationProvince: row.realOriginProvince,
-                          realDestinationCountry: row.realOriginCountry,
-                          realOriginName: row.realDestinationName,
-                          realOriginAddress: row.realDestinationAddress,
-                          realOriginCity: row.realDestinationCity,
-                          realOriginCap: row.realDestinationCap,
-                          realOriginProvince: row.realDestinationProvince,
-                          realOriginCountry: row.realDestinationCountry
-                        })));
-                      }
-                      setShipmentFormTipoOperazioneHub('OUTBOUND');
-                      setShipmentFormType('CARICO');
-                      setShipmentFormHubOrigineOperativo(selectedDepotId);
-                    }}
-                    className={`flex-1 py-2 px-1 text-center text-xs font-bold rounded-lg transition-all cursor-pointer leading-tight ${
-                      shipmentFormTipoOperazioneHub === 'OUTBOUND'
-                        ? 'bg-[#004B97] text-white shadow-sm'
-                        : 'text-gray-500 hover:text-black hover:bg-gray-200'
-                    }`}
-                  >
-                    <span className="block text-sm mb-0.5">📤</span>
-                    Uscita da Hub<br/>(Outbound)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (shipmentFormTipoOperazioneHub !== 'INBOUND') {
-                        setTripShipments(prev => prev.map(row => ({
-                          ...row,
-                          realOriginName: row.realDestinationName,
-                          realOriginAddress: row.realDestinationAddress,
-                          realOriginCity: row.realDestinationCity,
-                          realOriginCap: row.realDestinationCap,
-                          realOriginProvince: row.realDestinationProvince,
-                          realOriginCountry: row.realDestinationCountry,
-                          realDestinationName: row.realOriginName,
-                          realDestinationAddress: row.realOriginAddress,
-                          realDestinationCity: row.realOriginCity,
-                          realDestinationCap: row.realOriginCap,
-                          realDestinationProvince: row.realOriginProvince,
-                          realDestinationCountry: row.realOriginCountry
-                        })));
-                      }
-                      setShipmentFormTipoOperazioneHub('INBOUND');
-                      setShipmentFormType('SCARICO');
-                      setShipmentFormHubDestinazioneOperativo(selectedDepotId);
-                    }}
-                    className={`flex-1 py-2 px-1 text-center text-xs font-bold rounded-lg transition-all cursor-pointer leading-tight ${
-                      shipmentFormTipoOperazioneHub === 'INBOUND'
-                        ? 'bg-[#004B97] text-white shadow-sm'
-                        : 'text-gray-500 hover:text-black hover:bg-gray-200'
-                    }`}
-                  >
-                    <span className="block text-sm mb-0.5">📥</span>
-                    Arrivo su Hub<br/>(Inbound)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShipmentFormTipoOperazioneHub('TRANSITO');
-                      setShipmentFormType('CARICO');
-                      setShipmentFormHubOrigineOperativo(selectedDepotId);
-                    }}
-                    className={`flex-1 py-2 px-1 text-center text-xs font-bold rounded-lg transition-all cursor-pointer leading-tight ${
-                      shipmentFormTipoOperazioneHub === 'TRANSITO'
-                        ? 'bg-[#004B97] text-white shadow-sm'
-                        : 'text-gray-500 hover:text-black hover:bg-gray-200'
-                    }`}
-                  >
-                    <span className="block text-sm mb-0.5">🔄</span>
-                    Transito<br/>(Hub-to-Hub)
-                  </button>
+              {/* SMART BOUNDS & LIVE TIMELINE */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-black/10 flex flex-col mb-4">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
+                    Live Timeline Viaggio
+                  </span>
+                  <div className="flex bg-white rounded-lg p-1 border border-black/10 shadow-sm gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShipmentFormTipoOperazioneHub('OUTBOUND');
+                        setShipmentFormType('CARICO');
+                        setShipmentFormHubOrigineOperativo(selectedDepotId);
+                      }}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                        shipmentFormTipoOperazioneHub === 'OUTBOUND'
+                          ? 'bg-[#004B97] text-white'
+                          : 'text-gray-500 hover:text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      📤 Partenza
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShipmentFormTipoOperazioneHub('INBOUND');
+                        setShipmentFormType('SCARICO');
+                        setShipmentFormHubDestinazioneOperativo(selectedDepotId);
+                      }}
+                      className={`px-3 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                        shipmentFormTipoOperazioneHub === 'INBOUND'
+                          ? 'bg-[#004B97] text-white'
+                          : 'text-gray-500 hover:text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      📥 Arrivo
+                    </button>
+                  </div>
                 </div>
 
-                {shipmentFormTipoOperazioneHub === 'TRANSITO' && (
-                  <div className="mt-4 bg-gray-50 p-3 rounded-lg border border-black/10">
-                    <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider block mb-2">Sotto-tipo Transito</span>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
-                        <input 
-                          type="radio" 
-                          name="tipoTransito" 
-                          value="FTL" 
-                          checked={shipmentFormTipoTransito === 'FTL'} 
-                          onChange={() => setShipmentFormTipoTransito('FTL')} 
-                          className="text-blue-600 focus:ring-blue-500"
-                        />
-                        FTL / Blocco Unico (Solo Testata)
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
-                        <input 
-                          type="radio" 
-                          name="tipoTransito" 
-                          value="DETTAGLIATO" 
-                          checked={shipmentFormTipoTransito === 'DETTAGLIATO'} 
-                          onChange={() => setShipmentFormTipoTransito('DETTAGLIATO')} 
-                          className="text-blue-600 focus:ring-blue-500"
-                        />
-                        Transito Dettagliato (Con Spedizioni Multi-drop)
-                      </label>
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                  {/* ORIGINE */}
+                  <div className="flex flex-col min-w-[150px]">
+                    <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Origine</span>
+                    <div className="bg-white border-2 border-[#004B97] rounded-lg p-2 text-center shadow-sm">
+                      <span className="text-xs font-bold text-[#004B97] line-clamp-2">
+                        {shipmentFormTipoOperazioneHub === 'OUTBOUND' 
+                          ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
+                          : (tripShipments[0]?.tipoStop === 'HUB_TRANSIT' || tripShipments[0]?.tipoStop === 'CORRISPONDENTE' 
+                              ? depots.find(d => d.id === tripShipments[0]?.realOriginCity)?.name || 'DA DEFINIRE'
+                              : tripShipments[0]?.realOriginName || 'DA DEFINIRE')}
+                      </span>
                     </div>
                   </div>
-                )}
-                {shipmentFormTipoOperazioneHub === 'TRANSITO' && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-orange-50 p-3 rounded-lg border border-orange-200">
-                    <Select
-                      label="Hub di Partenza *"
-                      options={depots.map(d => ({ value: d.id, label: d.name }))}
-                      value={shipmentFormHubOrigineOperativo}
-                      onChange={(e) => setShipmentFormHubOrigineOperativo(e.target.value)}
-                      required
-                    />
-                    <Select
-                      label="Hub di Arrivo *"
-                      options={depots.map(d => ({ value: d.id, label: d.name }))}
-                      value={shipmentFormHubDestinazioneOperativo}
-                      onChange={(e) => setShipmentFormHubDestinazioneOperativo(e.target.value)}
-                      required
-                    />
-                    {shipmentFormTipoTransito === 'FTL' && (
-                      <>
-                        <Input
-                          label="Totale Pallet *"
-                          type="number"
-                          value={ftlPallet.toString()}
-                          onChange={(e) => setFtlPallet(Number(e.target.value))}
-                          min="0"
-                          required
-                        />
-                        <Input
-                          label="Totale Peso (kg) *"
-                          type="number"
-                          value={ftlWeight.toString()}
-                          onChange={(e) => setFtlWeight(Number(e.target.value))}
-                          min="0"
-                          required
-                        />
-                      </>
-                    )}
+
+                  {/* STOPS (SOLO PARTENZE PER ORA) */}
+                  {shipmentFormTipoOperazioneHub === 'OUTBOUND' && tripShipments.slice(0, -1).map((stop, idx) => (
+                    <React.Fragment key={`stop-${idx}`}>
+                      <div className="text-gray-400 font-mono text-sm">➔</div>
+                      <div className="flex flex-col min-w-[150px]">
+                        <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Stop {idx + 1}</span>
+                        <div className="bg-white border border-gray-300 rounded-lg p-2 text-center shadow-sm">
+                          <span className="text-xs font-medium text-gray-700 line-clamp-2">
+                            {stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE'
+                              ? depots.find(d => d.id === stop.realDestinationCity)?.name || 'DA DEFINIRE'
+                              : stop.realDestinationName || 'DA DEFINIRE'}
+                          </span>
+                        </div>
+                      </div>
+                    </React.Fragment>
+                  ))}
+
+                  <div className="text-gray-400 font-mono text-sm">➔</div>
+
+                  {/* DESTINAZIONE FINALE */}
+                  <div className="flex flex-col min-w-[150px]">
+                    <span className="text-[9px] uppercase font-bold text-orange-500 mb-1">Destinazione Finale</span>
+                    <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 text-center shadow-sm">
+                      <span className="text-xs font-bold text-orange-700 line-clamp-2">
+                        {shipmentFormTipoOperazioneHub === 'INBOUND'
+                          ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
+                          : (tripShipments[tripShipments.length - 1]?.tipoStop === 'HUB_TRANSIT' || tripShipments[tripShipments.length - 1]?.tipoStop === 'CORRISPONDENTE'
+                              ? depots.find(d => d.id === tripShipments[tripShipments.length - 1]?.realDestinationCity)?.name || 'DA DEFINIRE'
+                              : tripShipments[tripShipments.length - 1]?.realDestinationName || 'DA DEFINIRE')}
+                      </span>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -5261,8 +5221,7 @@ export const MonitorYard: React.FC = () => {
               </div>
 
               {/* CONTROLLO SOGLIE HEADER (Per FTL o globale) */}
-              {((shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'FTL' && (ftlPallet > 33 || ftlWeight > 28000)) || 
-                (tripShipments.reduce((acc, row) => acc + (row.palletPlaces || 0), 0) > 33) ||
+              {((tripShipments.reduce((acc, row) => acc + (row.palletPlaces || 0), 0) > 33) ||
                 (tripShipments.reduce((acc, row) => acc + (row.grossWeight || 0), 0) > 28000)
               ) && (
                 <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mt-4 shadow-sm animate-pulse-fast">
@@ -5288,7 +5247,6 @@ export const MonitorYard: React.FC = () => {
               )}
 
               {/* TRIP BUILDER: LISTA SPEDIZIONI */}
-              {!(shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'FTL') && (
               <div className="border-t border-black/5 pt-4">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">Spedizioni del Viaggio</h4>
@@ -5300,7 +5258,7 @@ export const MonitorYard: React.FC = () => {
                       <tr className="bg-gray-100 border-b border-black/10">
                         <th className="p-2 w-10 text-center text-[10px] font-mono text-gray-500 uppercase">Seq</th>
                         <th className="p-2 w-64 text-[10px] font-mono text-gray-500 uppercase">Riferimenti Delivery *</th>
-                        <th className="p-2 min-w-[300px] text-[10px] font-mono text-gray-500 uppercase">{(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? 'Dati Destinatario' : 'Dati Mittente'}</th>
+                        <th className="p-2 min-w-[300px] text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Dati Destinatario' : 'Dati Mittente'}</th>
                         <th className="p-2 w-20 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-l border-orange-200 uppercase text-center">Pallet</th>
                         <th className="p-2 w-24 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-r border-orange-200 uppercase text-center">Peso (kg)</th>
                         <th className="p-2 w-32 text-[10px] font-mono text-gray-500 uppercase">Annotazioni</th>
@@ -5313,20 +5271,19 @@ export const MonitorYard: React.FC = () => {
                           <td className="p-4 text-center font-mono font-bold text-gray-400 border-r border-black/5 align-top">{index + 1}</td>
                           <td className="p-4 align-top border-r border-black/5">
                             <div className="space-y-2">
-                              {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (
-                                <select
-                                  className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold bg-blue-50 text-blue-800"
-                                  value={row.deliveryType || 'DIRETTA'}
-                                  onChange={(e) => {
-                                    const newTripShipments = [...tripShipments];
-                                    newTripShipments[index].deliveryType = e.target.value as 'DIRETTA' | 'CORRISPONDENTE';
-                                    setTripShipments(newTripShipments);
-                                  }}
-                                >
-                                  <option value="DIRETTA">Consegna Diretta</option>
-                                  <option value="CORRISPONDENTE">Passaggio a Corrispondente</option>
-                                </select>
-                              )}
+                              <select
+                                className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold bg-blue-50 text-blue-800"
+                                value={row.tipoStop || 'DIRETTA'}
+                                onChange={(e) => {
+                                  const newTripShipments = [...tripShipments];
+                                  newTripShipments[index].tipoStop = e.target.value as 'DIRETTA' | 'HUB_TRANSIT' | 'CORRISPONDENTE';
+                                  setTripShipments(newTripShipments);
+                                }}
+                              >
+                                <option value="DIRETTA">Consegna Diretta</option>
+                                <option value="HUB_TRANSIT">Passaggio Hub Interno</option>
+                                <option value="CORRISPONDENTE">Scarico Corrispondente</option>
+                              </select>
                               <select
                                 className={`w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold bg-white text-gray-700`}
                                 value={row.clientId || ''}
@@ -5382,15 +5339,54 @@ export const MonitorYard: React.FC = () => {
                           </td>
                           <td className="p-4 min-w-[300px] align-top border-r border-black/5">
                             <div className="space-y-2">
-                              <>
+                              {(row.tipoStop === 'HUB_TRANSIT' || row.tipoStop === 'CORRISPONDENTE') ? (
+                                <div className="space-y-2">
+                                  <select
+                                    className="w-full border border-black/10 rounded-lg p-1.5 text-xs font-bold text-gray-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND') ? row.realDestinationCity || '' : row.realOriginCity || ''}
+                                    onChange={(e) => {
+                                      const selectedDepot = depots.find(d => d.id === e.target.value);
+                                      const newTripShipments = [...tripShipments];
+                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
+                                        newTripShipments[index].realDestinationCity = selectedDepot?.id;
+                                        newTripShipments[index].realDestinationName = selectedDepot?.name;
+                                        newTripShipments[index].realDestinationAddress = selectedDepot?.address;
+                                        newTripShipments[index].realDestinationCap = selectedDepot?.cap;
+                                        newTripShipments[index].realDestinationProvince = selectedDepot?.province;
+                                        newTripShipments[index].realDestinationCountry = selectedDepot?.country || 'Italia';
+                                      } else {
+                                        newTripShipments[index].realOriginCity = selectedDepot?.id;
+                                        newTripShipments[index].realOriginName = selectedDepot?.name;
+                                        newTripShipments[index].realOriginAddress = selectedDepot?.address;
+                                        newTripShipments[index].realOriginCap = selectedDepot?.cap;
+                                        newTripShipments[index].realOriginProvince = selectedDepot?.province;
+                                        newTripShipments[index].realOriginCountry = selectedDepot?.country || 'Italia';
+                                      }
+                                      setTripShipments(newTripShipments);
+                                    }}
+                                  >
+                                    <option value="" disabled>Seleziona Nodo Anagrafico...</option>
+                                    {depots.filter(d => row.tipoStop === 'HUB_TRANSIT' ? d.type === 'HUB' : d.type === 'CORRISPONDENTE').map(d => (
+                                      <option key={d.id} value={d.id}>{d.name}</option>
+                                    ))}
+                                  </select>
+                                  {((shipmentFormTipoOperazioneHub === 'OUTBOUND') ? row.realDestinationCity : row.realOriginCity) && (
+                                    <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded-lg border border-black/5 mt-2">
+                                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress : row.realOriginAddress} <br />
+                                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCap : row.realOriginCap} - {depots.find(d => d.id === (shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCity : row.realOriginCity))?.city} ({shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationProvince : row.realOriginProvince})
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <>
                                   <input 
                                     type="text" 
                                     className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold text-gray-800" 
-                                    placeholder={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? "Nome Destinatario" : "Nome Mittente"}
-                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationName || '' : row.realOriginName || ''}
+                                    placeholder={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? "Nome Destinatario" : "Nome Mittente"}
+                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationName || '' : row.realOriginName || ''}
                                     onChange={(e) => {
                                       const newTripShipments = [...tripShipments];
-                                      if ((shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO')) newTripShipments[index].realDestinationName = e.target.value.toUpperCase();
+                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationName = e.target.value.toUpperCase();
                                       else newTripShipments[index].realOriginName = e.target.value.toUpperCase();
                                       setTripShipments(newTripShipments);
                                     }}
@@ -5399,19 +5395,19 @@ export const MonitorYard: React.FC = () => {
                                     type="text" 
                                     className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
                                     placeholder="Indirizzo (es. Via Roma 1)"
-                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
+                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
                                     onChange={(e) => {
                                       const newTripShipments = [...tripShipments];
-                                      if ((shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO')) newTripShipments[index].realDestinationAddress = e.target.value.toUpperCase();
+                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationAddress = e.target.value.toUpperCase();
                                       else newTripShipments[index].realOriginAddress = e.target.value.toUpperCase();
                                       setTripShipments(newTripShipments);
                                     }}
                                   />
                                   <TerritoryAutocomplete
-                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationCity || '' : row.realOriginCity || ''}
+                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCity || '' : row.realOriginCity || ''}
                                     onChange={(val, record) => {
                                       const newTripShipments = [...tripShipments];
-                                      if ((shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO')) {
+                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
                                         newTripShipments[index].realDestinationCity = record ? record.comune : val;
                                         if (record) {
                                           newTripShipments[index].realDestinationCap = record.cap;
@@ -5433,26 +5429,27 @@ export const MonitorYard: React.FC = () => {
                                     <input 
                                       type="text" 
                                       placeholder="CAP"
-                                      value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationCap || '' : row.realOriginCap || ''}
+                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCap || '' : row.realOriginCap || ''}
                                       readOnly
                                       className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
                                     />
                                     <input 
                                       type="text" 
                                       placeholder="Prov"
-                                      value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationProvince || '' : row.realOriginProvince || ''}
+                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationProvince || '' : row.realOriginProvince || ''}
                                       readOnly
                                       className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
                                     />
                                     <input 
                                       type="text" 
                                       placeholder="Nazione"
-                                      value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationCountry || 'Italia' : row.realOriginCountry || 'Italia'}
+                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCountry || 'Italia' : row.realOriginCountry || 'Italia'}
                                       readOnly
                                       className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
                                     />
                                   </div>
                                 </>
+                              )}
                             </div>
                           </td>
                           <td className="p-4 align-top border-r border-black/5">
@@ -5606,7 +5603,6 @@ export const MonitorYard: React.FC = () => {
                 );
               })()}
               </div>
-              )}
 
               <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50 -mx-6 -mb-6">
                 <Button 

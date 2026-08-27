@@ -144,9 +144,11 @@ const getTodayDateString = () => {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // --- DATI DI DEFAULT ---
   const defaultDepots: Depot[] = [
-    { id: 'depot-milano', name: 'Milano Logistics Plant', city: 'Milano (MI)' },
-    { id: 'depot-roma', name: 'Roma Logistics Plant', city: 'Roma (RM)' },
-    { id: 'depot-bari', name: 'Bari Logistics Plant', city: 'Bari (BA)' },
+    { id: 'depot-milano', name: 'Milano Logistics Plant', city: 'Milano (MI)', type: 'HUB', address: 'Via Roma 1', cap: '20100', province: 'MI' },
+    { id: 'depot-roma', name: 'Roma Logistics Plant', city: 'Roma (RM)', type: 'HUB', address: 'Via del Corso 2', cap: '00100', province: 'RM' },
+    { id: 'depot-bari', name: 'Bari Logistics Plant', city: 'Bari (BA)', type: 'HUB', address: 'Via Bari 3', cap: '70100', province: 'BA' },
+    { id: 'corr-torino', name: 'Corrispondente Nord-Ovest SRL', city: 'Torino (TO)', type: 'CORRISPONDENTE', address: 'Strada del Drosso 4', cap: '10135', province: 'TO' },
+    { id: 'corr-napoli', name: 'Partenope Trasporti', city: 'Napoli (NA)', type: 'CORRISPONDENTE', address: 'Via Galileo Ferraris 5', cap: '80142', province: 'NA' },
   ];
 
   const defaultWarehouseModules: WarehouseModule[] = [

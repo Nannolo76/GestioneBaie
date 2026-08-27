@@ -6,6 +6,7 @@ export interface Depot {
   cap?: string;
   province?: string;
   country?: string;
+  type?: 'HUB' | 'CORRISPONDENTE';
 }
 
 export interface WarehouseModule {
@@ -189,9 +190,8 @@ export interface Shipment {
   realDestinationCountry?: string;
   hubOrigineOperativo?: string;
   hubDestinazioneOperativo?: string;
-  tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND' | 'TRANSITO';
-  tipoTransito?: 'FTL' | 'DETTAGLIATO';
-  deliveryType?: 'DIRETTA' | 'CORRISPONDENTE';
+  tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND';
+  tipoStop?: 'DIRETTA' | 'HUB_TRANSIT' | 'CORRISPONDENTE';
   routingStatus?: 'CONFERMATO' | 'DA_CONFERMARE';
   routingNotes?: string;
   sequence?: number; // Sequenza di carico/scarico nel Viaggio
