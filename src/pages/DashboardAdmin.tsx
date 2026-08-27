@@ -5,8 +5,7 @@ import { Card } from '../components/ui/Card';
 import { Input, Select } from '../components/ui/Input';
 import { Table } from '../components/ui/Table';
 import { Badge } from '../components/ui/Badge';
-
-
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments' }> = ({ defaultTab = 'hubs' }) => {
   const {
@@ -58,6 +57,16 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     updateUser,
     deleteUser
   } = useApp();
+
+  const [confirmDialogState, setConfirmDialogState] = useState<Omit<React.ComponentProps<typeof ConfirmDialog>, 'onCancel'>>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Conferma',
+    isDanger: false,
+    isAlert: false,
+    onConfirm: () => {}
+  });
 
   const [comuni, setComuni] = useState<any[]>([]);
   useEffect(() => {
@@ -298,7 +307,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName || !newUserEmail || !newUserUsername || newUserDepotIds.length === 0) {
-      alert("Si prega di inserire Username, Nome, Email e selezionare almeno un impianto logistico.");
+      setConfirmDialogState({
+        isOpen: true,
+        title: 'Attenzione',
+        message: 'Si prega di inserire Username, Nome, Email e selezionare almeno un impianto logistico.',
+        confirmLabel: 'OK',
+        isDanger: true,
+        onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))
+      });
       return;
     }
     addUser(newUserName, newUserEmail, newUserRole, newUserDepotIds, newUserUsername);
@@ -309,7 +325,6 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   };
 
 
-
   const handleDelete = (type: string, id: string, name: string) => {
     // 1. Hub
     if (type === 'depot') {
@@ -318,96 +333,79 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
       const hasBookings = bookings.some(b => b.depotId === id);
       const hasShipments = shipments.some(s => s.depotId === id);
       if (hasBays || hasModules || hasBookings || hasShipments) {
-        alert(`Impossibile eliminare lo stabilimento "${name}". Ci sono baie, moduli magazzino, prenotazioni o spedizioni collegate.`);
+        setConfirmDialogState({ isOpen: true, title: 'Attenzione', message: `Impossibile eliminare lo stabilimento "${name}". Ci sono baie, moduli magazzino, prenotazioni o spedizioni collegate.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
         return;
       }
-      if (confirm(`Sei sicuro di voler eliminare lo stabilimento "${name}"?`)) {
-        deleteDepot(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare lo stabilimento "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteDepot(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
     // 2. Modulo Magazzino
     if (type === 'warehouseModule') {
       const hasBays = bays.some(b => b.moduleId === id);
       if (hasBays) {
-        alert(`Impossibile eliminare il modulo "${name}". Ci sono baie associate.`);
+        setConfirmDialogState({ isOpen: true, title: 'Attenzione', message: `Impossibile eliminare il modulo "${name}". Ci sono baie associate.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
         return;
       }
-      if (confirm(`Sei sicuro di voler eliminare il modulo magazzino "${name}"?`)) {
-        deleteWarehouseModule(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare il modulo magazzino "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteWarehouseModule(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
     // 3. Baia
     if (type === 'bay') {
       const hasBookings = bookings.some(b => b.bayId === id);
       if (hasBookings) {
-        alert(`Impossibile eliminare la baia "${name}". Ci sono prenotazioni collegate.`);
+        setConfirmDialogState({ isOpen: true, title: 'Attenzione', message: `Impossibile eliminare la baia "${name}". Ci sono prenotazioni collegate.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
         return;
       }
-      if (confirm(`Sei sicuro di voler eliminare la baia "${name}"?`)) {
-        deleteBay(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare la baia "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteBay(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
     // 4. Vettore
     if (type === 'carrier') {
       const hasBookings = bookings.some(b => b.carrierId === id);
       const hasShipments = shipments.some(s => s.carrierId === id);
       if (hasBookings || hasShipments) {
-        alert(`Impossibile eliminare il vettore "${name}". Ci sono prenotazioni o spedizioni associate.`);
+        setConfirmDialogState({ isOpen: true, title: 'Attenzione', message: `Impossibile eliminare il vettore "${name}". Ci sono prenotazioni o spedizioni associate.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
         return;
       }
-      if (confirm(`Sei sicuro di voler eliminare il vettore "${name}"?`)) {
-        deleteCarrier(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare il vettore "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteCarrier(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
     // 5. Tipo Attività
     if (type === 'activityType') {
       const isUsedInBooking = bookings.some(b => b.activityType === name || b.activityType === id);
       const isUsedInShipment = shipments.some(s => s.activityType === name || s.activityType === id);
       if (isUsedInBooking || isUsedInShipment) {
-        alert(`Impossibile eliminare l'attività "${name}". È utilizzata in prenotazioni o spedizioni.`);
+        setConfirmDialogState({ isOpen: true, title: 'Attenzione', message: `Impossibile eliminare l'attività "${name}". È utilizzata in prenotazioni o spedizioni.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
         return;
       }
-      if (confirm(`Sei sicuro di voler eliminare l'attività "${name}"?`)) {
-        deleteActivityType(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare l'attività "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteActivityType(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
     // 6. Report Schedulatore
     if (type === 'reportSchedule') {
-      if (confirm(`Sei sicuro di voler eliminare la pianificazione report "${name}"?`)) {
-        deleteReportSchedule(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare la pianificazione report "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteReportSchedule(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
     // 7. Cliente
     if (type === 'client') {
       const hasBookings = bookings.some(b => b.clientId === id);
       const hasShipments = shipments.some(s => s.clientId === id);
       if (hasBookings || hasShipments) {
-        alert(`Impossibile eliminare il cliente "${name}". Ci sono prenotazioni o spedizioni associate.`);
+        setConfirmDialogState({ isOpen: true, title: 'Attenzione', message: `Impossibile eliminare il cliente "${name}". Ci sono prenotazioni o spedizioni associate.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
         return;
       }
-      if (confirm(`Sei sicuro di voler eliminare il cliente "${name}"?`)) {
-        deleteClient(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare il cliente "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteClient(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
     // 8. Tipo Pallet
     if (type === 'palletType') {
       const hasReturns = bookings.some(b => b.palletReturns && b.palletReturns.some(r => r.palletType === name));
       if (hasReturns) {
-        alert(`Impossibile eliminare il tipo pallet "${name}". È utilizzato in resi pallet di prenotazioni registrate.`);
+        setConfirmDialogState({ isOpen: true, title: 'Attenzione', message: `Impossibile eliminare il tipo pallet "${name}". È utilizzato in resi pallet di prenotazioni registrate.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
         return;
       }
-      if (confirm(`Sei sicuro di voler eliminare il tipo pallet "${name}"?`)) {
-        deletePalletType(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare il tipo pallet "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deletePalletType(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
+
     // 9. Utente
     if (type === 'user') {
       if (id === 'user-1' || id === 'user-2' || id === 'user-3') {
         // Prevenzione cancellazione utente sessione corrente se implementato
       }
-      if (confirm(`Sei sicuro di voler eliminare l'utente "${name}"?`)) {
-        deleteUser(id);
-      }
+      setConfirmDialogState({ isOpen: true, title: 'Conferma Eliminazione', message: `Sei sicuro di voler eliminare l'utente "${name}"?`, confirmLabel: 'Elimina', isDanger: true, onConfirm: () => { deleteUser(id); setConfirmDialogState(prev => ({ ...prev, isOpen: false })); } });
     }
   };
 
@@ -549,7 +547,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
       {adminTab === 'hubs' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
           <div className="space-y-6">
-            <Card title="Nuovo Plant (Stabilimento)" accent="orange">
+            <Card title="Nuovo Hub o Corrispondente" accent="orange">
               <form onSubmit={handleAddHub} className="space-y-4">
                 <Input
                   label="Nome Plant"
@@ -683,17 +681,17 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
           </div>
 
           <div className="lg:col-span-2 space-y-6">
-            <Card title="Stabilimenti Plant Registrati">
+            <Card title="Hub e Corrispondenti Registrati">
               <Table
                 data={depots}
                 emptyMessage="Nessun plant registrato."
                 columns={[
                   {
-                    header: 'Codice Hub',
+                    header: 'Codice Nodo',
                     accessor: (d) => <span className="font-mono font-bold text-xs text-ticket-accent">{d.id}</span>,
                   },
                   {
-                    header: 'Nome Stabilimento',
+                    header: 'Nome Hub/Corrispondente',
                     accessor: (d) => <span className="font-bold">{d.name}</span>,
                   },
                   {
@@ -710,9 +708,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   {
                     header: 'Conteggio Baie',
                     accessor: (d) => (
-                      <Badge variant="primary">
-                        {bays.filter((b) => b.depotId === d.id).length} Baie
-                      </Badge>
+                      (!d.type || d.type === 'HUB') ? (
+                        <Badge variant="primary">
+                          {bays.filter((b) => b.depotId === d.id).length} Baie
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400 italic text-[10px] uppercase font-mono">Non applicabile</span>
+                      )
                     ),
                   },
                   {
@@ -2414,6 +2416,11 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
           </div>
         </div>
       )}
+      
+      <ConfirmDialog 
+        {...confirmDialogState} 
+        onCancel={() => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))} 
+      />
     </div>
   );
 };

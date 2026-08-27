@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Input';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 export const AccessoLogin: React.FC = () => {
   const {
@@ -20,6 +21,15 @@ export const AccessoLogin: React.FC = () => {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'admin' | 'guardiola' | 'vettore' | 'preposto'>('guardiola');
+  const [confirmDialogState, setConfirmDialogState] = useState<Omit<React.ComponentProps<typeof ConfirmDialog>, 'onCancel'>>({
+    isOpen: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Conferma',
+    isDanger: false,
+    isAlert: false,
+    onConfirm: () => {}
+  });
   
   const [selectedPlantId, setSelectedPlantId] = useState(depots[0]?.id || '');
 
@@ -80,7 +90,15 @@ export const AccessoLogin: React.FC = () => {
     setLoginError('');
     if (activeTab === 'vettore') {
       if (!selectedCarrierId) {
-        alert('Seleziona un vettore abilitato per accedere.');
+        setConfirmDialogState({
+          isOpen: true,
+          title: 'Attenzione',
+          message: 'Seleziona un vettore abilitato per accedere.',
+          confirmLabel: 'OK',
+          isDanger: true,
+          isAlert: true,
+          onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))
+        });
         return;
       }
       setCurrentRole('VETTORE');
@@ -781,6 +799,11 @@ export const AccessoLogin: React.FC = () => {
           </div>
         </div>
       )}
+      
+      <ConfirmDialog 
+        {...confirmDialogState} 
+        onCancel={() => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))} 
+      />
       </div>
     </div>
   );

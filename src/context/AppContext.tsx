@@ -570,7 +570,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // --- AZIONI CONFIGURAZIONE / ADMIN ---
   const addDepot = (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB') => {
-    const id = `depot-${Date.now()}`;
+    const prefix = type === 'CORRISPONDENTE' ? 'corr-' : 'depot-';
+    const id = `${prefix}${Date.now()}`;
     const newDepot: Depot = { id, name, city, address, cap, province, country, type };
     setDepots((prev) => [...prev, newDepot]);
     logActivity(id, `Creato nuovo stabilimento/nodo: ${name} (${city})`, 'SUCCESS');

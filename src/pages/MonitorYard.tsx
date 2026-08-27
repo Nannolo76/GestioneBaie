@@ -91,7 +91,7 @@ export const MonitorYard: React.FC = () => {
 
   const [shipmentFormCarrier, setShipmentFormCarrier] = useState('');
   
-  const [confirmDialogState, setConfirmDialogState] = useState({
+  const [confirmDialogState, setConfirmDialogState] = useState<Omit<React.ComponentProps<typeof ConfirmDialog>, 'onCancel'>>({
     isOpen: false,
     title: '',
     message: '',
@@ -774,7 +774,15 @@ export const MonitorYard: React.FC = () => {
   const handleAssignBay = (bookingId: string) => {
     const bayId = tempBayAssignment[bookingId];
     if (!bayId) {
-      alert('Selezionare una baia prima di confermare.');
+      setConfirmDialogState({
+        isOpen: true,
+        title: 'Attenzione',
+        message: 'Selezionare una baia prima di confermare.',
+        confirmLabel: 'OK',
+        isDanger: true,
+        isAlert: true,
+        onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))
+      });
       return;
     }
     updateBookingStatus(bookingId, 'IN_BAIA', bayId);
@@ -900,8 +908,16 @@ export const MonitorYard: React.FC = () => {
 
   const handleResolveAlert = (action: 'PROCEDI' | 'RESPINTO') => {
     if (!activeAlertForGuardiola) return;
-    if (action === 'RESPINTO' && !alertResolveReason) {
-      alert('Inserire una giustificazione per respingere il mezzo.');
+    if (action === 'RESPINTO' && !alertResolveReason.trim()) {
+      setConfirmDialogState({
+        isOpen: true,
+        title: 'Attenzione',
+        message: 'Inserire una giustificazione per respingere il mezzo.',
+        confirmLabel: 'OK',
+        isDanger: true,
+        isAlert: true,
+        onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))
+      });
       return;
     }
     resolveChecklistAlert(activeAlertForGuardiola.id, action, alertResolveReason);
@@ -1068,7 +1084,15 @@ export const MonitorYard: React.FC = () => {
     });
 
     if (duplicateDelivery) {
-      alert(`Il numero di delivery "${duplicateDelivery.orderNumber}" è già esistente per il committente selezionato. Deve essere univoco.`);
+      setConfirmDialogState({
+        isOpen: true,
+        title: 'Attenzione',
+        message: `Il numero di delivery "${duplicateDelivery.orderNumber}" è già esistente per il committente selezionato. Deve essere univoco.`,
+        confirmLabel: 'OK',
+        isDanger: true,
+        isAlert: true,
+        onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))
+      });
       return;
     }
 
@@ -1083,7 +1107,15 @@ export const MonitorYard: React.FC = () => {
     let validTripShipments = tripShipments.filter(row => row.orderNumber && row.orderNumber.trim() !== '');
     
     if (validTripShipments.length === 0) {
-      alert('Non hai inserito nessuna spedizione valida (manca il Nr. Delivery).');
+      setConfirmDialogState({
+        isOpen: true,
+        title: 'Attenzione',
+        message: 'Non hai inserito nessuna spedizione valida (manca il Nr. Delivery).',
+        confirmLabel: 'OK',
+        isDanger: true,
+        isAlert: true,
+        onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))
+      });
       return;
     }
 
@@ -2286,25 +2318,29 @@ export const MonitorYard: React.FC = () => {
                 {/* BARRA DELLE AZIONI PRINCIPALI */}
                 <div className="flex flex-wrap gap-3 items-center justify-between bg-white border border-black/10 p-4 rounded-xl shadow-xs">
                   <div className="flex gap-2">
-                    <Button 
-                      variant="primary" 
-                      onClick={() => {
-                        resetShipmentForm();
-                        setIsNewShipmentModalOpen(true);
-                      }}
-                      className="font-bold text-xs uppercase tracking-wide cursor-pointer"
-                    >
-                      ➕ Nuova Spedizione Manuale
-                    </Button>
-                    <Button 
-                      variant="secondary" 
-                      onClick={() => {
-                        setIsImportShipmentModalOpen(true);
-                      }}
-                      className="font-bold text-xs uppercase tracking-wide cursor-pointer"
-                    >
-                      📥 Import Spedizioni (CSV/TXT)
-                    </Button>
+                    {currentRole !== 'ADMIN' && (
+                      <>
+                        <Button 
+                          variant="primary" 
+                          onClick={() => {
+                            resetShipmentForm();
+                            setIsNewShipmentModalOpen(true);
+                          }}
+                          className="font-bold text-xs uppercase tracking-wide cursor-pointer"
+                        >
+                          ➕ Nuova Spedizione Manuale
+                        </Button>
+                        <Button 
+                          variant="secondary" 
+                          onClick={() => {
+                            setIsImportShipmentModalOpen(true);
+                          }}
+                          className="font-bold text-xs uppercase tracking-wide cursor-pointer"
+                        >
+                          📥 Import Spedizioni (CSV/TXT)
+                        </Button>
+                      </>
+                    )}
                   </div>
 
                   {/* AZIONI MASSIVE */}
@@ -5111,7 +5147,7 @@ export const MonitorYard: React.FC = () => {
               <div className="bg-gray-50 p-4 rounded-xl border border-black/10 flex flex-col mb-4">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
-                    Live Timeline Viaggio
+                    Live Timeline Viaggio {tripShipments.filter(s => s.orderNumber && s.orderNumber.trim() !== '').length > 0 && `(Totale Spedizioni: ${tripShipments.filter(s => s.orderNumber && s.orderNumber.trim() !== '').length})`}
                   </span>
                   <div className="flex bg-white rounded-lg p-1 border border-black/10 shadow-sm gap-1">
                     <button
@@ -5148,21 +5184,23 @@ export const MonitorYard: React.FC = () => {
                 </div>
 
                 {(() => {
-                  // Raggruppo gli stop contigui per evitare doppioni
-                  const timelineStops = tripShipments.reduce((acc, stop) => {
+                  // Raggruppo gli stop contigui per evitare doppioni, mantenendo il conteggio
+                  const timelineStops = tripShipments.filter(s => s.orderNumber && s.orderNumber.trim() !== '').reduce((acc, stop) => {
                     const isHub = stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE';
                     const currentId = isHub ? stop.destinationNodeId : `${stop.realDestinationName}-${stop.realDestinationCity}`;
                     
                     if (acc.length > 0) {
-                      const prevStop = acc[acc.length - 1];
+                      const prevObj = acc[acc.length - 1];
+                      const prevStop = prevObj.stop;
                       const prevIsHub = prevStop.tipoStop === 'HUB_TRANSIT' || prevStop.tipoStop === 'CORRISPONDENTE';
                       const prevId = prevIsHub ? prevStop.destinationNodeId : `${prevStop.realDestinationName}-${prevStop.realDestinationCity}`;
                       if (currentId && currentId === prevId) {
+                        prevObj.count += 1;
                         return acc;
                       }
                     }
-                    return [...acc, stop];
-                  }, [] as typeof tripShipments);
+                    return [...acc, { stop, count: 1 }];
+                  }, [] as { stop: typeof tripShipments[0], count: number }[]);
 
                   return (
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
@@ -5170,33 +5208,38 @@ export const MonitorYard: React.FC = () => {
                       <div className="flex flex-col min-w-[150px]">
                         <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Origine</span>
                         <div className="bg-white border-2 border-[#004B97] rounded-lg p-2 flex flex-col shadow-sm">
-                          <span className="text-xs font-bold text-[#004B97] line-clamp-2 text-center">
+                          <span className="text-xs font-bold text-[#004B97] line-clamp-2 text-center relative">
                             {shipmentFormTipoOperazioneHub === 'OUTBOUND' 
                               ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
-                              : (timelineStops[0]?.tipoStop === 'HUB_TRANSIT' || timelineStops[0]?.tipoStop === 'CORRISPONDENTE' 
-                                  ? timelineStops[0]?.destinationNodeName || 'DA DEFINIRE'
-                                  : timelineStops[0]?.realOriginName || 'DA DEFINIRE')}
+                              : (timelineStops[0]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[0]?.stop?.tipoStop === 'CORRISPONDENTE' 
+                                  ? timelineStops[0]?.stop?.destinationNodeName || 'DA DEFINIRE'
+                                  : timelineStops[0]?.stop?.realOriginName || 'DA DEFINIRE')}
                           </span>
-                          {shipmentFormTipoOperazioneHub === 'INBOUND' && (timelineStops[0]?.tipoStop === 'HUB_TRANSIT' || timelineStops[0]?.tipoStop === 'CORRISPONDENTE') && (
+                          {shipmentFormTipoOperazioneHub === 'INBOUND' && (timelineStops[0]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[0]?.stop?.tipoStop === 'CORRISPONDENTE') && (
                             <span className="text-[9px] text-gray-500 mt-1 line-clamp-2 text-center border-t border-black/5 pt-1">
-                              {depots.find(d => d.id === timelineStops[0]?.destinationNodeId)?.city || '-'}
+                              {depots.find(d => d.id === timelineStops[0]?.stop?.destinationNodeId)?.city || '-'}
                             </span>
                           )}
-                          {shipmentFormTipoOperazioneHub === 'INBOUND' && (!timelineStops[0]?.tipoStop || timelineStops[0]?.tipoStop === 'DIRETTA') && timelineStops[0]?.realOriginCity && (
+                          {shipmentFormTipoOperazioneHub === 'INBOUND' && (!timelineStops[0]?.stop?.tipoStop || timelineStops[0]?.stop?.tipoStop === 'DIRETTA') && timelineStops[0]?.stop?.realOriginCity && (
                             <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-center">
-                              {timelineStops[0]?.realOriginCity}
+                              {timelineStops[0]?.stop?.realOriginCity}
                             </span>
                           )}
                         </div>
                       </div>
 
                       {/* STOPS (SOLO PARTENZE PER ORA) */}
-                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' && timelineStops.slice(0, -1).map((stop, idx) => (
+                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' && timelineStops.slice(0, -1).map(({ stop, count }, idx) => (
                         <React.Fragment key={`stop-${idx}`}>
                           <div className="text-gray-400 font-mono text-sm">➔</div>
                           <div className="flex flex-col min-w-[150px]">
                             <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Stop {idx + 1}</span>
-                            <div className="bg-white border border-gray-300 rounded-lg p-2 flex flex-col shadow-sm">
+                            <div className="bg-white border border-gray-300 rounded-lg p-2 flex flex-col shadow-sm relative">
+                              {count > 1 && (
+                                <div className="absolute -top-2 -right-2 bg-gray-500 text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm border-2 border-white">
+                                  {count}
+                                </div>
+                              )}
                               <span className="text-xs font-medium text-gray-700 line-clamp-2 text-center">
                                 {stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE'
                                   ? stop.destinationNodeName || 'DA DEFINIRE'
@@ -5222,22 +5265,27 @@ export const MonitorYard: React.FC = () => {
                       {/* DESTINAZIONE FINALE */}
                       <div className="flex flex-col min-w-[150px]">
                         <span className="text-[9px] uppercase font-bold text-orange-500 mb-1">Destinazione Finale</span>
-                        <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 flex flex-col shadow-sm">
+                        <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 flex flex-col shadow-sm relative">
+                          {timelineStops.length > 0 && timelineStops[timelineStops.length - 1].count > 1 && (
+                            <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm border-2 border-white">
+                              {timelineStops[timelineStops.length - 1].count}
+                            </div>
+                          )}
                           <span className="text-xs font-bold text-orange-700 line-clamp-2 text-center">
                             {shipmentFormTipoOperazioneHub === 'INBOUND'
                               ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
-                              : (timelineStops[timelineStops.length - 1]?.tipoStop === 'HUB_TRANSIT' || timelineStops[timelineStops.length - 1]?.tipoStop === 'CORRISPONDENTE'
-                                  ? timelineStops[timelineStops.length - 1]?.destinationNodeName || 'DA DEFINIRE'
-                                  : timelineStops[timelineStops.length - 1]?.realDestinationName || 'DA DEFINIRE')}
+                              : (timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'CORRISPONDENTE'
+                                  ? timelineStops[timelineStops.length - 1]?.stop?.destinationNodeName || 'DA DEFINIRE'
+                                  : timelineStops[timelineStops.length - 1]?.stop?.realDestinationName || 'DA DEFINIRE')}
                           </span>
-                          {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (timelineStops[timelineStops.length - 1]?.tipoStop === 'HUB_TRANSIT' || timelineStops[timelineStops.length - 1]?.tipoStop === 'CORRISPONDENTE') && (
+                          {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'CORRISPONDENTE') && (
                             <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-1 text-center border-t border-orange-400/20 pt-1">
-                              {depots.find(d => d.id === timelineStops[timelineStops.length - 1]?.destinationNodeId)?.city || '-'}
+                              {depots.find(d => d.id === timelineStops[timelineStops.length - 1]?.stop?.destinationNodeId)?.city || '-'}
                             </span>
                           )}
-                          {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (!timelineStops[timelineStops.length - 1]?.tipoStop || timelineStops[timelineStops.length - 1]?.tipoStop === 'DIRETTA') && timelineStops[timelineStops.length - 1]?.realDestinationCity && (
+                          {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (!timelineStops[timelineStops.length - 1]?.stop?.tipoStop || timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'DIRETTA') && timelineStops[timelineStops.length - 1]?.stop?.realDestinationCity && (
                             <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-1 text-center">
-                              {timelineStops[timelineStops.length - 1]?.realDestinationCity}
+                              {timelineStops[timelineStops.length - 1]?.stop?.realDestinationCity}
                             </span>
                           )}
                         </div>
@@ -5300,6 +5348,48 @@ export const MonitorYard: React.FC = () => {
               <div className="border-t border-black/5 pt-4">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">Spedizioni del Viaggio</h4>
+                  <Button 
+                    type="button" 
+                    size="sm" 
+                    variant="secondary"
+                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
+                    onClick={() => {
+                      // Validazione
+                      const invalidRowIndex = tripShipments.findIndex(s => {
+                        const missingBase = !s.orderNumber || !s.clientId;
+                        const missingHubDest = (s.tipoStop === 'HUB_TRANSIT' || s.tipoStop === 'CORRISPONDENTE') && !s.destinationNodeId;
+                        const missingDirectDest = (!s.tipoStop || s.tipoStop === 'DIRETTA') && (!s.realDestinationName || !s.realDestinationCity);
+                        return missingBase || missingHubDest || missingDirectDest;
+                      });
+                      
+                      if (invalidRowIndex !== -1) {
+                        setConfirmDialogState({
+                          isOpen: true,
+                          title: 'Attenzione',
+                          message: `Attenzione! La riga ${invalidRowIndex + 1} è incompleta.\n\nCompila tutti i campi obbligatori:\n- Committente\n- Nr. Delivery\n- Dati Destinazione\n\n(prima di poter aggiungere una nuova spedizione)`,
+                          confirmLabel: 'OK',
+                          isDanger: true,
+                          isAlert: true,
+                          onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))
+                        });
+                        return;
+                      }
+
+                      const firstRow = tripShipments[0];
+                      const defaultTipoStop = (firstRow?.tipoStop === 'HUB_TRANSIT' || firstRow?.tipoStop === 'CORRISPONDENTE') ? firstRow.tipoStop : undefined;
+                      const defaultNodeId = defaultTipoStop ? firstRow.destinationNodeId : undefined;
+                      const defaultNodeName = defaultTipoStop ? firstRow.destinationNodeName : undefined;
+                      
+                      setTripShipments([{ 
+                        id: `tmp-${Date.now()}`,
+                        tipoStop: defaultTipoStop,
+                        destinationNodeId: defaultNodeId,
+                        destinationNodeName: defaultNodeName
+                      }, ...tripShipments]);
+                    }}
+                  >
+                    + Salva Spedizione e Aggiungi Nuova Riga
+                  </Button>
                 </div>
                 
                 <div className="overflow-x-auto border border-black/10 rounded-lg">
@@ -5580,43 +5670,6 @@ export const MonitorYard: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
-                
-                <div className="mt-3 flex justify-end">
-                  <Button 
-                    type="button" 
-                    size="sm" 
-                    variant="secondary"
-                    className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                    onClick={() => {
-                      // Validazione
-                      const invalidRowIndex = tripShipments.findIndex(s => {
-                        const missingBase = !s.orderNumber || !s.clientId;
-                        const missingHubDest = (s.tipoStop === 'HUB_TRANSIT' || s.tipoStop === 'CORRISPONDENTE') && !s.destinationNodeId;
-                        const missingDirectDest = (!s.tipoStop || s.tipoStop === 'DIRETTA') && (!s.realDestinationName || !s.realDestinationCity);
-                        return missingBase || missingHubDest || missingDirectDest;
-                      });
-                      
-                      if (invalidRowIndex !== -1) {
-                        alert(`Attenzione! La riga ${invalidRowIndex + 1} è incompleta.\n\nCompila tutti i campi obbligatori:\n- Committente\n- Nr. Delivery\n- Dati Destinazione\n\n(prima di poter aggiungere una nuova spedizione)`);
-                        return;
-                      }
-
-                      const firstRow = tripShipments[0];
-                      const defaultTipoStop = (firstRow?.tipoStop === 'HUB_TRANSIT' || firstRow?.tipoStop === 'CORRISPONDENTE') ? firstRow.tipoStop : undefined;
-                      const defaultNodeId = defaultTipoStop ? firstRow.destinationNodeId : undefined;
-                      const defaultNodeName = defaultTipoStop ? firstRow.destinationNodeName : undefined;
-                      
-                      setTripShipments([{ 
-                        id: `tmp-${Date.now()}`,
-                        tipoStop: defaultTipoStop,
-                        destinationNodeId: defaultNodeId,
-                        destinationNodeName: defaultNodeName
-                      }, ...tripShipments]);
-                    }}
-                  >
-                    + Salva Spedizione e Aggiungi Nuova Riga
-                  </Button>
-                </div>
 
               {/* CONTROLLO LIMITI */}
               {(() => {
@@ -5665,7 +5718,7 @@ export const MonitorYard: React.FC = () => {
               })()}
               </div>
 
-              <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50 -mx-6 -mb-6">
+              <div className="flex gap-2 p-4 border-t border-black/10 bg-gray-100 -mx-6 -mb-6 sticky -bottom-6 z-10 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1)]">
                 <Button 
                   type="button" 
                   variant="secondary" 
@@ -5674,7 +5727,7 @@ export const MonitorYard: React.FC = () => {
                 >
                   Annulla
                 </Button>
-                <Button type="submit" variant="primary" className="flex-1 font-bold cursor-pointer">
+                <Button type="submit" variant="primary" className="flex-1 font-bold cursor-pointer shadow-md">
                   {shipmentFormId ? "Salva Modifiche" : "Registra Spedizione"}
                 </Button>
               </div>
