@@ -520,6 +520,9 @@ async function initializeDb() {
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS routing_notes TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS trip_id TEXT`);
   await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS client_trip_number TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS tipo_stop TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS destination_node_id TEXT`);
+  await sql(`ALTER TABLE shipments ADD COLUMN IF NOT EXISTS destination_node_name TEXT`);
 
   // Nuovi campi geografici strutturati per i plant/depots
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS address TEXT`);
@@ -1139,7 +1142,31 @@ export default async function handler(req: any, res: any) {
         country: s.country,
         grossWeight: s.gross_weight,
         deliveryNotes: s.delivery_notes,
-        internalNotes: s.internal_notes
+        internalNotes: s.internal_notes,
+        realOriginName: s.real_origin_name,
+        realOriginAddress: s.real_origin_address,
+        realOriginCity: s.real_origin_city,
+        realOriginCap: s.real_origin_cap,
+        realOriginProvince: s.real_origin_province,
+        realOriginCountry: s.real_origin_country,
+        realDestinationName: s.real_destination_name,
+        realDestinationAddress: s.real_destination_address,
+        realDestinationCity: s.real_destination_city,
+        realDestinationCap: s.real_destination_cap,
+        realDestinationProvince: s.real_destination_province,
+        realDestinationCountry: s.real_destination_country,
+        hubOrigineOperativo: s.hub_origine_operativo,
+        hubDestinazioneOperativo: s.hub_destinazione_operativo,
+        tipoOperazioneHub: s.tipo_operazione_hub,
+        tipoStop: s.tipo_stop,
+        destinationNodeId: s.destination_node_id,
+        destinationNodeName: s.destination_node_name,
+        routingStatus: s.routing_status,
+        routingNotes: s.routing_notes,
+        sequence: s.sequence,
+        justificationNote: s.justification_note,
+        tripId: s.trip_id,
+        clientTripNumber: s.client_trip_number
       }));
 
       const parsedClients = clients.map((c: any) => ({
@@ -1479,8 +1506,8 @@ export default async function handler(req: any, res: any) {
               real_origin_name, real_origin_address, real_origin_city, real_origin_cap, real_origin_province, real_origin_country,
               real_destination_name, real_destination_address, real_destination_city, real_destination_cap, real_destination_province, real_destination_country,
               hub_origine_operativo, hub_destinazione_operativo, tipo_operazione_hub, routing_status, routing_notes, sequence, justification_note,
-              trip_id, client_trip_number
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47)
+              trip_id, client_trip_number, tipo_stop, destination_node_id, destination_node_name
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50)
           `, [
             payload.id, payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
             payload.activityType, payload.palletPlaces, payload.status, payload.expectedDate, payload.expectedTime || null,
@@ -1491,7 +1518,7 @@ export default async function handler(req: any, res: any) {
             payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
             payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
             payload.routingStatus || null, payload.routingNotes || null, payload.sequence || null, payload.justificationNote || null,
-            payload.tripId || null, payload.clientTripNumber || null
+            payload.tripId || null, payload.clientTripNumber || null, payload.tipoStop || null, payload.destinationNodeId || null, payload.destinationNodeName || null
           ]);
           break;
  
@@ -1510,8 +1537,9 @@ export default async function handler(req: any, res: any) {
                real_origin_name = $23, real_origin_address = $24, real_origin_city = $25, real_origin_cap = $26, real_origin_province = $27, real_origin_country = $28,
                real_destination_name = $29, real_destination_address = $30, real_destination_city = $31, real_destination_cap = $32, real_destination_province = $33, real_destination_country = $34,
                hub_origine_operativo = $35, hub_destinazione_operativo = $36, tipo_operazione_hub = $37,
-               routing_status = $38, routing_notes = $39, sequence = $40, justification_note = $41
-             WHERE id = $42
+               routing_status = $38, routing_notes = $39, sequence = $40, justification_note = $41,
+               trip_id = $42, client_trip_number = $43, tipo_stop = $44, destination_node_id = $45, destination_node_name = $46
+             WHERE id = $47
            `, [
              payload.clientId, payload.carrierId, payload.depotId, payload.orderNumber, payload.orderNumber2 || null,
              payload.activityType, payload.palletPlaces, payload.expectedDate, payload.expectedTime || null,
@@ -1522,6 +1550,7 @@ export default async function handler(req: any, res: any) {
              payload.realDestinationName || null, payload.realDestinationAddress || null, payload.realDestinationCity || null, payload.realDestinationCap || null, payload.realDestinationProvince || null, payload.realDestinationCountry || null,
              payload.hubOrigineOperativo || null, payload.hubDestinazioneOperativo || null, payload.tipoOperazioneHub || null,
              payload.routingStatus || null, payload.routingNotes || null, payload.sequence || null, payload.justificationNote || null,
+             payload.tripId || null, payload.clientTripNumber || null, payload.tipoStop || null, payload.destinationNodeId || null, payload.destinationNodeName || null,
              payload.id
            ]);
            break;

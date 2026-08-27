@@ -1164,6 +1164,9 @@ export const MonitorYard: React.FC = () => {
         hubOrigineOperativo: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? selectedDepotId : (shipmentFormHubOrigineOperativo || undefined),
         hubDestinazioneOperativo: shipmentFormTipoOperazioneHub === 'INBOUND' ? selectedDepotId : (shipmentFormHubDestinazioneOperativo || undefined),
         tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
+        tipoStop: row.tipoStop || undefined,
+        destinationNodeId: row.destinationNodeId || undefined,
+        destinationNodeName: row.destinationNodeName || undefined,
 
         routingStatus: isRoutingAmbiguous && isAutoRoutingEnabled ? ('DA_CONFERMARE' as const) : ('CONFERMATO' as const),
         routingNotes: shipmentFormRoutingNotes,
