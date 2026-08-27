@@ -29,6 +29,16 @@ export interface TripGroup {
 }
 import { calculateSmartRouting } from '../utils/geo';
 
+export interface PreviewRow {
+  index: number;
+  rawLine: string;
+  parsedShipment: any;
+  hasError: boolean;
+  hasWarning: boolean;
+  messages: string[];
+  tripId?: string; // For grouping validation
+}
+
 export const MonitorYard: React.FC = () => {
   const {
     depots,
@@ -346,6 +356,8 @@ export const MonitorYard: React.FC = () => {
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState('');
   const [importSuccess, setImportSuccess] = useState('');
+  const [importPreviewData, setImportPreviewData] = useState<PreviewRow[]>([]);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
   // Stati KPI & Statistiche
   const [kpiDataSource, setKpiDataSource] = useState<'reali' | 'simulati'>('simulati');
   const [kpiTimeRange, setKpiTimeRange] = useState<'oggi' | '7g' | '30g'>('7g');
@@ -1148,14 +1160,21 @@ export const MonitorYard: React.FC = () => {
     setIsNewShipmentModalOpen(false);
   };
 
-  const handleImportShipments = () => {
+  const handleImportShipments = async () => {
     if (!importText.trim()) {
       setImportError('Il testo di importazione è vuoto.');
       return;
     }
 
+    let territoryData: any[] = [];
+    try {
+      const module = await import('../data/territory.json');
+      territoryData = module.default;
+    } catch (e) {
+      console.warn("Impossibile caricare territory.json");
+    }
+
     const lines = importText.split('\n');
-    let successCount = 0;
     let errorCount = 0;
 
     const defaultClient = clients[0]?.id;
@@ -1165,6 +1184,8 @@ export const MonitorYard: React.FC = () => {
       setImportError('Impossibile determinare cliente o vettore predefinito.');
       return;
     }
+
+    const previewRows: PreviewRow[] = [];
 
     lines.forEach((line, idx) => {
       const trimmed = line.trim();
@@ -1215,111 +1236,133 @@ export const MonitorYard: React.FC = () => {
       const realDestinationProvince = parts[27] || '';
       const realDestinationCountry = parts[28] || 'Italia';
 
-      let hubOrigineOperativo = parts[29] || '';
-      let hubDestinazioneOperativo = parts[30] || '';
-      let tipoOperazioneHub = parts[31]?.toUpperCase() || '';
+      const hubOrigineOperativo = parts[29] || '';
+      const hubDestinazioneOperativo = parts[30] || '';
+      const tipoOperazioneHub = parts[31]?.toUpperCase() || '';
       const tripId = parts[32] || undefined;
       const sequence = parts[33] ? Number(parts[33]) : undefined;
 
-      let finalInternalNotes = internalNotes;
-      let routingStatus: 'CONFERMATO' | 'DA_CONFERMARE' = 'CONFERMATO';
-      let routingNotes = 'Instradamento confermato';
-
-      if (!hubOrigineOperativo || !hubDestinazioneOperativo || !tipoOperazioneHub) {
-        const routing = calculateSmartRouting(
-          {
-            city: realOriginCity,
-            cap: realOriginCap,
-            province: realOriginProvince,
-            name: realOriginName
-          },
-          {
-            city: realDestinationCity,
-            cap: realDestinationCap,
-            province: realDestinationProvince,
-            name: realDestinationName
-          },
-          activityType as any,
-          defaultClient,
-          depots,
-          clients
-        );
-
-        if (!hubOrigineOperativo) hubOrigineOperativo = routing.hubOrigineOperativo;
-        if (!hubDestinazioneOperativo) hubDestinazioneOperativo = routing.hubDestinazioneOperativo;
-        if (!tipoOperazioneHub) tipoOperazioneHub = routing.tipoOperazioneHub;
-        
-        routingStatus = routing.isAmbiguous ? 'DA_CONFERMARE' : 'CONFERMATO';
-        routingNotes = routing.routingNotes;
-
-        if (routing.isAmbiguous) {
-          finalInternalNotes = finalInternalNotes 
-            ? `${finalInternalNotes} | ⚠️ Hub ambiguo - verificare instradamento manuale`
-            : `⚠️ Hub ambiguo - verificare instradamento manuale`;
+      const row: PreviewRow = {
+        index: idx,
+        rawLine: line,
+        hasError: false,
+        hasWarning: false,
+        messages: [],
+        tripId: tripId,
+        parsedShipment: {
+          clientId: defaultClient,
+          carrierId: defaultCarrier,
+          depotId: selectedDepotId,
+          orderNumber,
+          orderNumber2: orderNumber2 || undefined,
+          activityType: activityType as any,
+          palletPlaces,
+          expectedDate,
+          expectedTime: expectedTime || undefined,
+          originOrDestination: city,
+          goodsType: goodsType || undefined,
+          expectedDeliveryDate: expectedDate,
+          subjectName,
+          address,
+          city,
+          cap,
+          province,
+          region,
+          country,
+          grossWeight,
+          deliveryNotes,
+          internalNotes,
+          realOriginName,
+          realOriginAddress,
+          realOriginCity,
+          realOriginCap,
+          realOriginProvince,
+          realOriginCountry,
+          realDestinationName,
+          realDestinationAddress,
+          realDestinationCity,
+          realDestinationCap,
+          realDestinationProvince,
+          realDestinationCountry,
+          hubOrigineOperativo,
+          hubDestinazioneOperativo,
+          tipoOperazioneHub: tipoOperazioneHub as any,
+          routingStatus: 'CONFERMATO',
+          routingNotes: 'Da file (Validato)',
+          tripId,
+          sequence
         }
-      } else {
-        // Se fornito esplicitamente, lo consideriamo confermato
-        routingStatus = 'CONFERMATO';
-        routingNotes = 'Inserito manualmente / Da file';
+      };
+
+      if (!hubOrigineOperativo || !hubDestinazioneOperativo || !['OUTBOUND', 'INBOUND', 'TRANSITO'].includes(tipoOperazioneHub)) {
+        row.hasError = true;
+        row.messages.push('Routing mancante o Tipo Operazione errato (OUTBOUND, INBOUND, TRANSITO)');
       }
 
-      addShipment({
-        clientId: defaultClient,
-        carrierId: defaultCarrier,
-        depotId: selectedDepotId,
-        orderNumber,
-        orderNumber2: orderNumber2 || undefined,
-        activityType: activityType as any,
-        palletPlaces,
-        expectedDate,
-        expectedTime: expectedTime || undefined,
-        originOrDestination: city,
-        goodsType: goodsType || undefined,
-        expectedDeliveryDate: expectedDate,
-        subjectName,
-        address,
-        city,
-        cap,
-        province,
-        region,
-        country,
-        grossWeight,
-        deliveryNotes,
-        internalNotes: finalInternalNotes,
-        realOriginName,
-        realOriginAddress,
-        realOriginCity,
-        realOriginCap,
-        realOriginProvince,
-        realOriginCountry,
-        realDestinationName,
-        realDestinationAddress,
-        realDestinationCity,
-        realDestinationCap,
-        realDestinationProvince,
-        realDestinationCountry,
-        hubOrigineOperativo,
-        hubDestinazioneOperativo,
-        tipoOperazioneHub: tipoOperazioneHub as any,
-        routingStatus,
-        routingNotes,
-        tripId,
-        sequence
-      });
-      successCount++;
+      if (territoryData.length > 0) {
+        if (tipoOperazioneHub === 'OUTBOUND' && realDestinationCity) {
+          const match = territoryData.find(t => t.comune.toLowerCase() === realDestinationCity.toLowerCase());
+          if (!match) {
+            row.hasError = true;
+            row.messages.push(`Città Destinazione non in anagrafica: ${realDestinationCity}`);
+          }
+        }
+        if (tipoOperazioneHub === 'INBOUND' && realOriginCity) {
+          const match = territoryData.find(t => t.comune.toLowerCase() === realOriginCity.toLowerCase());
+          if (!match) {
+            row.hasError = true;
+            row.messages.push(`Città Partenza non in anagrafica: ${realOriginCity}`);
+          }
+        }
+      }
+
+      if (palletPlaces > 33) {
+        row.hasWarning = true;
+        row.messages.push(`Pallet (${palletPlaces}) > 33`);
+      }
+      if (grossWeight > 28000) {
+        row.hasWarning = true;
+        row.messages.push(`Peso (${grossWeight}kg) > 28000`);
+      }
+
+      previewRows.push(row);
     });
 
-    if (successCount > 0) {
-      setImportSuccess(`Importate con successo ${successCount} spedizioni! (${errorCount} righe errate saltate)`);
+    const tripsWithErrors = new Set<string>();
+    previewRows.forEach(row => {
+      if (row.hasError && row.tripId) {
+        tripsWithErrors.add(row.tripId);
+      }
+    });
+
+    previewRows.forEach(row => {
+      if (row.tripId && tripsWithErrors.has(row.tripId) && !row.hasError) {
+        row.hasError = true;
+        row.messages.push('Viaggio contenente altre righe con errori');
+      }
+    });
+
+    setImportPreviewData(previewRows);
+    setIsPreviewMode(true);
+    setImportError('');
+  };
+
+  const confirmImport = () => {
+    let successCount = 0;
+    importPreviewData.forEach(row => {
+      if (!row.hasError) {
+        addShipment(row.parsedShipment);
+        successCount++;
+      }
+    });
+    setImportSuccess(`Importate con successo ${successCount} spedizioni!`);
+    setTimeout(() => {
+      setIsImportShipmentModalOpen(false);
+      setImportSuccess('');
+      setImportPreviewData([]);
+      setIsPreviewMode(false);
       setImportText('');
-      setImportError('');
-      setTimeout(() => {
-        setIsImportShipmentModalOpen(false);
-        setImportSuccess('');
-      }, 2000);
-    } else {
-      setImportError('Nessuna riga valida trovata. Controlla il formato.');
-    }
+    }, 2000);
   };
 
   const formatDateString = (y: number, m: number, d: number) => {
@@ -5523,92 +5566,166 @@ export const MonitorYard: React.FC = () => {
       {/* MODALE DI IMPORTAZIONE MASSIVA DA CSV/TXT */}
       {isImportShipmentModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
-          <div className="bg-white rounded-xl shadow-xl max-w-xl w-full border border-black/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 flex justify-between items-center">
+          <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full border border-black/10 overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-sm uppercase tracking-wide">
-                Importazione Spedizioni da File (CSV/TXT)
+                {isPreviewMode ? "Anteprima Importazione" : "Importazione Spedizioni da File (CSV/TXT)"}
               </h3>
               <button 
-                onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); }}
+                onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); setIsPreviewMode(false); setImportPreviewData([]); }}
                 className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
               >
                 ×
               </button>
             </div>
-            <div className="p-6 space-y-4">
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-[10px] text-blue-800 font-mono leading-relaxed">
-                <p className="font-bold mb-1">Tracciato Campi Richiesto (delimitato da virgola o punto e virgola):</p>
-                <code>Rif1;Rif2;TipoAttivita;PostiPallet;PesoLordo;Nome;Localita;CAP;Provincia;DataPrevista;OraPrevista;Merce;Indirizzo;Regione;Nazione;NoteConsegna;NoteInterne</code>
-                <p className="mt-2 text-gray-500 italic">Esempio:<br/>ORD-12345;REF-AAA;SCARICO;24;15000;Rossi Srl;Milano;20121;MI;2026-08-10;10:30;Alimentari</p>
-              </div>
+            
+            <div className="p-6 space-y-4 overflow-y-auto flex-grow">
+              {!isPreviewMode ? (
+                <>
+                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-[10px] text-blue-800 font-mono leading-relaxed">
+                    <p className="font-bold mb-1">Tracciato Campi Richiesto (delimitato da virgola o punto e virgola):</p>
+                    <code>Rif1;Rif2;TipoAttivita;PostiPallet;PesoLordo;Nome;Localita;CAP;Provincia;DataPrevista;OraPrevista;Merce;Indirizzo;Regione;Nazione;NoteConsegna;NoteInterne</code>
+                    <p className="mt-2 text-gray-500 italic">Esempio:<br/>ORD-12345;REF-AAA;SCARICO;24;15000;Rossi Srl;Milano;20121;MI;2026-08-10;10:30;Alimentari</p>
+                  </div>
 
-              {importError && (
-                <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-mono">
-                  {importError}
+                  {importError && (
+                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-mono">
+                      {importError}
+                    </div>
+                  )}
+
+                  {importSuccess && (
+                    <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-xs rounded-lg font-mono">
+                      {importSuccess}
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
+                      Copia e Incolla Righe Dati:
+                    </label>
+                    <textarea
+                      rows={6}
+                      value={importText}
+                      onChange={(e) => setImportText(e.target.value)}
+                      placeholder="Incolla qui le righe di dati del foglio Excel o file TXT..."
+                      className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none font-mono"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 block">
+                      Oppure seleziona un file locale:
+                    </label>
+                    <input
+                      type="file"
+                      accept=".csv,.txt"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const text = event.target?.result as string;
+                            setImportText(text);
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                      className="text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-black hover:file:bg-gray-200 cursor-pointer"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-4">
+                  {importSuccess ? (
+                    <div className="p-4 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg font-bold text-center">
+                      {importSuccess}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="text-sm font-semibold text-gray-700">
+                        Righe lette: {importPreviewData.length}
+                      </div>
+                      
+                      {importPreviewData.some(r => r.hasError) && (
+                        <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-mono font-bold">
+                          ⚠️ Attenzione: Ci sono errori bloccanti. I viaggi con errori non possono essere importati finché il file non viene corretto.
+                        </div>
+                      )}
+
+                      <div className="overflow-x-auto border border-black/10 rounded-lg">
+                        <table className="w-full text-left border-collapse text-[10px] font-mono whitespace-nowrap">
+                          <thead className="sticky top-0 bg-gray-100 z-10 shadow-sm">
+                            <tr className="border-b border-black/10">
+                              <th className="p-2 w-10">Riga</th>
+                              <th className="p-2 w-32">Riferimenti</th>
+                              <th className="p-2">Mittente / Destinatario</th>
+                              <th className="p-2">Routing</th>
+                              <th className="p-2">Codice Viaggio</th>
+                              <th className="p-2 min-w-[200px]">Stato</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-black/5">
+                            {importPreviewData.map((row) => (
+                              <tr key={row.index} className={row.hasError ? 'bg-red-50/50' : (row.hasWarning ? 'bg-yellow-50/50' : '')}>
+                                <td className="p-2 font-bold align-top">{row.index + 1}</td>
+                                <td className="p-2 align-top">
+                                  {row.parsedShipment.orderNumber}<br/>
+                                  <span className="text-gray-500">{row.parsedShipment.activityType}</span>
+                                </td>
+                                <td className="p-2 align-top whitespace-normal min-w-[200px]">
+                                  {row.parsedShipment.activityType === 'SCARICO' 
+                                    ? <>{row.parsedShipment.realOriginName}<br/><span className="text-gray-500">{row.parsedShipment.realOriginCity} ({row.parsedShipment.realOriginProvince})</span></>
+                                    : <>{row.parsedShipment.realDestinationName}<br/><span className="text-gray-500">{row.parsedShipment.realDestinationCity} ({row.parsedShipment.realDestinationProvince})</span></>
+                                  }
+                                </td>
+                                <td className="p-2 align-top">
+                                  {row.parsedShipment.tipoOperazioneHub}<br/>
+                                  <span className="text-gray-500">
+                                    {row.parsedShipment.hubOrigineOperativo} &rarr; {row.parsedShipment.hubDestinazioneOperativo}
+                                  </span>
+                                </td>
+                                <td className="p-2 align-top font-bold text-indigo-700">
+                                  {row.parsedShipment.tripId || <span className="text-gray-400 italic">Nessuno</span>}
+                                </td>
+                                <td className="p-2 align-top whitespace-normal min-w-[200px]">
+                                  {row.hasError ? (
+                                    <div className="flex flex-col gap-0.5 text-red-600">
+                                      <span className="font-bold">❌ Errore</span>
+                                      {row.messages.map((m, i) => <span key={i} className="text-[9px] leading-tight">- {m}</span>)}
+                                    </div>
+                                  ) : row.hasWarning ? (
+                                    <div className="flex flex-col gap-0.5 text-yellow-700">
+                                      <span className="font-bold">⚠️ Avviso</span>
+                                      {row.messages.map((m, i) => <span key={i} className="text-[9px] leading-tight">- {m}</span>)}
+                                    </div>
+                                  ) : (
+                                    <span className="text-green-600 font-bold">✅ Valido</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
+            </div>
 
-              {importSuccess && (
-                <div className="p-3 bg-green-50 border border-green-200 text-green-700 text-xs rounded-lg font-mono">
-                  {importSuccess}
-                </div>
+            <div className="flex gap-2 border-t border-black/5 p-4 bg-gray-50 shrink-0">
+              {!isPreviewMode ? (
+                <>
+                  <Button type="button" variant="secondary" className="flex-grow text-xs cursor-pointer" onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); }}>Annulla</Button>
+                  <Button type="button" variant="success" className="flex-grow text-xs font-bold cursor-pointer" onClick={handleImportShipments} disabled={!importText.trim()}>Avanti (Anteprima)</Button>
+                </>
+              ) : (
+                <>
+                  <Button type="button" variant="secondary" className="flex-grow text-xs cursor-pointer" onClick={() => setIsPreviewMode(false)} disabled={!!importSuccess}>Indietro</Button>
+                  <Button type="button" variant="primary" className="flex-grow text-xs font-bold cursor-pointer" onClick={confirmImport} disabled={importPreviewData.some(r => r.hasError) || !!importSuccess}>Conferma e Importa</Button>
+                </>
               )}
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500">
-                  Copia e Incolla Righe Dati:
-                </label>
-                <textarea
-                  rows={6}
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  placeholder="Incolla qui le righe di dati del foglio Excel o file TXT..."
-                  className="w-full bg-gray-50 border border-black/10 rounded-lg p-2 text-xs focus:ring-0 focus:outline-none font-mono"
-                />
-              </div>
-
-              {/* OPZIONE CARICAMENTO FILE REALISTICA */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-gray-500 block">
-                  Oppure seleziona un file locale:
-                </label>
-                <input
-                  type="file"
-                  accept=".csv,.txt"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        const text = event.target?.result as string;
-                        setImportText(text);
-                      };
-                      reader.readAsText(file);
-                    }
-                  }}
-                  className="text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-black hover:file:bg-gray-200 cursor-pointer"
-                />
-              </div>
-
-              <div className="flex gap-2 border-t border-black/5 pt-4 bg-gray-50 -mx-6 -mb-6 p-4">
-                <Button 
-                  type="button" 
-                  variant="secondary" 
-                  className="flex-grow text-xs cursor-pointer" 
-                  onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); }}
-                >
-                  Annulla
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="success" 
-                  className="flex-grow text-xs font-bold cursor-pointer" 
-                  onClick={handleImportShipments}
-                  disabled={!importText.trim()}
-                >
-                  Procedi con Importazione
-                </Button>
-              </div>
             </div>
           </div>
         </div>
