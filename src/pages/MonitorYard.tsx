@@ -5188,7 +5188,8 @@ export const MonitorYard: React.FC = () => {
 
                 {(() => {
                   // Raggruppo gli stop contigui per evitare doppioni, mantenendo il conteggio
-                  const timelineStops = tripShipments.filter(s => s.orderNumber && s.orderNumber.trim() !== '').reduce((acc, stop) => {
+                  const validShipments = [...tripShipments].reverse().filter(s => s.orderNumber && s.orderNumber.trim() !== '');
+                  const timelineStops = validShipments.reduce((acc, stop) => {
                     const isHub = stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE';
                     const currentId = isHub ? stop.destinationNodeId : `${stop.realDestinationName}-${stop.realDestinationCity}`;
                     
@@ -5208,10 +5209,13 @@ export const MonitorYard: React.FC = () => {
                   return (
                     <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
                       {/* ORIGINE */}
-                      <div className="flex flex-col min-w-[150px]">
+                      <div className="flex flex-col min-w-[160px]">
                         <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Origine</span>
-                        <div className="bg-white border-2 border-[#004B97] rounded-lg p-2 flex flex-col shadow-sm">
-                          <span className="text-xs font-bold text-[#004B97] line-clamp-2 text-center relative">
+                        <div className="bg-white border-2 border-[#004B97] rounded-lg p-2 flex flex-col shadow-sm relative">
+                          <span className="text-[8px] uppercase tracking-wider font-bold text-white bg-[#004B97] px-1.5 py-0.5 rounded-sm self-start mb-1">
+                            {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'PARTENZA HUB' : 'RITIRO DIRETTO'}
+                          </span>
+                          <span className="text-xs font-bold text-[#004B97] line-clamp-2 text-left relative">
                             {shipmentFormTipoOperazioneHub === 'OUTBOUND' 
                               ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
                               : (timelineStops[0]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[0]?.stop?.tipoStop === 'CORRISPONDENTE' 
@@ -5219,12 +5223,12 @@ export const MonitorYard: React.FC = () => {
                                   : timelineStops[0]?.stop?.realOriginName || 'DA DEFINIRE')}
                           </span>
                           {shipmentFormTipoOperazioneHub === 'INBOUND' && (timelineStops[0]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[0]?.stop?.tipoStop === 'CORRISPONDENTE') && (
-                            <span className="text-[9px] text-gray-500 mt-1 line-clamp-2 text-center border-t border-black/5 pt-1">
+                            <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-left border-t border-black/5 pt-1">
                               {depots.find(d => d.id === timelineStops[0]?.stop?.destinationNodeId)?.city || '-'}
                             </span>
                           )}
                           {shipmentFormTipoOperazioneHub === 'INBOUND' && (!timelineStops[0]?.stop?.tipoStop || timelineStops[0]?.stop?.tipoStop === 'DIRETTA') && timelineStops[0]?.stop?.realOriginCity && (
-                            <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-center">
+                            <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-left">
                               {timelineStops[0]?.stop?.realOriginCity}
                             </span>
                           )}
@@ -5232,41 +5236,55 @@ export const MonitorYard: React.FC = () => {
                       </div>
 
                       {/* STOPS (SOLO PARTENZE PER ORA) */}
-                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' && timelineStops.slice(0, -1).map(({ stop, count }, idx) => (
-                        <React.Fragment key={`stop-${idx}`}>
-                          <div className="text-gray-400 font-mono text-sm">➔</div>
-                          <div className="flex flex-col min-w-[150px]">
-                            <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Stop {idx + 1}</span>
-                            <div className="bg-white border border-gray-300 rounded-lg p-2 flex flex-col shadow-sm relative">
-                              {count > 1 && (
-                                <div className="absolute -top-2 -right-2 bg-gray-500 text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm border-2 border-white">
-                                  {count}
-                                </div>
-                              )}
-                              <span className="text-xs font-medium text-gray-700 line-clamp-2 text-center">
-                                {stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE'
-                                  ? stop.destinationNodeName || 'DA DEFINIRE'
-                                  : stop.realDestinationName || 'DA DEFINIRE'}
-                              </span>
-                              {(stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE') && (
-                                <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-center border-t border-black/5 pt-1">
-                                  {depots.find(d => d.id === stop.destinationNodeId)?.city || '-'}
+                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' && timelineStops.slice(0, -1).map(({ stop, count }, idx) => {
+                        const isHub = stop.tipoStop === 'HUB_TRANSIT';
+                        const isCorr = stop.tipoStop === 'CORRISPONDENTE';
+                        const isDiretta = !stop.tipoStop || stop.tipoStop === 'DIRETTA';
+                        
+                        return (
+                          <React.Fragment key={`stop-${idx}`}>
+                            <div className="text-gray-400 font-mono text-sm">➔</div>
+                            <div className="flex flex-col min-w-[160px]">
+                              <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Stop {idx + 1}</span>
+                              <div className={`bg-white border-2 rounded-lg p-2 flex flex-col shadow-sm relative ${isHub ? 'border-blue-400' : isCorr ? 'border-green-400' : 'border-gray-300'}`}>
+                                {count > 1 && (
+                                  <div className={`absolute -top-2 -right-2 text-white text-[9px] font-bold w-5 h-5 flex items-center justify-center rounded-full shadow-sm border-2 border-white ${isHub ? 'bg-blue-500' : isCorr ? 'bg-green-500' : 'bg-gray-500'}`}>
+                                    {count}
+                                  </div>
+                                )}
+                                <span className={`text-[8px] uppercase tracking-wider font-bold text-white px-1.5 py-0.5 rounded-sm self-start mb-1 ${isHub ? 'bg-blue-500' : isCorr ? 'bg-green-500' : 'bg-gray-500'}`}>
+                                  {isHub ? 'HUB TRANSITO' : isCorr ? 'CORRISPONDENTE' : 'CONSEGNA DIRETTA'}
                                 </span>
-                              )}
-                              {(!stop.tipoStop || stop.tipoStop === 'DIRETTA') && stop.realDestinationCity && (
-                                <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-center">
-                                  {stop.realDestinationCity}
+                                <span className="text-xs font-medium text-gray-700 line-clamp-2 text-left">
+                                  {isHub || isCorr
+                                    ? stop.destinationNodeName || 'DA DEFINIRE'
+                                    : stop.realDestinationName || 'DA DEFINIRE'}
                                 </span>
-                              )}
+                                {isDiretta && stop.subjectName && (
+                                  <span className="text-[9px] text-gray-400 mt-0.5 line-clamp-1 italic text-left">
+                                    {stop.subjectName}
+                                  </span>
+                                )}
+                                {(isHub || isCorr) && (
+                                  <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-left border-t border-black/5 pt-1">
+                                    {depots.find(d => d.id === stop.destinationNodeId)?.city || '-'}
+                                  </span>
+                                )}
+                                {isDiretta && stop.realDestinationCity && (
+                                  <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-left">
+                                    {stop.realDestinationCity}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </React.Fragment>
-                      ))}
+                          </React.Fragment>
+                        );
+                      })}
 
                       <div className="text-gray-400 font-mono text-sm">➔</div>
 
                       {/* DESTINAZIONE FINALE */}
-                      <div className="flex flex-col min-w-[150px]">
+                      <div className="flex flex-col min-w-[160px]">
                         <span className="text-[9px] uppercase font-bold text-orange-500 mb-1">Destinazione Finale</span>
                         <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 flex flex-col shadow-sm relative">
                           {timelineStops.length > 0 && timelineStops[timelineStops.length - 1].count > 1 && (
@@ -5274,23 +5292,42 @@ export const MonitorYard: React.FC = () => {
                               {timelineStops[timelineStops.length - 1].count}
                             </div>
                           )}
-                          <span className="text-xs font-bold text-orange-700 line-clamp-2 text-center">
-                            {shipmentFormTipoOperazioneHub === 'INBOUND'
-                              ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
-                              : (timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'CORRISPONDENTE'
-                                  ? timelineStops[timelineStops.length - 1]?.stop?.destinationNodeName || 'DA DEFINIRE'
-                                  : timelineStops[timelineStops.length - 1]?.stop?.realDestinationName || 'DA DEFINIRE')}
-                          </span>
-                          {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'CORRISPONDENTE') && (
-                            <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-1 text-center border-t border-orange-400/20 pt-1">
-                              {depots.find(d => d.id === timelineStops[timelineStops.length - 1]?.stop?.destinationNodeId)?.city || '-'}
-                            </span>
-                          )}
-                          {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (!timelineStops[timelineStops.length - 1]?.stop?.tipoStop || timelineStops[timelineStops.length - 1]?.stop?.tipoStop === 'DIRETTA') && timelineStops[timelineStops.length - 1]?.stop?.realDestinationCity && (
-                            <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-1 text-center">
-                              {timelineStops[timelineStops.length - 1]?.stop?.realDestinationCity}
-                            </span>
-                          )}
+                          {(() => {
+                            const lastStop = timelineStops[timelineStops.length - 1]?.stop;
+                            const isHub = lastStop?.tipoStop === 'HUB_TRANSIT';
+                            const isCorr = lastStop?.tipoStop === 'CORRISPONDENTE';
+                            const isDiretta = !lastStop?.tipoStop || lastStop?.tipoStop === 'DIRETTA';
+                            
+                            return (
+                              <>
+                                <span className={`text-[8px] uppercase tracking-wider font-bold text-white px-1.5 py-0.5 rounded-sm self-start mb-1 ${isHub ? 'bg-blue-500' : isCorr ? 'bg-green-500' : 'bg-orange-500'}`}>
+                                  {shipmentFormTipoOperazioneHub === 'INBOUND' ? 'SCARICO HUB' : (isHub ? 'HUB TRANSITO' : isCorr ? 'CORRISPONDENTE' : 'CONSEGNA DIRETTA')}
+                                </span>
+                                <span className="text-xs font-bold text-orange-700 line-clamp-2 text-left">
+                                  {shipmentFormTipoOperazioneHub === 'INBOUND'
+                                    ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
+                                    : (isHub || isCorr
+                                        ? lastStop?.destinationNodeName || 'DA DEFINIRE'
+                                        : lastStop?.realDestinationName || 'DA DEFINIRE')}
+                                </span>
+                                {shipmentFormTipoOperazioneHub === 'OUTBOUND' && isDiretta && lastStop?.subjectName && (
+                                  <span className="text-[9px] text-orange-600/70 mt-0.5 line-clamp-1 italic text-left">
+                                    {lastStop.subjectName}
+                                  </span>
+                                )}
+                                {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (isHub || isCorr) && (
+                                  <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-1 text-left border-t border-orange-400/20 pt-1">
+                                    {depots.find(d => d.id === lastStop?.destinationNodeId)?.city || '-'}
+                                  </span>
+                                )}
+                                {shipmentFormTipoOperazioneHub === 'OUTBOUND' && isDiretta && lastStop?.realDestinationCity && (
+                                  <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-1 text-left">
+                                    {lastStop?.realDestinationCity}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>
