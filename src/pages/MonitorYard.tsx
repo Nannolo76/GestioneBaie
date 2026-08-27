@@ -88,7 +88,7 @@ export const MonitorYard: React.FC = () => {
   // Stati Gestione Spedizioni Guardiola
   const [shipmentFormId, setShipmentFormId] = useState('');
   const [shipmentFormClient, setShipmentFormClient] = useState('');
-  const [shipmentFormTipoTransito, setShipmentFormTipoTransito] = useState<'COMMITTENTE' | 'INTERNO'>('COMMITTENTE');
+  const [shipmentFormTipoTransito, setShipmentFormTipoTransito] = useState<'FTL' | 'DETTAGLIATO'>('FTL');
   const [shipmentFormCarrier, setShipmentFormCarrier] = useState('');
   
   const [confirmDialogState, setConfirmDialogState] = useState({
@@ -107,6 +107,8 @@ export const MonitorYard: React.FC = () => {
   const [tripShipments, setTripShipments] = useState<Partial<Shipment>[]>([{ id: `tmp-${Date.now()}` }]);
   const [tripJustificationNote, setTripJustificationNote] = useState('');
   const [shipmentFormTripNumber, setShipmentFormTripNumber] = useState('');
+  const [ftlPallet, setFtlPallet] = useState<number>(0);
+  const [ftlWeight, setFtlWeight] = useState<number>(0);
 
   const [shipmentFormType, setShipmentFormType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
   
@@ -953,7 +955,9 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo('');
     setShipmentFormHubDestinazioneOperativo('');
     setShipmentFormTipoOperazioneHub('OUTBOUND');
-    setShipmentFormTipoTransito('COMMITTENTE');
+    setShipmentFormTipoTransito('FTL');
+    setFtlPallet(0);
+    setFtlWeight(0);
 
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(true);
@@ -982,7 +986,9 @@ export const MonitorYard: React.FC = () => {
     setShipmentFormHubOrigineOperativo(s.hubOrigineOperativo || '');
     setShipmentFormHubDestinazioneOperativo(s.hubDestinazioneOperativo || '');
     setShipmentFormTipoOperazioneHub(s.tipoOperazioneHub || 'OUTBOUND');
-    setShipmentFormTipoTransito(s.tipoTransito || 'COMMITTENTE');
+    setShipmentFormTipoTransito(s.tipoTransito || 'FTL');
+    setFtlPallet(relatedShipments.reduce((acc, row) => acc + (row.palletPlaces || 0), 0));
+    setFtlWeight(relatedShipments.reduce((acc, row) => acc + (row.grossWeight || 0), 0));
 
     setIsRoutingAmbiguous(false);
     setIsAutoRoutingEnabled(false);
@@ -1099,8 +1105,7 @@ export const MonitorYard: React.FC = () => {
     // Loop through all valid shipments in the Trip Builder
     for (let index = 0; index < validTripShipments.length; index++) {
       const row = validTripShipments[index];
-      const isInternalTransit = shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO';
-      const rowClientId = isInternalTransit ? 'INTERNO' : (row.clientId || shipmentFormClient || clients[0]?.id);
+      const rowClientId = row.clientId || shipmentFormClient || clients[0]?.id;
       
       const payloadUpdates = {
         tripId: commonTripId,
@@ -5171,23 +5176,23 @@ export const MonitorYard: React.FC = () => {
                         <input 
                           type="radio" 
                           name="tipoTransito" 
-                          value="COMMITTENTE" 
-                          checked={shipmentFormTipoTransito === 'COMMITTENTE'} 
-                          onChange={() => setShipmentFormTipoTransito('COMMITTENTE')} 
+                          value="FTL" 
+                          checked={shipmentFormTipoTransito === 'FTL'} 
+                          onChange={() => setShipmentFormTipoTransito('FTL')} 
                           className="text-blue-600 focus:ring-blue-500"
                         />
-                        Transito per Conto Terzi (Committente)
+                        FTL / Blocco Unico (Solo Testata)
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-700">
                         <input 
                           type="radio" 
                           name="tipoTransito" 
-                          value="INTERNO" 
-                          checked={shipmentFormTipoTransito === 'INTERNO'} 
-                          onChange={() => setShipmentFormTipoTransito('INTERNO')} 
+                          value="DETTAGLIATO" 
+                          checked={shipmentFormTipoTransito === 'DETTAGLIATO'} 
+                          onChange={() => setShipmentFormTipoTransito('DETTAGLIATO')} 
                           className="text-blue-600 focus:ring-blue-500"
                         />
-                        Movimentazione Interna (Aziendale)
+                        Transito Dettagliato (Con Spedizioni Multi-drop)
                       </label>
                     </div>
                   </div>
@@ -5208,6 +5213,26 @@ export const MonitorYard: React.FC = () => {
                       onChange={(e) => setShipmentFormHubDestinazioneOperativo(e.target.value)}
                       required
                     />
+                    {shipmentFormTipoTransito === 'FTL' && (
+                      <>
+                        <Input
+                          label="Totale Pallet *"
+                          type="number"
+                          value={ftlPallet.toString()}
+                          onChange={(e) => setFtlPallet(Number(e.target.value))}
+                          min="0"
+                          required
+                        />
+                        <Input
+                          label="Totale Peso (kg) *"
+                          type="number"
+                          value={ftlWeight.toString()}
+                          onChange={(e) => setFtlWeight(Number(e.target.value))}
+                          min="0"
+                          required
+                        />
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -5235,7 +5260,35 @@ export const MonitorYard: React.FC = () => {
                 </span>
               </div>
 
+              {/* CONTROLLO SOGLIE HEADER (Per FTL o globale) */}
+              {((shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'FTL' && (ftlPallet > 33 || ftlWeight > 28000)) || 
+                (tripShipments.reduce((acc, row) => acc + (row.palletPlaces || 0), 0) > 33) ||
+                (tripShipments.reduce((acc, row) => acc + (row.grossWeight || 0), 0) > 28000)
+              ) && (
+                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg mt-4 shadow-sm animate-pulse-fast">
+                  <div className="flex gap-3">
+                    <span className="text-xl">⚠️</span>
+                    <div className="flex-1">
+                      <h4 className="text-xs font-bold text-yellow-800 uppercase tracking-wide">Attenzione: Limiti di carico superati!</h4>
+                      <p className="text-[10px] text-yellow-700 mt-1 mb-2">
+                        I valori totali di Pallet (&gt; 33) o Peso (&gt; 28000 kg) superano le soglie di sistema. 
+                        È obbligatorio inserire una nota giustificativa per poter procedere al salvataggio.
+                      </p>
+                      <textarea
+                        className="w-full text-xs p-2 rounded border border-yellow-300 focus:ring-yellow-500 focus:border-yellow-500 bg-white shadow-inner"
+                        placeholder="Es. Trasporto eccezionale autorizzato da..."
+                        value={tripJustificationNote}
+                        onChange={(e) => setTripJustificationNote(e.target.value)}
+                        rows={2}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* TRIP BUILDER: LISTA SPEDIZIONI */}
+              {!(shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'FTL') && (
               <div className="border-t border-black/5 pt-4">
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-[10px] font-mono font-bold uppercase tracking-wider text-orange-600">Spedizioni del Viaggio</h4>
@@ -5247,7 +5300,7 @@ export const MonitorYard: React.FC = () => {
                       <tr className="bg-gray-100 border-b border-black/10">
                         <th className="p-2 w-10 text-center text-[10px] font-mono text-gray-500 uppercase">Seq</th>
                         <th className="p-2 w-64 text-[10px] font-mono text-gray-500 uppercase">Riferimenti Delivery *</th>
-                        <th className="p-2 min-w-[300px] text-[10px] font-mono text-gray-500 uppercase">{shipmentFormTipoOperazioneHub === 'OUTBOUND' ? 'Dati Destinatario' : 'Dati Mittente'}</th>
+                        <th className="p-2 min-w-[300px] text-[10px] font-mono text-gray-500 uppercase">{(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? 'Dati Destinatario' : 'Dati Mittente'}</th>
                         <th className="p-2 w-20 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-l border-orange-200 uppercase text-center">Pallet</th>
                         <th className="p-2 w-24 text-[10px] font-mono font-bold text-orange-700 bg-orange-100 border-r border-orange-200 uppercase text-center">Peso (kg)</th>
                         <th className="p-2 w-32 text-[10px] font-mono text-gray-500 uppercase">Annotazioni</th>
@@ -5260,27 +5313,36 @@ export const MonitorYard: React.FC = () => {
                           <td className="p-4 text-center font-mono font-bold text-gray-400 border-r border-black/5 align-top">{index + 1}</td>
                           <td className="p-4 align-top border-r border-black/5">
                             <div className="space-y-2">
+                              {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (
+                                <select
+                                  className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold bg-blue-50 text-blue-800"
+                                  value={row.deliveryType || 'DIRETTA'}
+                                  onChange={(e) => {
+                                    const newTripShipments = [...tripShipments];
+                                    newTripShipments[index].deliveryType = e.target.value as 'DIRETTA' | 'CORRISPONDENTE';
+                                    setTripShipments(newTripShipments);
+                                  }}
+                                >
+                                  <option value="DIRETTA">Consegna Diretta</option>
+                                  <option value="CORRISPONDENTE">Passaggio a Corrispondente</option>
+                                </select>
+                              )}
                               <select
-                                className={`w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold ${shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-white text-gray-700'}`}
-                                value={shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO' ? 'INTERNO' : (row.clientId || '')}
+                                className={`w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold bg-white text-gray-700`}
+                                value={row.clientId || ''}
                                 onChange={(e) => {
                                   const newTripShipments = [...tripShipments];
                                   newTripShipments[index].clientId = e.target.value;
                                   setTripShipments(newTripShipments);
                                 }}
                                 required
-                                disabled={shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO'}
                               >
-                                {shipmentFormTipoOperazioneHub === 'TRANSITO' && shipmentFormTipoTransito === 'INTERNO' ? (
-                                  <option value="INTERNO">Movimentazione Interna (Aziendale)</option>
-                                ) : (
-                                  <>
-                                    <option value="" disabled>Seleziona Committente...</option>
-                                    {clients.map(c => (
-                                      <option key={c.id} value={c.id}>{c.name}</option>
-                                    ))}
-                                  </>
-                                )}
+                                <>
+                                  <option value="" disabled>Seleziona Committente...</option>
+                                  {clients.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  ))}
+                                </>
                               </select>
                               <input 
                                 type="text" 
@@ -5324,11 +5386,11 @@ export const MonitorYard: React.FC = () => {
                                   <input 
                                     type="text" 
                                     className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none font-bold text-gray-800" 
-                                    placeholder={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? "Nome Destinatario" : "Nome Mittente"}
-                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationName || '' : row.realOriginName || ''}
+                                    placeholder={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? "Nome Destinatario" : "Nome Mittente"}
+                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationName || '' : row.realOriginName || ''}
                                     onChange={(e) => {
                                       const newTripShipments = [...tripShipments];
-                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationName = e.target.value.toUpperCase();
+                                      if ((shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO')) newTripShipments[index].realDestinationName = e.target.value.toUpperCase();
                                       else newTripShipments[index].realOriginName = e.target.value.toUpperCase();
                                       setTripShipments(newTripShipments);
                                     }}
@@ -5337,19 +5399,19 @@ export const MonitorYard: React.FC = () => {
                                     type="text" 
                                     className="w-full border border-black/10 rounded-lg p-1.5 text-xs focus:ring-1 focus:ring-blue-500 outline-none" 
                                     placeholder="Indirizzo (es. Via Roma 1)"
-                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
+                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationAddress || '' : row.realOriginAddress || ''}
                                     onChange={(e) => {
                                       const newTripShipments = [...tripShipments];
-                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') newTripShipments[index].realDestinationAddress = e.target.value.toUpperCase();
+                                      if ((shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO')) newTripShipments[index].realDestinationAddress = e.target.value.toUpperCase();
                                       else newTripShipments[index].realOriginAddress = e.target.value.toUpperCase();
                                       setTripShipments(newTripShipments);
                                     }}
                                   />
                                   <TerritoryAutocomplete
-                                    value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCity || '' : row.realOriginCity || ''}
+                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationCity || '' : row.realOriginCity || ''}
                                     onChange={(val, record) => {
                                       const newTripShipments = [...tripShipments];
-                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
+                                      if ((shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO')) {
                                         newTripShipments[index].realDestinationCity = record ? record.comune : val;
                                         if (record) {
                                           newTripShipments[index].realDestinationCap = record.cap;
@@ -5371,21 +5433,21 @@ export const MonitorYard: React.FC = () => {
                                     <input 
                                       type="text" 
                                       placeholder="CAP"
-                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCap || '' : row.realOriginCap || ''}
+                                      value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationCap || '' : row.realOriginCap || ''}
                                       readOnly
                                       className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
                                     />
                                     <input 
                                       type="text" 
                                       placeholder="Prov"
-                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationProvince || '' : row.realOriginProvince || ''}
+                                      value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationProvince || '' : row.realOriginProvince || ''}
                                       readOnly
                                       className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
                                     />
                                     <input 
                                       type="text" 
                                       placeholder="Nazione"
-                                      value={shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCountry || 'Italia' : row.realOriginCountry || 'Italia'}
+                                      value={(shipmentFormTipoOperazioneHub === 'OUTBOUND' || shipmentFormTipoOperazioneHub === 'TRANSITO') ? row.realDestinationCountry || 'Italia' : row.realOriginCountry || 'Italia'}
                                       readOnly
                                       className="w-1/3 border border-black/5 bg-gray-50 rounded-lg p-1.5 text-xs text-gray-500 outline-none"
                                     />
@@ -5497,7 +5559,6 @@ export const MonitorYard: React.FC = () => {
                     + Salva Spedizione e Aggiungi Nuova Riga
                   </Button>
                 </div>
-              </div>
 
               {/* CONTROLLO LIMITI */}
               {(() => {
@@ -5510,7 +5571,7 @@ export const MonitorYard: React.FC = () => {
                 const isOverLimit = currentTotalPallets > maxPallets || currentTotalWeight > maxWeight;
 
                 return (
-                  <div className={`border rounded-xl p-4 transition-colors ${isOverLimit ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-black/5'}`}>
+                  <div className={`border rounded-xl p-4 mt-4 transition-colors ${isOverLimit ? 'bg-orange-50 border-orange-200' : 'bg-gray-50 border-black/5'}`}>
                     <div className="flex justify-between items-center text-xs font-mono">
                       <div className="flex flex-col gap-1">
                         <span className="text-gray-500 uppercase tracking-wider text-[9px]">Totale Pallet</span>
@@ -5544,6 +5605,8 @@ export const MonitorYard: React.FC = () => {
                   </div>
                 );
               })()}
+              </div>
+              )}
 
               <div className="flex gap-2 p-4 border-t border-black/5 bg-gray-50 -mx-6 -mb-6">
                 <Button 

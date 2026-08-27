@@ -190,7 +190,8 @@ export interface Shipment {
   hubOrigineOperativo?: string;
   hubDestinazioneOperativo?: string;
   tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND' | 'TRANSITO';
-  tipoTransito?: 'COMMITTENTE' | 'INTERNO';
+  tipoTransito?: 'FTL' | 'DETTAGLIATO';
+  deliveryType?: 'DIRETTA' | 'CORRISPONDENTE';
   routingStatus?: 'CONFERMATO' | 'DA_CONFERMARE';
   routingNotes?: string;
   sequence?: number; // Sequenza di carico/scarico nel Viaggio
