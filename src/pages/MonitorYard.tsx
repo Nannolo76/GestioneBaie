@@ -5383,10 +5383,15 @@ export const MonitorYard: React.FC = () => {
                                     }}
                                   >
                                     <option value="" disabled>Seleziona Nodo Anagrafico...</option>
-                                    {depots.filter(d => row.tipoStop === 'HUB_TRANSIT' ? d.type === 'HUB' : d.type === 'CORRISPONDENTE').map(d => (
+                                    {depots.filter(d => row.tipoStop === 'HUB_TRANSIT' ? (d.type === 'HUB' || !d.type) : d.type === 'CORRISPONDENTE').map(d => (
                                       <option key={d.id} value={d.id}>{d.name}</option>
                                     ))}
                                   </select>
+                                  {depots.filter(d => row.tipoStop === 'HUB_TRANSIT' ? (d.type === 'HUB' || !d.type) : d.type === 'CORRISPONDENTE').length === 0 && (
+                                    <p className="text-[10px] text-red-500 bg-red-50 p-1 rounded font-medium border border-red-200 text-left mt-1">
+                                      Nessun {row.tipoStop === 'HUB_TRANSIT' ? 'Hub' : 'Corrispondente'} anagrafico trovato. Per procedere, creane uno dal Pannello Admin.
+                                    </p>
+                                  )}
                                 </div>
                               )}
                               
