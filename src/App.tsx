@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { AlertProvider } from './context/AlertContext';
 import { Sidebar } from './components/Sidebar';
 import { MonitorYard } from './pages/MonitorYard';
 import { PortaleVettori } from './pages/PortaleVettori';
@@ -69,9 +70,11 @@ function AppContent() {
 
 function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <AlertProvider>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </AlertProvider>
   );
 }
 

@@ -9,7 +9,8 @@ import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
 
 import type { Booking, Bay, BookingNote, Shipment } from '../types';
-
+import { TripRouteSequence } from '../components/ui/TripRouteSequence';
+import { useAlert } from '../context/AlertContext';
 export interface TripGroup {
   id: string;
   tripId: string;
@@ -75,7 +76,8 @@ export const MonitorYard: React.FC = () => {
     updateShipment,
     systemParameters
   } = useApp();
-
+  
+  const alert = useAlert();
   // Stato navigazione sottomenu a sinistra (Opzione A)
   const [guardiolaView, setGuardiolaView] = useState<'station' | 'bays' | 'gate' | 'expected' | 'rapid' | 'schedule' | 'anomalies'>('station');
   
@@ -2160,42 +2162,83 @@ export const MonitorYard: React.FC = () => {
                       />
                     </div>
                     <div className="space-y-4 max-h-[350px] overflow-y-auto">
-                      {shipments
-                        .filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO' && s.routingStatus !== 'DA_CONFERMARE')
-                        .filter(s => {
-                          if (!unboundSearchTerm) return true;
-                          const term = unboundSearchTerm.toLowerCase();
+                      {(() => {
+                        const unboundShipmentsFiltered = shipments
+                          .filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO' && s.routingStatus !== 'DA_CONFERMARE')
+                          .filter(s => {
+                            if (!unboundSearchTerm) return true;
+                            const term = unboundSearchTerm.toLowerCase();
+                            return (
+                              (s.orderNumber && s.orderNumber.toLowerCase().includes(term)) ||
+                              (s.orderNumber2 && s.orderNumber2.toLowerCase().includes(term)) ||
+                              (s.tripId && s.tripId.toLowerCase().includes(term)) ||
+                              (s.deliveryNotes && s.deliveryNotes.toLowerCase().includes(term))
+                            );
+                          });
+
+                        const unboundGroupsMap = new Map<string, TripGroup>();
+                        unboundShipmentsFiltered.forEach(s => {
+                          const tripKey = s.tripId || s.id;
+                          if (!unboundGroupsMap.has(tripKey)) {
+                            unboundGroupsMap.set(tripKey, {
+                              id: tripKey,
+                              tripId: s.tripId || '',
+                              isMasterTrip: !!s.tripId,
+                              activityType: s.activityType,
+                              carrierId: s.carrierId,
+                              totalPallets: 0,
+                              totalGrossWeight: 0,
+                              status: s.status,
+                              origin: '',
+                              originCity: '',
+                              destination: '',
+                              destinationCity: '',
+                              expectedDate: s.expectedDate,
+                              expectedTime: s.expectedTime,
+                              shipments: []
+                            });
+                          }
+                          const g = unboundGroupsMap.get(tripKey)!;
+                          g.shipments.push(s);
+                          g.totalPallets += s.palletPlaces || 0;
+                          g.totalGrossWeight += s.grossWeight || 0;
+                        });
+                        
+                        const unboundGroups = Array.from(unboundGroupsMap.values());
+                        
+                        if (unboundGroups.length === 0) {
                           return (
-                            (s.orderNumber && s.orderNumber.toLowerCase().includes(term)) ||
-                            (s.orderNumber2 && s.orderNumber2.toLowerCase().includes(term)) ||
-                            (s.tripId && s.tripId.toLowerCase().includes(term)) ||
-                            (s.deliveryNotes && s.deliveryNotes.toLowerCase().includes(term))
+                            <div className="text-center py-6 text-gray-400 italic text-xs">
+                              Nessun viaggio orfano in attesa.
+                            </div>
                           );
-                        })
-                        .map(s => {
-                          const clientName = clientMap.get(s.clientId) || s.clientId || 'Generico';
-                          const isLinking = activeLinkingShipmentId === s.id;
-                          
-                          // Filtra i mezzi attivi presenti in Yard
+                        }
+
+                        return unboundGroups.map(g => {
+                          const clientName = g.shipments.length === 1 ? (clientMap.get(g.shipments[0].clientId) || g.shipments[0].clientId) : 'Multi-Committente';
+                          const isLinking = activeLinkingShipmentId === g.id;
                           const activeYardVehicles = bookings.filter(b => b.depotId === selectedDepotId && b.status !== 'COMPLETATO');
 
                           return (
-                            <div key={s.id} className="p-3 bg-gray-50 border border-black/5 rounded-xl space-y-2">
+                            <div key={g.id} className="p-3 bg-gray-50 border border-black/5 rounded-xl space-y-3">
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <span className="font-bold font-mono text-ticket-accent text-xs block">{s.orderNumber}</span>
-                                  {s.orderNumber2 && <span className="text-[10px] text-gray-400 block font-mono">Ref 2: {s.orderNumber2}</span>}
-                                  <span className="text-[10px] font-sans text-gray-700 block mt-0.5">
-                                    Cliente: <span className="font-bold">{clientName}</span> | {s.palletPlaces} PLT | {s.activityType}
+                                  <span className="font-bold font-mono text-ticket-accent text-xs block bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded w-max border border-blue-200">
+                                    {g.tripId ? `VIAGGIO INT: ${g.tripId}` : 'SPEDIZIONE SINGOLA'}
+                                  </span>
+                                  <span className="text-[10px] font-sans text-gray-700 block mt-1">
+                                    Client: <span className="font-bold">{clientName}</span> | {g.totalPallets} PLT | {g.activityType}
                                   </span>
                                 </div>
                                 <span className="text-[10px] font-mono bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded">
-                                  {s.expectedTime ? `${s.expectedDate} [${s.expectedTime}]` : s.expectedDate}
+                                  {g.expectedTime ? `${g.expectedDate} [${g.expectedTime}]` : g.expectedDate}
                                 </span>
                               </div>
+                              
+                              <TripRouteSequence shipments={g.shipments} depots={depots} selectedDepotId={selectedDepotId} />
 
                               {isLinking ? (
-                                <div className="p-2 bg-white border border-amber-500/30 rounded-lg space-y-2 font-sans">
+                                <div className="p-2 bg-white border border-amber-500/30 rounded-lg space-y-2 font-sans mt-2">
                                   <label className="block text-[9px] font-mono uppercase text-gray-500">Seleziona Veicolo in Yard:</label>
                                   <select
                                     value={linkingBookingId}
@@ -2218,69 +2261,92 @@ export const MonitorYard: React.FC = () => {
                                       variant="success"
                                       disabled={!linkingBookingId}
                                       onClick={() => {
-                                        const shipmentsToBind = [s.id];
-                                        
-                                        if (s.tripId) {
-                                          const relatedShipments = shipments.filter(
-                                            other => other.depotId === selectedDepotId && 
-                                                     !other.bookingId && 
-                                                     other.status !== 'COMPLETATO' && 
-                                                     other.routingStatus !== 'DA_CONFERMARE' &&
-                                                     other.tripId === s.tripId && 
-                                                     other.id !== s.id
-                                          );
-                                          
-                                          if (relatedShipments.length > 0) {
-                                            const confirmMsg = `Questa spedizione fa parte del viaggio "${s.tripId}" assieme ad altre ${relatedShipments.length} spedizioni in attesa.\n\nVuoi collegare anche tutte le altre spedizioni dello stesso viaggio a questo veicolo?`;
-                                            if (window.confirm(confirmMsg)) {
-                                              shipmentsToBind.push(...relatedShipments.map(r => r.id));
-                                            }
-                                          }
-                                        }
-                                        
+                                        const shipmentsToBind = g.shipments.map(s => s.id);
                                         bindShipmentsToBooking(shipmentsToBind, linkingBookingId);
                                         setActiveLinkingShipmentId(null);
                                         setLinkingBookingId('');
+                                        alert.showAlert({
+                                          title: 'Operazione completata',
+                                          message: `Tutte le ${shipmentsToBind.length} spedizioni del viaggio sono state associate al veicolo con successo.`,
+                                          type: 'success'
+                                        });
                                       }}
                                     >
-                                      Conferma Abbina
+                                      Conferma Abbina Viaggio
                                     </Button>
                                   </div>
                                 </div>
                               ) : (
                                 <div className="flex justify-end pt-1">
-                                  <Button size="sm" variant="primary" className="text-[10px]" onClick={() => { setActiveLinkingShipmentId(s.id); setLinkingBookingId(''); }}>
-                                    🔗 Collega a Veicolo
+                                  <Button size="sm" variant="primary" className="text-[10px]" onClick={() => { setActiveLinkingShipmentId(g.id); setLinkingBookingId(''); }}>
+                                    🔗 Collega Viaggio a Veicolo
                                   </Button>
                                 </div>
                               )}
                             </div>
                           );
-                        })}
-                      {shipments.filter(s => s.depotId === selectedDepotId && !s.bookingId && s.status !== 'COMPLETATO').length === 0 && (
-                        <div className="text-center py-6 text-gray-400 italic text-xs">
-                          Nessuna spedizione orfana in attesa.
-                        </div>
-                      )}
+                        });
+                      })()}
                     </div>
                   </Card>
 
                   {/* Spedizioni associate attive (Mezzi fisici) */}
                   <Card title="Mezzi fisici" accent="green">
                     <div className="space-y-4 max-h-[350px] overflow-y-auto">
-                      {shipments
-                        .filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO')
-                        .map(s => {
-                          const clientName = clientMap.get(s.clientId) || s.clientId || 'Generico';
-                          const carrierName = carrierMap.get(s.carrierId) || s.carrierId || 'Vettore';
-                          const booking = bookingMap.get(s.bookingId || '');
+                      {(() => {
+                        const boundShipmentsFiltered = shipments.filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO');
+                        
+                        const boundGroupsMap = new Map<string, TripGroup>();
+                        boundShipmentsFiltered.forEach(s => {
+                          const tripKey = s.tripId || s.id;
+                          if (!boundGroupsMap.has(tripKey)) {
+                            boundGroupsMap.set(tripKey, {
+                              id: tripKey,
+                              tripId: s.tripId || '',
+                              isMasterTrip: !!s.tripId,
+                              activityType: s.activityType,
+                              carrierId: s.carrierId,
+                              totalPallets: 0,
+                              totalGrossWeight: 0,
+                              status: s.status,
+                              origin: '',
+                              originCity: '',
+                              destination: '',
+                              destinationCity: '',
+                              expectedDate: s.expectedDate,
+                              expectedTime: s.expectedTime,
+                              shipments: []
+                            });
+                          }
+                          const g = boundGroupsMap.get(tripKey)!;
+                          g.shipments.push(s);
+                          g.totalPallets += s.palletPlaces || 0;
+                          g.totalGrossWeight += s.grossWeight || 0;
+                        });
+                        
+                        const boundGroups = Array.from(boundGroupsMap.values());
+                        
+                        if (boundGroups.length === 0) {
+                          return (
+                            <div className="text-center py-6 text-gray-400 italic text-xs">
+                              Nessun viaggio associato attivo al momento.
+                            </div>
+                          );
+                        }
+
+                        return boundGroups.map(g => {
+                          const clientName = g.shipments.length === 1 ? (clientMap.get(g.shipments[0].clientId) || g.shipments[0].clientId) : 'Multi-Committente';
+                          const carrierName = carrierMap.get(g.carrierId) || g.carrierId || 'Vettore';
+                          const booking = bookingMap.get(g.shipments[0].bookingId || '');
 
                           return (
-                            <div key={s.id} className="p-3 bg-white border border-emerald-100 rounded-xl space-y-2 shadow-xs">
+                            <div key={g.id} className="p-3 bg-white border border-emerald-100 rounded-xl space-y-3 shadow-xs">
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <span className="font-bold font-mono text-emerald-600 text-xs block">{s.orderNumber}</span>
-                                  <span className="text-[10px] font-sans text-gray-700 block mt-0.5">
+                                  <span className="font-bold font-mono text-emerald-600 text-xs block bg-emerald-50 px-1.5 py-0.5 rounded w-max border border-emerald-200">
+                                    {g.tripId ? `VIAGGIO INT: ${g.tripId}` : 'SPEDIZIONE SINGOLA'}
+                                  </span>
+                                  <span className="text-[10px] font-sans text-gray-700 block mt-1">
                                     Cliente: <span className="font-bold">{clientName}</span> | Vettore: <span className="font-bold">{carrierName}</span>
                                   </span>
                                   <span className="text-[10px] font-mono text-gray-400 block mt-1">
@@ -2291,19 +2357,26 @@ export const MonitorYard: React.FC = () => {
                                   size="sm"
                                   variant="danger"
                                   className="text-[9px] py-1 px-2"
-                                  onClick={() => unbindShipmentFromBooking(s.id)}
+                                  onClick={() => {
+                                    alert.showAlert({
+                                      title: 'Conferma Scollegamento',
+                                      message: `Sei sicuro di voler scollegare l'intero viaggio dal veicolo? (${g.shipments.length} spedizioni verranno rimosse dal veicolo)`,
+                                      type: 'warning',
+                                      confirmLabel: 'Scollega',
+                                      onConfirm: () => {
+                                        g.shipments.forEach(s => unbindShipmentFromBooking(s.id));
+                                      }
+                                    });
+                                  }}
                                 >
-                                  Scollega
+                                  Scollega Viaggio
                                 </Button>
                               </div>
+                              <TripRouteSequence shipments={g.shipments} depots={depots} selectedDepotId={selectedDepotId} />
                             </div>
                           );
-                        })}
-                      {shipments.filter(s => s.depotId === selectedDepotId && s.bookingId && s.status !== 'COMPLETATO').length === 0 && (
-                        <div className="text-center py-6 text-gray-400 italic text-xs">
-                          Nessuna spedizione associata attiva al momento.
-                        </div>
-                      )}
+                        });
+                      })()}
                     </div>
                   </Card>
                 </div>
@@ -2529,9 +2602,15 @@ export const MonitorYard: React.FC = () => {
                                     <td className="p-2 text-center font-mono text-gray-400">{idx + 1}</td>
                                     <td className="p-2 font-mono text-ticket-accent font-bold">{s.orderNumber}</td>
                                     <td className="p-2">
-                                      <div className="font-bold">{clientName}</div>
+                                      <div className="font-bold">
+                                        {s.tipoStop === 'HUB_TRANSIT' || s.tipoStop === 'CORRISPONDENTE' 
+                                          ? (s.destinationNodeName || 'Hub/Corrispondente')
+                                          : (s.realDestinationName || s.subjectName || clientName)}
+                                      </div>
                                       <div className="text-[10px] text-gray-500 truncate max-w-[200px]">
-                                        {s.city || s.originOrDestination || 'N/D'} {s.province && `(${s.province})`}
+                                        {s.tipoStop === 'HUB_TRANSIT' || s.tipoStop === 'CORRISPONDENTE'
+                                          ? 'Transito di Rete'
+                                          : `${s.realDestinationCity || s.city || s.originOrDestination || 'Destinazione Sconosciuta'} ${s.realDestinationProvince || s.province ? `(${s.realDestinationProvince || s.province})` : ''}`}
                                       </div>
                                     </td>
                                     <td className="p-2 text-right font-mono font-bold">{s.palletPlaces}</td>
