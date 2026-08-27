@@ -19,8 +19,8 @@ interface AppContextType {
   currentUser: User | null;
   currentCarrierId: string;
   selectedDepotId: string;
-  addDepot: (name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => void;
-  updateDepot: (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => void;
+  addDepot: (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type?: 'HUB' | 'CORRISPONDENTE') => void;
+  updateDepot: (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type?: 'HUB' | 'CORRISPONDENTE') => void;
   deleteDepot: (id: string) => void;
   addWarehouseModule: (depotId: string, name: string, description?: string) => void;
   updateWarehouseModule: (id: string, depotId: string, name: string, description?: string) => void;
@@ -569,17 +569,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- AZIONI CONFIGURAZIONE / ADMIN ---
-  const addDepot = (name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => {
+  const addDepot = (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB') => {
     const id = `depot-${Date.now()}`;
-    const newDepot: Depot = { id, name, city, address, cap, province, country };
+    const newDepot: Depot = { id, name, city, address, cap, province, country, type };
     setDepots((prev) => [...prev, newDepot]);
-    logActivity(id, `Creato nuovo stabilimento Plant: ${name} (${city})`, 'SUCCESS');
+    logActivity(id, `Creato nuovo stabilimento/nodo: ${name} (${city})`, 'SUCCESS');
     saveAction('ADD_DEPOT', newDepot);
   };
 
-  const updateDepot = (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string) => {
-    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city, address, cap, province, country } : d)));
-    logActivity(selectedDepotId, `Aggiornato stabilimento: ${name} (${city})`, 'INFO');
+  const updateDepot = (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB') => {
+    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city, address, cap, province, country, type } : d)));
+    logActivity(selectedDepotId, `Aggiornato nodo: ${name} (${city})`, 'INFO');
     saveAction('UPDATE_DEPOT', { id, name, city, address, cap, province, country });
   };
 

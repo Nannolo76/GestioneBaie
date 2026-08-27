@@ -192,6 +192,8 @@ export interface Shipment {
   hubDestinazioneOperativo?: string;
   tipoOperazioneHub?: 'INBOUND' | 'OUTBOUND';
   tipoStop?: 'DIRETTA' | 'HUB_TRANSIT' | 'CORRISPONDENTE';
+  destinationNodeId?: string; // ID of the Hub or Corrispondente selected
+  destinationNodeName?: string; // Name of the Hub or Corrispondente selected
   routingStatus?: 'CONFERMATO' | 'DA_CONFERMARE';
   routingNotes?: string;
   sequence?: number; // Sequenza di carico/scarico nel Viaggio

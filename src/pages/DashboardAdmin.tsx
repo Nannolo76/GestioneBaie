@@ -56,10 +56,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     deletePalletType,
     addUser,
     updateUser,
-    deleteUser,
-    addShipment,
-    updateShipmentStatus,
-    deleteShipment
+    deleteUser
   } = useApp();
 
   const [comuni, setComuni] = useState<any[]>([]);
@@ -85,14 +82,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newHubCap, setNewHubCap] = useState('');
   const [newHubProvince, setNewHubProvince] = useState('');
   const [newHubCountry, setNewHubCountry] = useState('Italia');
+  const [newHubType, setNewHubType] = useState<'HUB' | 'CORRISPONDENTE'>('HUB');
 
   // Stati Autocomplete
   const [filteredHubComuni, setFilteredHubComuni] = useState<any[]>([]);
   const [showHubSuggestions, setShowHubSuggestions] = useState(false);
   const [filteredEditHubComuni, setFilteredEditHubComuni] = useState<any[]>([]);
   const [showEditHubSuggestions, setShowEditHubSuggestions] = useState(false);
-  const [filteredShipComuni, setFilteredShipComuni] = useState<any[]>([]);
-  const [showShipSuggestions, setShowShipSuggestions] = useState(false);
 
   // Stati Baia
   const [selectedHubForBay, setSelectedHubForBay] = useState(depots[0]?.id || '');
@@ -135,19 +131,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   const [newPalletName, setNewPalletName] = useState('');
   const [newPalletDesc, setNewPalletDesc] = useState('');
 
-  // Stati Spedizioni
-  const [newShipClientId, setNewShipClientId] = useState('');
-  const [newShipCarrierId, setNewShipCarrierId] = useState('');
-  const [newShipDepotId, setNewShipDepotId] = useState(depots[0]?.id || '');
-  const [newShipOrderNum, setNewShipOrderNum] = useState('');
-  const [newShipOrderNum2, setNewShipOrderNum2] = useState('');
-  const [newShipActivityType, setNewShipActivityType] = useState<'CARICO' | 'SCARICO' | 'RESO' | 'CONTAINER'>('CARICO');
-  const [newShipPalletPlaces, setNewShipPalletPlaces] = useState<number>(24);
-  const [newShipExpectedDate, setNewShipExpectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newShipExpectedTime, setNewShipExpectedTime] = useState('');
-  const [newShipOriginOrDestination, setNewShipOriginOrDestination] = useState('');
-  const [newShipGoodsType, setNewShipGoodsType] = useState('');
-  const [newShipExpectedDeliveryDate, setNewShipExpectedDeliveryDate] = useState('');
+
 
   const [newUserName, setNewUserName] = useState('');
   const [newUserUsername, setNewUserUsername] = useState('');
@@ -245,46 +229,27 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     setShowEditHubSuggestions(false);
   };
 
-  const handleShipOriginOrDestChange = (val: string) => {
-    setNewShipOriginOrDestination(val);
-    if (!val) {
-      setFilteredShipComuni([]);
-      return;
-    }
-    const filtered = (comuni || []).filter(c => 
-      c.comune.toLowerCase().includes(val.toLowerCase()) ||
-      c.provincia.toLowerCase().includes(val.toLowerCase()) ||
-      c.cap.startsWith(val)
-    );
-    setFilteredShipComuni(filtered.slice(0, 6));
-    setShowShipSuggestions(true);
-  };
-
-  const handleSelectShipComune = (c: { comune: string; cap: string; provincia: string }) => {
-    setNewShipOriginOrDestination(`${c.comune} (${c.provincia}) - ${c.cap}`);
-    setFilteredShipComuni([]);
-    setShowShipSuggestions(false);
-  };
 
   useEffect(() => {
     if (depots.length > 0) {
-      if (!selectedHubForBay) setSelectedHubForBay(depots[0].id);
-      if (!newModHubId) setNewModHubId(depots[0].id);
-      if (!newShipDepotId) setNewShipDepotId(depots[0].id);
+      const hubs = depots.filter(d => d.type === 'HUB' || !d.type);
+      if (!selectedHubForBay && hubs.length > 0) setSelectedHubForBay(hubs[0].id);
+      if (!newModHubId && hubs.length > 0) setNewModHubId(hubs[0].id);
     }
-  }, [depots, selectedHubForBay, newModHubId, newShipDepotId]);
+  }, [depots, selectedHubForBay, newModHubId]);
 
   // Form Submits
   const handleAddHub = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newHubName || !newHubCity) return;
-    addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry);
+    addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry, newHubType);
     setNewHubName('');
     setNewHubCity('');
     setNewHubAddress('');
     setNewHubCap('');
     setNewHubProvince('');
     setNewHubCountry('Italia');
+    setNewHubType('HUB');
   };
 
   const handleAddBay = (e: React.FormEvent) => {
@@ -464,37 +429,6 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     setNewPalletDesc('');
   };
 
-  const handleAddShipment = (e: React.FormEvent) => {
-    e.preventDefault();
-    const cId = newShipClientId || clients[0]?.id;
-    const carrId = newShipCarrierId || carriers.filter(c => c.status === 'APPROVATO')[0]?.id;
-    const dId = newShipDepotId || depots[0]?.id;
-    if (!cId || !carrId || !dId || !newShipOrderNum) return;
-    addShipment({
-      clientId: cId,
-      carrierId: carrId,
-      depotId: dId,
-      orderNumber: newShipOrderNum,
-      orderNumber2: newShipOrderNum2 || undefined,
-      activityType: newShipActivityType,
-      palletPlaces: newShipPalletPlaces,
-      expectedDate: newShipExpectedDate,
-      expectedTime: newShipExpectedTime || undefined,
-      originOrDestination: newShipOriginOrDestination,
-      goodsType: newShipGoodsType || undefined,
-      expectedDeliveryDate: newShipExpectedDeliveryDate || undefined,
-      hubOrigineOperativo: newShipActivityType === 'SCARICO' ? dId : undefined,
-      hubDestinazioneOperativo: newShipActivityType === 'CARICO' ? dId : undefined,
-      tipoOperazioneHub: newShipActivityType === 'SCARICO' ? 'INBOUND' : 'OUTBOUND'
-    });
-    setNewShipOrderNum('');
-    setNewShipOrderNum2('');
-    setNewShipPalletPlaces(24);
-    setNewShipExpectedTime('');
-    setNewShipOriginOrDestination('');
-    setNewShipGoodsType('');
-    setNewShipExpectedDeliveryDate('');
-  };
 
   const activeHubModules = warehouseModules.filter((m) => m.depotId === selectedHubForBay);
 
@@ -600,14 +534,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
         >
           🪵 Tipologie Pallet ({palletTypes.length})
         </button>
-        <button
-          onClick={() => setAdminTab('shipments')}
-          className={`px-3 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
-            adminTab === 'shipments' ? 'border-ticket-accent text-ticket-accent bg-white/50' : 'border-transparent text-gray-400 hover:text-black hover:bg-white/20'
-          }`}
-        >
-          🚢 Spedizioni / Viaggi ({shipments.length})
-        </button>
+
         <button
           onClick={() => setAdminTab('comuni')}
           className={`px-3 py-2 font-bold uppercase transition-all border-b-2 rounded-t-lg cursor-pointer ${
@@ -629,6 +556,16 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   placeholder="Es. Milano Logistics Plant"
                   value={newHubName}
                   onChange={(e) => setNewHubName(e.target.value)}
+                  required
+                />
+                <Select
+                  label="Tipologia Nodo"
+                  value={newHubType}
+                  onChange={(e) => setNewHubType(e.target.value as 'HUB' | 'CORRISPONDENTE')}
+                  options={[
+                    { value: 'HUB', label: 'HUB Interno' },
+                    { value: 'CORRISPONDENTE', label: 'Corrispondente Esterno' }
+                  ]}
                   required
                 />
                 <Input
@@ -696,7 +633,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
               <form onSubmit={handleAddBay} className="space-y-4">
                 <Select
                   label="Stabilimento Plant Ass."
-                  options={depots.map(d => ({ value: d.id, label: `${d.name} (${d.city})` }))}
+                  options={depots.filter(d => d.type === 'HUB' || !d.type).map(d => ({ value: d.id, label: `${d.name} (${d.city})` }))}
                   value={depots.find(d => d.id === selectedHubForBay)?.name || selectedHubForBay}
                   onChange={(e) => {
                     const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
@@ -914,7 +851,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
               <form onSubmit={handleAddModule} className="space-y-4">
                 <Select
                   label="Stabilimento Plant"
-                  options={depots.map(d => ({ value: d.id, label: `${d.name} (${d.city})` }))}
+                  options={depots.filter(d => d.type === 'HUB' || !d.type).map(d => ({ value: d.id, label: `${d.name} (${d.city})` }))}
                   value={depots.find(d => d.id === newModHubId)?.name || newModHubId}
                   onChange={(e) => {
                     const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
@@ -1814,244 +1751,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
         </div>
       )}
 
-      {/* --- TAB: GESTIONE SPEDIZIONI --- */}
-      {adminTab === 'shipments' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-          <div>
-            <Card title="Nuovo Viaggio / Spedizione" accent="orange">
-              <form onSubmit={handleAddShipment} className="space-y-4">
-                <Select
-                  label="Cliente Committente *"
-                  options={clients.map(c => ({ value: c.id, label: c.name }))}
-                  value={clients.find(c => c.id === newShipClientId)?.name || (clients[0]?.name || '')}
-                  onChange={(e) => {
-                    const found = clients.find(c => c.name === e.target.value || c.id === e.target.value);
-                    if (found) setNewShipClientId(found.id);
-                  }}
-                  required
-                />
-                <Select
-                  label="Vettore Assegnato *"
-                  options={carriers.filter(c => c.status === 'APPROVATO').map(c => ({ value: c.id, label: c.name }))}
-                  value={carriers.find(c => c.id === newShipCarrierId)?.name || (carriers.filter(c => c.status === 'APPROVATO')[0]?.name || '')}
-                  onChange={(e) => {
-                    const found = carriers.find(c => c.name === e.target.value || c.id === e.target.value);
-                    if (found) setNewShipCarrierId(found.id);
-                  }}
-                  required
-                />
-                <Select
-                  label="Stabilimento Plant *"
-                  options={depots.map(d => ({ value: d.id, label: d.name }))}
-                  value={depots.find(d => d.id === newShipDepotId)?.name || (depots[0]?.name || '')}
-                  onChange={(e) => {
-                    const found = depots.find(d => d.name === e.target.value || d.id === e.target.value);
-                    if (found) setNewShipDepotId(found.id);
-                  }}
-                  required
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label="Riferimento 1 (Ref 1) *"
-                    placeholder="Es. ORD-2026-X"
-                    value={newShipOrderNum}
-                    onChange={(e) => setNewShipOrderNum(e.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Riferimento 2 (Ref 2)"
-                    placeholder="Es. REF-XYZ"
-                    value={newShipOrderNum2}
-                    onChange={(e) => setNewShipOrderNum2(e.target.value)}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label="Data Prevista *"
-                    type="date"
-                    value={newShipExpectedDate}
-                    onChange={(e) => setNewShipExpectedDate(e.target.value)}
-                    required
-                  />
-                  <Input
-                    label="Ora Prevista"
-                    placeholder="Es. 09:30"
-                    value={newShipExpectedTime}
-                    onChange={(e) => setNewShipExpectedTime(e.target.value)}
-                  />
-                </div>
-                <div className="relative">
-                  <Input
-                    label="Provenienza / Destinazione *"
-                    placeholder="Es. Hub Milano / Client Location"
-                    value={newShipOriginOrDestination}
-                    onChange={(e) => handleShipOriginOrDestChange(e.target.value)}
-                    onFocus={() => setShowShipSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowShipSuggestions(false), 200)}
-                    required
-                  />
-                  {showShipSuggestions && filteredShipComuni.length > 0 && (
-                    <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-48 overflow-y-auto font-sans text-xs text-black">
-                      {filteredShipComuni.map((c, i) => (
-                        <div
-                          key={i}
-                          onClick={() => handleSelectShipComune(c)}
-                          className="px-3 py-2 hover:bg-blue-50 cursor-pointer border-b border-slate-50 last:border-b-0 flex justify-between items-center"
-                        >
-                          <span className="font-bold text-slate-800">{c.comune}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">{c.cap} ({c.provincia})</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input
-                    label="Tipologia Merce"
-                    placeholder="Es. Alimentare"
-                    value={newShipGoodsType}
-                    onChange={(e) => setNewShipGoodsType(e.target.value)}
-                  />
-                  <Input
-                    label="Posti Pallet Previsti *"
-                    type="number"
-                    value={newShipPalletPlaces}
-                    onChange={(e) => setNewShipPalletPlaces(Number(e.target.value))}
-                    required
-                  />
-                </div>
-                <Select
-                  label="Tipo Attività *"
-                  options={[
-                    { value: 'CARICO', label: 'Spedizione (Carico)' },
-                    { value: 'SCARICO', label: 'Accettazione (Scarico)' },
-                    { value: 'RESO', label: 'Reso Merce' },
-                    { value: 'CONTAINER', label: 'Attività Container' }
-                  ]}
-                  value={newShipActivityType}
-                  onChange={(e) => setNewShipActivityType(e.target.value as any)}
-                  required
-                />
-                {newShipActivityType === 'CARICO' && (
-                  <Input
-                    label="Data Consegna Prevista"
-                    type="date"
-                    value={newShipExpectedDeliveryDate}
-                    onChange={(e) => setNewShipExpectedDeliveryDate(e.target.value)}
-                  />
-                )}
-                <Button type="submit" className="w-full">
-                  Registra Spedizione
-                </Button>
-              </form>
-            </Card>
-          </div>
 
-          <div className="lg:col-span-2">
-            <Card title="Viaggi e Spedizioni Commissionati">
-              <Table
-                data={shipments}
-                emptyMessage="Nessun viaggio commissionato."
-                columns={[
-                  {
-                    header: 'Riferimenti',
-                    accessor: (s) => (
-                      <div className="font-mono text-xs">
-                        <span className="font-bold text-ticket-accent block">{s.orderNumber}</span>
-                        {s.orderNumber2 && <span className="text-gray-400 text-[10px] block">Ref 2: {s.orderNumber2}</span>}
-                      </div>
-                    )
-                  },
-                  {
-                    header: 'Data / Ora Prev.',
-                    accessor: (s) => (
-                      <div className="text-xs font-mono">
-                        <span>{s.expectedDate}</span>
-                        {s.expectedTime && <span className="block text-ticket-accent">[{s.expectedTime}]</span>}
-                      </div>
-                    )
-                  },
-                  {
-                    header: 'Cliente / Vettore',
-                    accessor: (s) => {
-                      const clientName = clients.find(c => c.id === s.clientId)?.name || 'Sconosciuto';
-                      const carrierName = carriers.find(c => c.id === s.carrierId)?.name || 'Sconosciuto';
-                      return (
-                        <div className="text-xs font-sans">
-                          <span className="font-bold block">{clientName}</span>
-                          {s.subjectName && <span className="text-ticket-accent text-[10px] block">Sogg: {s.subjectName}</span>}
-                          <span className="text-gray-500 text-[10px] block">Vettore: {carrierName}</span>
-                        </div>
-                      );
-                    }
-                  },
-                  {
-                    header: 'Tratta / Merce',
-                    accessor: (s) => (
-                      <div className="text-xs font-sans">
-                        <span className="font-bold block">{s.city || s.originOrDestination || 'N/D'} {s.province && `(${s.province})`}</span>
-                        {s.goodsType && <span className="text-gray-500 text-[10px] block">Merce: {s.goodsType}</span>}
-                      </div>
-                    )
-                  },
-                  {
-                    header: 'Dettagli / Plt',
-                    accessor: (s) => (
-                      <div className="text-xs">
-                        <Badge variant={s.activityType === 'CARICO' ? 'info' : 'primary'}>{s.activityType}</Badge>
-                        <span className="block font-bold font-mono text-[10px] mt-0.5">{s.palletPlaces} PLT</span>
-                      </div>
-                    )
-                  },
-                  {
-                    header: 'Viaggio Abbinato',
-                    accessor: (s) => {
-                      if (s.bookingId) {
-                        const booking = bookings.find(b => b.id === s.bookingId);
-                        return (
-                          <div className="text-xs">
-                            <span className="font-bold font-mono text-emerald-600 block">{booking?.ticketNumber || 'Abbinato'}</span>
-                            {s.licensePlate && <span className="text-gray-400 text-[10px] font-mono block">Targa: {s.licensePlate}</span>}
-                          </div>
-                        );
-                      }
-                      return <span className="text-gray-400 italic text-[10px]">Non Abbinato</span>;
-                    }
-                  },
-                  {
-                    header: 'Stato',
-                    accessor: (s) => (
-                      <Badge variant={s.status === 'COMPLETATO' ? 'success' : s.status === 'PIANIFICATO' ? 'info' : 'warning'}>
-                        {s.status.replace('_', ' ')}
-                      </Badge>
-                    )
-                  },
-                  {
-                    header: 'Azioni',
-                    accessor: (s) => (
-                      <div className="flex gap-1">
-                        {s.status === 'DA_PIANIFICARE' && (
-                          <Button size="sm" variant="success" onClick={() => updateShipmentStatus(s.id, 'PIANIFICATO')}>
-                            Pianificato
-                          </Button>
-                        )}
-                        {s.status === 'PIANIFICATO' && (
-                          <Button size="sm" variant="primary" onClick={() => updateShipmentStatus(s.id, 'COMPLETATO')}>
-                            Completa
-                          </Button>
-                        )}
-                        <Button size="sm" variant="danger" onClick={() => deleteShipment(s.id)}>
-                          Rimuovi
-                        </Button>
-                      </div>
-                    )
-                  }
-                ]}
-              />
-            </Card>
-          </div>
-        </div>
-      )}
 
       {/* --- TAB: ANAGRAFICA COMUNI --- */}
       {adminTab === 'comuni' && (

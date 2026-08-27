@@ -5151,14 +5151,24 @@ export const MonitorYard: React.FC = () => {
                   {/* ORIGINE */}
                   <div className="flex flex-col min-w-[150px]">
                     <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Origine</span>
-                    <div className="bg-white border-2 border-[#004B97] rounded-lg p-2 text-center shadow-sm">
-                      <span className="text-xs font-bold text-[#004B97] line-clamp-2">
+                    <div className="bg-white border-2 border-[#004B97] rounded-lg p-2 flex flex-col shadow-sm">
+                      <span className="text-xs font-bold text-[#004B97] line-clamp-2 text-center">
                         {shipmentFormTipoOperazioneHub === 'OUTBOUND' 
                           ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
                           : (tripShipments[0]?.tipoStop === 'HUB_TRANSIT' || tripShipments[0]?.tipoStop === 'CORRISPONDENTE' 
-                              ? depots.find(d => d.id === tripShipments[0]?.realOriginCity)?.name || 'DA DEFINIRE'
+                              ? tripShipments[0]?.destinationNodeName || 'DA DEFINIRE'
                               : tripShipments[0]?.realOriginName || 'DA DEFINIRE')}
                       </span>
+                      {shipmentFormTipoOperazioneHub === 'INBOUND' && (tripShipments[0]?.tipoStop === 'HUB_TRANSIT' || tripShipments[0]?.tipoStop === 'CORRISPONDENTE') && tripShipments[0]?.realOriginName && (
+                        <span className="text-[9px] text-gray-500 mt-1 line-clamp-2 text-center border-t border-black/5 pt-1">
+                          Mittente: {tripShipments[0]?.realOriginName} <br/> ({tripShipments[0]?.realOriginCity || '-'})
+                        </span>
+                      )}
+                      {shipmentFormTipoOperazioneHub === 'INBOUND' && (!tripShipments[0]?.tipoStop || tripShipments[0]?.tipoStop === 'DIRETTA') && tripShipments[0]?.realOriginCity && (
+                        <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-center">
+                          {tripShipments[0]?.realOriginCity}
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -5168,12 +5178,22 @@ export const MonitorYard: React.FC = () => {
                       <div className="text-gray-400 font-mono text-sm">➔</div>
                       <div className="flex flex-col min-w-[150px]">
                         <span className="text-[9px] uppercase font-bold text-gray-400 mb-1">Stop {idx + 1}</span>
-                        <div className="bg-white border border-gray-300 rounded-lg p-2 text-center shadow-sm">
-                          <span className="text-xs font-medium text-gray-700 line-clamp-2">
+                        <div className="bg-white border border-gray-300 rounded-lg p-2 flex flex-col shadow-sm">
+                          <span className="text-xs font-medium text-gray-700 line-clamp-2 text-center">
                             {stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE'
-                              ? depots.find(d => d.id === stop.realDestinationCity)?.name || 'DA DEFINIRE'
+                              ? stop.destinationNodeName || 'DA DEFINIRE'
                               : stop.realDestinationName || 'DA DEFINIRE'}
                           </span>
+                          {(stop.tipoStop === 'HUB_TRANSIT' || stop.tipoStop === 'CORRISPONDENTE') && stop.realDestinationName && (
+                            <span className="text-[9px] text-gray-500 mt-1 line-clamp-2 text-center border-t border-black/5 pt-1">
+                              Dest: {stop.realDestinationName} <br/> ({stop.realDestinationCity || '-'})
+                            </span>
+                          )}
+                          {(!stop.tipoStop || stop.tipoStop === 'DIRETTA') && stop.realDestinationCity && (
+                            <span className="text-[9px] text-gray-500 mt-1 line-clamp-1 text-center">
+                              {stop.realDestinationCity}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </React.Fragment>
@@ -5184,14 +5204,24 @@ export const MonitorYard: React.FC = () => {
                   {/* DESTINAZIONE FINALE */}
                   <div className="flex flex-col min-w-[150px]">
                     <span className="text-[9px] uppercase font-bold text-orange-500 mb-1">Destinazione Finale</span>
-                    <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 text-center shadow-sm">
-                      <span className="text-xs font-bold text-orange-700 line-clamp-2">
+                    <div className="bg-orange-50 border-2 border-orange-400 rounded-lg p-2 flex flex-col shadow-sm">
+                      <span className="text-xs font-bold text-orange-700 line-clamp-2 text-center">
                         {shipmentFormTipoOperazioneHub === 'INBOUND'
                           ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB NON SELEZIONATO')
                           : (tripShipments[tripShipments.length - 1]?.tipoStop === 'HUB_TRANSIT' || tripShipments[tripShipments.length - 1]?.tipoStop === 'CORRISPONDENTE'
-                              ? depots.find(d => d.id === tripShipments[tripShipments.length - 1]?.realDestinationCity)?.name || 'DA DEFINIRE'
+                              ? tripShipments[tripShipments.length - 1]?.destinationNodeName || 'DA DEFINIRE'
                               : tripShipments[tripShipments.length - 1]?.realDestinationName || 'DA DEFINIRE')}
                       </span>
+                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (tripShipments[tripShipments.length - 1]?.tipoStop === 'HUB_TRANSIT' || tripShipments[tripShipments.length - 1]?.tipoStop === 'CORRISPONDENTE') && tripShipments[tripShipments.length - 1]?.realDestinationName && (
+                        <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-2 text-center border-t border-orange-400/20 pt-1">
+                          Dest: {tripShipments[tripShipments.length - 1]?.realDestinationName} <br/> ({tripShipments[tripShipments.length - 1]?.realDestinationCity || '-'})
+                        </span>
+                      )}
+                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' && (!tripShipments[tripShipments.length - 1]?.tipoStop || tripShipments[tripShipments.length - 1]?.tipoStop === 'DIRETTA') && tripShipments[tripShipments.length - 1]?.realDestinationCity && (
+                        <span className="text-[9px] text-orange-600/70 mt-1 line-clamp-1 text-center">
+                          {tripShipments[tripShipments.length - 1]?.realDestinationCity}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -5339,29 +5369,16 @@ export const MonitorYard: React.FC = () => {
                           </td>
                           <td className="p-4 min-w-[300px] align-top border-r border-black/5">
                             <div className="space-y-2">
-                              {(row.tipoStop === 'HUB_TRANSIT' || row.tipoStop === 'CORRISPONDENTE') ? (
-                                <div className="space-y-2">
+                              {(row.tipoStop === 'HUB_TRANSIT' || row.tipoStop === 'CORRISPONDENTE') && (
+                                <div className="space-y-2 mb-4">
                                   <select
                                     className="w-full border border-black/10 rounded-lg p-1.5 text-xs font-bold text-gray-800 focus:ring-1 focus:ring-blue-500 outline-none"
-                                    value={(shipmentFormTipoOperazioneHub === 'OUTBOUND') ? row.realDestinationCity || '' : row.realOriginCity || ''}
+                                    value={row.destinationNodeId || ''}
                                     onChange={(e) => {
                                       const selectedDepot = depots.find(d => d.id === e.target.value);
                                       const newTripShipments = [...tripShipments];
-                                      if (shipmentFormTipoOperazioneHub === 'OUTBOUND') {
-                                        newTripShipments[index].realDestinationCity = selectedDepot?.id;
-                                        newTripShipments[index].realDestinationName = selectedDepot?.name;
-                                        newTripShipments[index].realDestinationAddress = selectedDepot?.address;
-                                        newTripShipments[index].realDestinationCap = selectedDepot?.cap;
-                                        newTripShipments[index].realDestinationProvince = selectedDepot?.province;
-                                        newTripShipments[index].realDestinationCountry = selectedDepot?.country || 'Italia';
-                                      } else {
-                                        newTripShipments[index].realOriginCity = selectedDepot?.id;
-                                        newTripShipments[index].realOriginName = selectedDepot?.name;
-                                        newTripShipments[index].realOriginAddress = selectedDepot?.address;
-                                        newTripShipments[index].realOriginCap = selectedDepot?.cap;
-                                        newTripShipments[index].realOriginProvince = selectedDepot?.province;
-                                        newTripShipments[index].realOriginCountry = selectedDepot?.country || 'Italia';
-                                      }
+                                      newTripShipments[index].destinationNodeId = selectedDepot?.id;
+                                      newTripShipments[index].destinationNodeName = selectedDepot?.name;
                                       setTripShipments(newTripShipments);
                                     }}
                                   >
@@ -5370,14 +5387,9 @@ export const MonitorYard: React.FC = () => {
                                       <option key={d.id} value={d.id}>{d.name}</option>
                                     ))}
                                   </select>
-                                  {((shipmentFormTipoOperazioneHub === 'OUTBOUND') ? row.realDestinationCity : row.realOriginCity) && (
-                                    <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded-lg border border-black/5 mt-2">
-                                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationAddress : row.realOriginAddress} <br />
-                                      {shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCap : row.realOriginCap} - {depots.find(d => d.id === (shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationCity : row.realOriginCity))?.city} ({shipmentFormTipoOperazioneHub === 'OUTBOUND' ? row.realDestinationProvince : row.realOriginProvince})
-                                    </div>
-                                  )}
                                 </div>
-                              ) : (
+                              )}
+                              
                                 <>
                                   <input 
                                     type="text" 
@@ -5449,7 +5461,6 @@ export const MonitorYard: React.FC = () => {
                                     />
                                   </div>
                                 </>
-                              )}
                             </div>
                           </td>
                           <td className="p-4 align-top border-r border-black/5">
@@ -5551,7 +5562,19 @@ export const MonitorYard: React.FC = () => {
                     size="sm" 
                     variant="secondary"
                     className="border-blue-500 text-blue-600 hover:bg-blue-50"
-                    onClick={() => setTripShipments([{ id: `tmp-${Date.now()}` }, ...tripShipments])}
+                    onClick={() => {
+                      const firstRow = tripShipments[0];
+                      const defaultTipoStop = (firstRow?.tipoStop === 'HUB_TRANSIT' || firstRow?.tipoStop === 'CORRISPONDENTE') ? firstRow.tipoStop : undefined;
+                      const defaultNodeId = defaultTipoStop ? firstRow.destinationNodeId : undefined;
+                      const defaultNodeName = defaultTipoStop ? firstRow.destinationNodeName : undefined;
+                      
+                      setTripShipments([{ 
+                        id: `tmp-${Date.now()}`,
+                        tipoStop: defaultTipoStop,
+                        destinationNodeId: defaultNodeId,
+                        destinationNodeName: defaultNodeName
+                      }, ...tripShipments]);
+                    }}
                   >
                     + Salva Spedizione e Aggiungi Nuova Riga
                   </Button>
