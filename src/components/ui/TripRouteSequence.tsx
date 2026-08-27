@@ -26,7 +26,7 @@ export const TripRouteSequence: React.FC<{
     return [...acc, { stop, count: 1 }];
   }, [] as { stop: typeof validShipments[0], count: number }[]);
 
-  const badges: React.ReactNode[] = [];
+  const elements: React.ReactNode[] = [];
   
   // Origin
   const originName = validShipments[0]?.tipoOperazioneHub === 'OUTBOUND' || validShipments[0]?.tipoOperazioneHub === 'TRANSITO'
@@ -35,24 +35,48 @@ export const TripRouteSequence: React.FC<{
         ? timelineStops[0]?.stop?.destinationNodeName || 'HUB'
         : timelineStops[0]?.stop?.realOriginCity || 'DIR');
         
-  badges.push(<span key="origin" className="bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded text-[10px] font-bold border border-gray-300 break-words max-w-[120px] line-clamp-1 flex-shrink-0" title={originName}>[{originName}]</span>);
+  elements.push(
+    <span key="origin" className="flex items-center gap-1">
+      🏢 <span>{originName}</span>
+    </span>
+  );
 
   timelineStops.forEach(({ stop, count }: { stop: any; count: number }, idx: number) => {
     const isHub = stop.tipoStop === 'HUB_TRANSIT';
     const isCorr = stop.tipoStop === 'CORRISPONDENTE';
     
     let label = '';
-    if (isHub) label = stop.destinationNodeName || 'HUB';
-    else if (isCorr) label = `${stop.destinationNodeName || 'CORR'} (C)`;
-    else label = `${stop.realDestinationCity || 'DIR'} (D)`;
+    let icon = '';
     
-    if (count > 1) label += ` [${count}x]`;
-
-    const colorClass = isHub ? 'bg-blue-100 text-blue-800 border-blue-300' : isCorr ? 'bg-green-100 text-green-800 border-green-300' : 'bg-orange-100 text-orange-800 border-orange-300';
+    if (isHub) {
+      label = stop.destinationNodeName || 'HUB';
+      icon = '🏢';
+    } else if (isCorr) {
+      label = stop.destinationNodeName || 'CORR';
+      icon = '🤝';
+    } else {
+      label = stop.realDestinationCity || 'DIR';
+      icon = '📍';
+    }
     
-    badges.push(<span key={`arrow-${idx}`} className="text-gray-400 mx-1 flex-shrink-0">➔</span>);
-    badges.push(<span key={`stop-${idx}`} className={`px-1.5 py-0.5 rounded text-[10px] font-bold border break-words max-w-[120px] line-clamp-1 flex-shrink-0 ${colorClass}`} title={label}>[{label}]</span>);
+    const suffix = count > 1 ? ` (${count} sped.)` : isHub || isCorr ? '' : ' (Diretta)';
+    
+    elements.push(
+      <span key={`arrow-${idx}`} className="text-gray-500 mx-1">➔</span>
+    );
+    elements.push(
+      <span key={`stop-${idx}`} className="flex items-center gap-1" title={`${label}${suffix}`}>
+        {icon} <span>{label}</span><span className="text-gray-400">{suffix}</span>
+      </span>
+    );
   });
   
-  return <div className="flex items-center flex-wrap gap-y-1">{badges}</div>;
+  return (
+    <div className="flex flex-col gap-1.5 max-w-full">
+      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tratta / Itinerario:</span>
+      <div className="bg-[#1C1C1E] text-gray-300 px-3 py-1.5 rounded-full inline-flex items-center text-[11px] font-mono whitespace-nowrap overflow-x-auto max-w-full hide-scrollbar border border-black/20 shadow-inner">
+        {elements}
+      </div>
+    </div>
+  );
 };

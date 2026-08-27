@@ -2034,12 +2034,13 @@ export const MonitorYard: React.FC = () => {
                           )
                         },
                         {
-                          header: 'Provenienza',
-                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.originOrDestination || '-'}</span>
-                        },
-                        {
-                          header: 'Merce',
-                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.goodsType || '-'}</span>
+                          header: 'Provenienza / Itinerario',
+                          accessor: (s) => {
+                            const tripShipments = s.tripId 
+                              ? shipments.filter(x => x.tripId === s.tripId)
+                              : [s];
+                            return <TripRouteSequence shipments={tripShipments} depots={depots} selectedDepotId={selectedDepotId} />;
+                          }
                         },
                         {
                           header: 'PLT',
@@ -2107,12 +2108,13 @@ export const MonitorYard: React.FC = () => {
                           )
                         },
                         {
-                          header: 'Destinazione',
-                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.originOrDestination || '-'}</span>
-                        },
-                        {
-                          header: 'Merce',
-                          accessor: (s) => <span className="text-xs font-sans text-gray-600">{s.goodsType || '-'}</span>
+                          header: 'Destinazione / Itinerario',
+                          accessor: (s) => {
+                            const tripShipments = s.tripId 
+                              ? shipments.filter(x => x.tripId === s.tripId)
+                              : [s];
+                            return <TripRouteSequence shipments={tripShipments} depots={depots} selectedDepotId={selectedDepotId} />;
+                          }
                         },
                         {
                           header: 'PLT',
@@ -2151,7 +2153,7 @@ export const MonitorYard: React.FC = () => {
             {guardiolaView === 'station' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Spedizioni da abbinare */}
-                  <Card title="Spedizioni in attesa di abbinamento a camion fisici" accent="orange">
+                  <Card title="Viaggi in attesa di abbinamento a camion fisici" accent="orange">
                     <div className="mb-3 px-1">
                       <input 
                         type="text" 
@@ -2358,7 +2360,7 @@ export const MonitorYard: React.FC = () => {
                                   variant="danger"
                                   className="text-[9px] py-1 px-2"
                                   onClick={() => {
-                                    alert.showAlert({
+                                    alert.showConfirm({
                                       title: 'Conferma Scollegamento',
                                       message: `Sei sicuro di voler scollegare l'intero viaggio dal veicolo? (${g.shipments.length} spedizioni verranno rimosse dal veicolo)`,
                                       type: 'warning',
