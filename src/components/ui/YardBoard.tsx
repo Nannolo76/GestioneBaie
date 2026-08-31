@@ -57,10 +57,20 @@ export const YardBoard: React.FC = () => {
 
   const activeData = stationSubTab === 'arrivi' ? arrivi : partenze;
 
+  // Use the date of the first record if available, else today
+  let displayDate = new Date().toISOString().split('T')[0];
+  if (activeData.length > 0 && activeData[0].expectedDate) {
+    displayDate = activeData[0].expectedDate;
+  }
+  const dateObj = new Date(displayDate);
+  const formattedDate = !isNaN(dateObj.getTime()) 
+    ? dateObj.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) 
+    : displayDate;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <Card
-        title={`STATION BOARD - ${stationSubTab === 'arrivi' ? 'ARRIVI' : 'PARTENZE'}`}
+        title={`STATION BOARD - ${stationSubTab === 'arrivi' ? 'ARRIVI' : 'PARTENZE'} DEL ${formattedDate}`}
         accent={stationSubTab === 'arrivi' ? 'orange' : 'green'}
         headerAction={
           <div className="flex gap-2 font-mono">
@@ -128,23 +138,25 @@ export const YardBoard: React.FC = () => {
               }
             },
             {
-              header: 'Orario & Consegna',
+              header: 'Orario',
+              accessor: (g) => (
+                <div className="text-lg font-mono font-bold text-gray-800 tracking-tight">
+                  {g.expectedTime || '--:--'}
+                </div>
+              )
+            },
+            {
+              header: 'Prevista Cons.',
               accessor: (g) => {
                 const deliveryDates = g.shipments.map((s: any) => s.expectedDeliveryDate).filter(Boolean);
                 const firstDeliveryDate = deliveryDates.length > 0 ? deliveryDates[0] : null;
                 
-                return (
-                  <div className="text-sm font-mono">
-                    <div className="text-gray-800">
-                      <span className="font-bold">{g.expectedTime || '--:--'}</span>
-                      {g.expectedDate && <span className="text-[10px] ml-1">{g.expectedDate}</span>}
-                    </div>
-                    {firstDeliveryDate && (
-                      <div className="text-[10px] text-emerald-600 font-bold mt-1 bg-emerald-50 border border-emerald-200 rounded px-1 w-max">
-                        Cons: {firstDeliveryDate}
-                      </div>
-                    )}
+                return firstDeliveryDate ? (
+                  <div className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 w-max">
+                    {new Date(firstDeliveryDate).toLocaleDateString('it-IT')}
                   </div>
+                ) : (
+                  <span className="text-gray-400 text-xs">-</span>
                 );
               }
             },
