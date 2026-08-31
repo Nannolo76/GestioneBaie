@@ -13,6 +13,7 @@ import type { Booking, Bay, BookingNote, Shipment } from '../types';
 import { TripRouteSequence } from '../components/ui/TripRouteSequence';
 import { ShipmentsGrid } from '../components/ui/ShipmentsGrid';
 import { YardBoard } from '../components/ui/YardBoard';
+import { useResizer } from '../hooks/useResizer';
 import { useAlert } from '../context/AlertContext';
 export interface TripGroup {
   id: string;
@@ -179,6 +180,8 @@ export const MonitorYard: React.FC = () => {
   const ITEMS_PER_PAGE = 50;
   const [dateFilter, setDateFilter] = useState<'ALL' | '7_DAYS' | 'TODAY'>('7_DAYS');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'tripId', direction: 'desc' });
+
+  const { width: menuWidth, startResizing: startResizingMenu } = useResizer(220, 180, 400);
 
   // Performance optimizations: O(1) Lookups (HashMaps)
   const clientMap = useMemo(() => new Map(clients.map(c => [c.id, c.name])), [clients]);
@@ -1818,10 +1821,20 @@ export const MonitorYard: React.FC = () => {
         )}
 
         {/* Layout responsive: Barra di Navigazione a sinistra, Contenuto a destra */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
           
           {/* Menu Laterale Guardiola */}
-          <div className="lg:col-span-1 space-y-2 bg-gray-50 border border-black/5 p-3.5 rounded-xl font-mono text-xs shadow-2xs">
+          <div 
+            className="w-full shrink-0 space-y-2 bg-gray-50 border border-black/5 p-3.5 rounded-xl font-mono text-xs shadow-2xs relative lg:w-[var(--menu-width)]"
+            style={{ '--menu-width': `${menuWidth}px` } as React.CSSProperties}
+          >
+             <div 
+               onMouseDown={startResizingMenu}
+               className="absolute top-0 -right-3 w-3 h-full cursor-col-resize hover:bg-black/5 transition-colors z-10 flex items-center justify-center rounded-r-xl hidden lg:flex"
+             >
+               <div className="h-8 w-0.5 bg-black/20 rounded-full"></div>
+             </div>
+
             <div className="text-[9px] uppercase tracking-wider text-gray-400 font-bold mb-3 px-2">// MENU GUARDIOLA</div>
             
             <button
@@ -1965,7 +1978,7 @@ export const MonitorYard: React.FC = () => {
           </div>
 
           {/* Area Contenuto (Destra) */}
-          <div className="lg:col-span-4">
+          <div className="flex-1 w-full min-w-0">
             
             {/* VISTA: TABELLONE YARD BOARD */}
             {guardiolaView === 'station' && (

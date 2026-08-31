@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { useResizer } from '../hooks/useResizer';
 
 interface SidebarProps {
   activeTab: string;
@@ -31,8 +32,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
   const currentCarrierName = carriers.find((c) => c.id === currentCarrierId)?.name || 'Vettore';
   const currentDepotName = depots.find((d) => d.id === selectedDepotId)?.name || 'Milano';
 
+  const { width, startResizing } = useResizer(220, 180, 400);
+
   return (
-    <div className="w-80 bg-gradient-to-br from-[#003a75] via-[#004B97] to-[#0062b8] flex flex-col justify-between h-screen sticky top-0 text-white select-none shrink-0 border-r border-white/10">
+    <div 
+      className="bg-gradient-to-br from-[#003a75] via-[#004B97] to-[#0062b8] flex flex-col justify-between h-screen sticky top-0 text-white select-none shrink-0 border-r border-white/10 relative z-20"
+      style={{ width: `${width}px` }}
+    >
+      <div 
+        onMouseDown={startResizing}
+        className="absolute top-0 right-0 w-1.5 h-full cursor-col-resize hover:bg-white/20 transition-colors z-50 group flex items-center justify-center"
+      >
+        <div className="h-8 w-0.5 bg-white/30 rounded-full group-hover:bg-white/80 transition-colors"></div>
+      </div>
+
       {/* Brand */}
       <div>
         <div className="px-5 py-5 border-b border-white/10">
