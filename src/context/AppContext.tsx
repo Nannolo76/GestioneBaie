@@ -19,8 +19,8 @@ interface AppContextType {
   currentUser: User | null;
   currentCarrierId: string;
   selectedDepotId: string;
-  addDepot: (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type?: 'HUB' | 'CORRISPONDENTE') => void;
-  updateDepot: (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type?: 'HUB' | 'CORRISPONDENTE') => void;
+  addDepot: (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type?: 'HUB' | 'CORRISPONDENTE', shortCode?: string) => void;
+  updateDepot: (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type?: 'HUB' | 'CORRISPONDENTE', shortCode?: string) => void;
   deleteDepot: (id: string) => void;
   addWarehouseModule: (depotId: string, name: string, description?: string) => void;
   updateWarehouseModule: (id: string, depotId: string, name: string, description?: string) => void;
@@ -144,11 +144,11 @@ const getTodayDateString = () => {
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // --- DATI DI DEFAULT ---
   const defaultDepots: Depot[] = [
-    { id: 'depot-milano', name: 'Milano Logistics Plant', city: 'Milano (MI)', type: 'HUB', address: 'Via Roma 1', cap: '20100', province: 'MI' },
-    { id: 'depot-roma', name: 'Roma Logistics Plant', city: 'Roma (RM)', type: 'HUB', address: 'Via del Corso 2', cap: '00100', province: 'RM' },
-    { id: 'depot-bari', name: 'Bari Logistics Plant', city: 'Bari (BA)', type: 'HUB', address: 'Via Bari 3', cap: '70100', province: 'BA' },
-    { id: 'corr-torino', name: 'Corrispondente Nord-Ovest SRL', city: 'Torino (TO)', type: 'CORRISPONDENTE', address: 'Strada del Drosso 4', cap: '10135', province: 'TO' },
-    { id: 'corr-napoli', name: 'Partenope Trasporti', city: 'Napoli (NA)', type: 'CORRISPONDENTE', address: 'Via Galileo Ferraris 5', cap: '80142', province: 'NA' },
+    { id: 'depot-milano', name: 'Milano Logistics Plant', shortCode: 'MIL', city: 'Milano (MI)', type: 'HUB', address: 'Via Roma 1', cap: '20100', province: 'MI' },
+    { id: 'depot-roma', name: 'Roma Logistics Plant', shortCode: 'ROM', city: 'Roma (RM)', type: 'HUB', address: 'Via del Corso 2', cap: '00100', province: 'RM' },
+    { id: 'depot-bari', name: 'Bari Logistics Plant', shortCode: 'BAR', city: 'Bari (BA)', type: 'HUB', address: 'Via Bari 3', cap: '70100', province: 'BA' },
+    { id: 'corr-torino', name: 'Corrispondente Nord-Ovest SRL', shortCode: 'TO1', city: 'Torino (TO)', type: 'CORRISPONDENTE', address: 'Strada del Drosso 4', cap: '10135', province: 'TO' },
+    { id: 'corr-napoli', name: 'Partenope Trasporti', shortCode: 'NA1', city: 'Napoli (NA)', type: 'CORRISPONDENTE', address: 'Via Galileo Ferraris 5', cap: '80142', province: 'NA' },
   ];
 
   const defaultWarehouseModules: WarehouseModule[] = [
@@ -569,19 +569,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- AZIONI CONFIGURAZIONE / ADMIN ---
-  const addDepot = (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB') => {
+  const addDepot = (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB', shortCode?: string) => {
     const prefix = type === 'CORRISPONDENTE' ? 'corr-' : 'depot-';
     const id = `${prefix}${Date.now()}`;
-    const newDepot: Depot = { id, name, city, address, cap, province, country, type };
+    const newDepot: Depot = { id, name, city, address, cap, province, country, type, shortCode };
     setDepots((prev) => [...prev, newDepot]);
     logActivity(id, `Creato nuovo stabilimento/nodo: ${name} (${city})`, 'SUCCESS');
     saveAction('ADD_DEPOT', newDepot);
   };
 
-  const updateDepot = (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB') => {
-    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city, address, cap, province, country, type } : d)));
+  const updateDepot = (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB', shortCode?: string) => {
+    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city, address, cap, province, country, type, shortCode } : d)));
     logActivity(selectedDepotId, `Aggiornato nodo: ${name} (${city})`, 'INFO');
-    saveAction('UPDATE_DEPOT', { id, name, city, address, cap, province, country });
+    saveAction('UPDATE_DEPOT', { id, name, city, address, cap, province, country, shortCode });
   };
 
   const deleteDepot = (id: string) => {

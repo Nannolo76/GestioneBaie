@@ -1127,6 +1127,18 @@ export const MonitorYard: React.FC = () => {
       return;
     }
 
+    // Derivazione Automatica degli Endpoints (Smart Trip Builder)
+    const firstStop = validTripShipments[validTripShipments.length - 1]; // reverse order
+    const lastStop = validTripShipments[0]; // reverse order
+    
+    const derivedOrigin = shipmentFormTipoOperazioneHub === 'OUTBOUND' 
+      ? selectedDepotId 
+      : (firstStop?.tipoStop === 'HUB_TRANSIT' || firstStop?.tipoStop === 'CORRISPONDENTE' ? firstStop.destinationNodeId : undefined);
+      
+    const derivedDestination = shipmentFormTipoOperazioneHub === 'INBOUND'
+      ? selectedDepotId
+      : (lastStop?.tipoStop === 'HUB_TRANSIT' || lastStop?.tipoStop === 'CORRISPONDENTE' ? lastStop.destinationNodeId : undefined);
+
     // Loop through all valid shipments in the Trip Builder
     for (let index = 0; index < validTripShipments.length; index++) {
       const row = validTripShipments[index];
@@ -1169,8 +1181,8 @@ export const MonitorYard: React.FC = () => {
         realDestinationCap: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.cap : (row.realDestinationCap || undefined),
         realDestinationProvince: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.province : (row.realDestinationProvince || undefined),
         realDestinationCountry: shipmentFormTipoOperazioneHub === 'INBOUND' ? activeDepot?.country : (row.realDestinationCountry || undefined),
-        hubOrigineOperativo: shipmentFormTipoOperazioneHub === 'OUTBOUND' ? selectedDepotId : (shipmentFormHubOrigineOperativo || undefined),
-        hubDestinazioneOperativo: shipmentFormTipoOperazioneHub === 'INBOUND' ? selectedDepotId : (shipmentFormHubDestinazioneOperativo || undefined),
+        hubOrigineOperativo: derivedOrigin,
+        hubDestinazioneOperativo: derivedDestination,
         tipoOperazioneHub: shipmentFormTipoOperazioneHub || undefined,
         tipoStop: row.tipoStop || undefined,
         destinationNodeId: row.destinationNodeId || undefined,

@@ -1,6 +1,7 @@
 export interface Depot {
   id: string;
   name: string;
+  shortCode?: string; // e.g. "MIL", "ROM"
   city: string;
   address?: string;
   cap?: string;

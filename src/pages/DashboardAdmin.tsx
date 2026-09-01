@@ -86,6 +86,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
 
   // Stati Hub
   const [newHubName, setNewHubName] = useState('');
+  const [newHubShortCode, setNewHubShortCode] = useState(''); // Sigla
   const [newHubCity, setNewHubCity] = useState(''); // Località
   const [newHubAddress, setNewHubAddress] = useState('');
   const [newHubCap, setNewHubCap] = useState('');
@@ -250,9 +251,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   // Form Submits
   const handleAddHub = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newHubName || !newHubCity) return;
-    addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry, newHubType);
+    if (!newHubName || !newHubCity || !newHubShortCode) return;
+    if (newHubType === 'CORRISPONDENTE' && (!newHubAddress || !newHubCap || !newHubProvince)) {
+      setConfirmDialogState({ isOpen: true, title: 'Errore Dati', message: 'Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.', confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+      return;
+    }
+    addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry, newHubType, newHubShortCode.toUpperCase());
     setNewHubName('');
+    setNewHubShortCode('');
     setNewHubCity('');
     setNewHubAddress('');
     setNewHubCap('');
@@ -550,24 +556,34 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
             <Card title="Nuovo Hub o Corrispondente" accent="orange">
               <form onSubmit={handleAddHub} className="space-y-4">
                 <Input
-                  label="Nome Plant"
+                  label="Ragione Sociale / Nome Plant"
                   placeholder="Es. Milano Logistics Plant"
                   value={newHubName}
                   onChange={(e) => setNewHubName(e.target.value)}
                   required
                 />
-                <Select
-                  label="Tipologia Nodo"
-                  value={newHubType}
-                  onChange={(e) => setNewHubType(e.target.value as 'HUB' | 'CORRISPONDENTE')}
-                  options={[
-                    { value: 'HUB', label: 'HUB Interno' },
-                    { value: 'CORRISPONDENTE', label: 'Corrispondente Esterno' }
-                  ]}
-                  required
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Codice Breve (Sigla)"
+                    placeholder="Es. MIL"
+                    maxLength={4}
+                    value={newHubShortCode}
+                    onChange={(e) => setNewHubShortCode(e.target.value.toUpperCase())}
+                    required
+                  />
+                  <Select
+                    label="Tipologia Nodo"
+                    value={newHubType}
+                    onChange={(e) => setNewHubType(e.target.value as 'HUB' | 'CORRISPONDENTE')}
+                    options={[
+                      { value: 'HUB', label: 'HUB Interno' },
+                      { value: 'CORRISPONDENTE', label: 'Corrispondente Esterno' }
+                    ]}
+                    required
+                  />
+                </div>
                 <Input
-                  label="Indirizzo"
+                  label={`Indirizzo${newHubType === 'CORRISPONDENTE' ? ' *' : ''}`}
                   placeholder="Es. Via dell'Artigianato, 10"
                   value={newHubAddress}
                   onChange={(e) => setNewHubAddress(e.target.value)}
@@ -1844,7 +1860,11 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
               e.preventDefault();
               const { type, id, fields } = editingItem;
               if (type === 'depot') {
-                updateDepot(id, fields.name, fields.city, fields.address, fields.cap, fields.province, fields.country);
+                if (fields.type === 'CORRISPONDENTE' && (!fields.address || !fields.cap || !fields.province)) {
+                  setConfirmDialogState({ isOpen: true, title: 'Errore Dati', message: 'Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.', confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+                  return;
+                }
+                updateDepot(id, fields.name, fields.city, fields.address, fields.cap, fields.province, fields.country, fields.type, fields.shortCode?.toUpperCase());
               } else if (type === 'warehouseModule') {
                 updateWarehouseModule(id, fields.depotId, fields.name, fields.description);
               } else if (type === 'bay') {
@@ -1880,8 +1900,41 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                       required
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Codice Breve (Sigla) *</label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        value={editingItem.fields.shortCode || ''}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          fields: { ...editingItem.fields, shortCode: e.target.value.toUpperCase() }
+                        })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Tipologia Nodo *</label>
+                      <select
+                        value={editingItem.fields.type || 'HUB'}
+                        onChange={(e) => setEditingItem({
+                          ...editingItem,
+                          fields: { ...editingItem.fields, type: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 bg-slate-900 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#11BCEC]"
+                        required
+                      >
+                        <option value="HUB">HUB Interno</option>
+                        <option value="CORRISPONDENTE">Corrispondente Esterno</option>
+                      </select>
+                    </div>
+                  </div>
                   <div className="space-y-1">
-                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Indirizzo</label>
+                    <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">
+                      Indirizzo{editingItem.fields.type === 'CORRISPONDENTE' ? ' *' : ''}
+                    </label>
                     <input
                       type="text"
                       value={editingItem.fields.address || ''}
@@ -1894,7 +1947,9 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div className="space-y-1 relative">
-                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">CAP</label>
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">
+                        CAP{editingItem.fields.type === 'CORRISPONDENTE' ? ' *' : ''}
+                      </label>
                       <input
                         type="text"
                         value={editingItem.fields.cap || ''}
@@ -1931,7 +1986,9 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                       )}
                     </div>
                     <div className="space-y-1">
-                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">Provincia</label>
+                      <label className="block text-slate-300 font-bold uppercase font-mono tracking-wider text-[10px]">
+                        Provincia{editingItem.fields.type === 'CORRISPONDENTE' ? ' *' : ''}
+                      </label>
                       <input
                         type="text"
                         value={editingItem.fields.province || ''}

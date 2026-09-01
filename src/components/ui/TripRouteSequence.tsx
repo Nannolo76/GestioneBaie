@@ -31,28 +31,53 @@ export const TripRouteSequence: React.FC<{
   const elements: React.ReactNode[] = [];
   
   // Origin
-  const originName = validShipments[0]?.tipoOperazioneHub === 'OUTBOUND' || validShipments[0]?.tipoOperazioneHub === 'TRANSITO'
-    ? (depots.find(d => d.id === selectedDepotId)?.name || 'HUB')
-    : (timelineStops[0]?.stop?.tipoStop === 'HUB_TRANSIT' || timelineStops[0]?.stop?.tipoStop === 'CORRISPONDENTE' 
-        ? timelineStops[0]?.stop?.destinationNodeName || 'HUB'
-        : timelineStops[0]?.stop?.realOriginCity || timelineStops[0]?.stop?.originOrDestination || 'DIR');
+  const originDepot = depots.find(d => d.id === selectedDepotId);
+  const isOutbound = validShipments[0]?.tipoOperazioneHub === 'OUTBOUND' || validShipments[0]?.tipoOperazioneHub === 'TRANSITO';
+  let originLabel = '';
+  let originTitle = '';
+  let originColor = '';
+
+  if (isOutbound) {
+    originLabel = originDepot?.shortCode || originDepot?.city || 'HUB';
+    originTitle = originDepot?.name || 'Hub di Partenza';
+    originColor = 'bg-blue-100 text-blue-800 border-blue-300';
+  } else {
+    const firstStop = timelineStops[0]?.stop;
+    if (firstStop?.tipoStop === 'HUB_TRANSIT') {
+      const h = depots.find(d => d.id === firstStop.destinationNodeId);
+      originLabel = h?.shortCode || h?.city || 'HUB';
+      originTitle = h?.name || 'Hub Interno';
+      originColor = 'bg-blue-100 text-blue-800 border-blue-300';
+    } else if (firstStop?.tipoStop === 'CORRISPONDENTE') {
+      const c = depots.find(d => d.id === firstStop.destinationNodeId);
+      originLabel = c?.shortCode || c?.name || 'CORR';
+      originTitle = c?.name || 'Corrispondente';
+      originColor = 'bg-orange-100 text-orange-800 border-orange-300';
+    } else {
+      originLabel = firstStop?.realOriginCity || firstStop?.originOrDestination || 'DIR';
+      originTitle = firstStop?.realOriginName || 'Consegna Diretta';
+      originColor = 'bg-rose-100 text-rose-800 border-rose-300';
+    }
+  }
         
   elements.push(
-    <span key="origin" className="flex items-center gap-1 shrink-0">
-      🏢 <span>{originName}</span>
+    <span key="origin" className={`px-2 py-0.5 rounded-md border text-[10px] font-bold shrink-0 shadow-sm flex items-center gap-1 ${originColor}`} title={originTitle}>
+      {originColor.includes('blue') ? '🏢' : originColor.includes('orange') ? '🤝' : '📍'} {originLabel}
     </span>
   );
 
-  let lastLabel = originName;
+  let lastLabel = originLabel;
   const filteredStops = timelineStops.filter((ts: any) => {
     const isHub = ts.stop.tipoStop === 'HUB_TRANSIT';
     const isCorr = ts.stop.tipoStop === 'CORRISPONDENTE';
+    const d = depots.find(dep => dep.id === ts.stop.destinationNodeId);
     let label = '';
-    if (isHub) label = ts.stop.destinationNodeName || 'HUB';
-    else if (isCorr) label = ts.stop.destinationNodeName || 'CORR';
+    
+    if (isHub) label = d?.shortCode || d?.city || 'HUB';
+    else if (isCorr) label = d?.shortCode || d?.name || 'CORR';
     else label = ts.stop.realDestinationCity || ts.stop.originOrDestination || ts.stop.city || 'DIR';
 
-    // Prevent redundant immediate repeats (e.g. Origin -> Origin)
+    // Prevent redundant immediate repeats
     if (label === lastLabel) {
       return false; // skip this stop as it's redundant
     }
@@ -69,36 +94,46 @@ export const TripRouteSequence: React.FC<{
   displayStops.forEach(({ stop, count }: { stop: any; count: number }, idx: number) => {
     const isHub = stop.tipoStop === 'HUB_TRANSIT';
     const isCorr = stop.tipoStop === 'CORRISPONDENTE';
+    const d = depots.find(dep => dep.id === stop.destinationNodeId);
     
     let label = '';
+    let title = '';
     let icon = '';
+    let color = '';
     
     if (isHub) {
-      label = stop.destinationNodeName || 'HUB';
+      label = d?.shortCode || d?.city || 'HUB';
+      title = d?.name || 'Hub Interno';
       icon = '🏢';
+      color = 'bg-blue-100 text-blue-800 border-blue-300';
     } else if (isCorr) {
-      label = stop.destinationNodeName || 'CORR';
+      label = d?.shortCode || d?.name || 'CORR';
+      title = d?.name || 'Corrispondente';
       icon = '🤝';
+      color = 'bg-orange-100 text-orange-800 border-orange-300';
     } else {
       label = stop.realDestinationCity || stop.originOrDestination || stop.city || 'DIR';
+      title = stop.realDestinationName || 'Consegna Diretta';
       icon = '📍';
+      color = 'bg-rose-100 text-rose-800 border-rose-300';
     }
     
-    const suffix = count > 1 ? ` (${count} sped.)` : isHub || isCorr ? '' : '';
+    const suffix = count > 1 ? ` (${count})` : '';
     
     elements.push(
-      <span key={`arrow-${idx}`} className="text-gray-500 mx-0.5 shrink-0">➔</span>
+      <span key={`arrow-${idx}`} className="text-gray-400 mx-0.5 shrink-0 text-[10px]">➔</span>
     );
     elements.push(
-      <span key={`stop-${idx}`} className="flex items-center gap-1 shrink-0" title={`${label}${suffix}`}>
-        {icon} <span>{label}</span><span className="text-gray-400">{suffix}</span>
+      <span key={`stop-${idx}`} className={`px-2 py-0.5 rounded-md border text-[10px] font-bold shrink-0 shadow-sm flex items-center gap-1 ${color}`} title={`${title}${suffix}`}>
+        {icon} <span>{label}</span>
+        {count > 1 && <span className="ml-1 px-1 bg-white/50 rounded-sm text-[8px]">{count}</span>}
       </span>
     );
   });
   
   if (hiddenCount > 0) {
     elements.push(
-      <span key="arrow-hidden" className="text-gray-500 mx-0.5 shrink-0">➔</span>
+      <span key="arrow-hidden" className="text-gray-400 mx-0.5 shrink-0 text-[10px]">➔</span>
     );
     elements.push(
       <button 
@@ -107,9 +142,9 @@ export const TripRouteSequence: React.FC<{
           e.stopPropagation();
           setIsExpanded(true);
         }}
-        className="flex items-center gap-1 bg-blue-50/50 hover:bg-blue-100 px-2 py-0.5 rounded cursor-pointer shrink-0 transition-colors border border-blue-100"
+        className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md cursor-pointer shrink-0 transition-colors border border-slate-300 shadow-sm"
       >
-        <span className="text-[9px] uppercase font-bold tracking-wider text-blue-700">
+        <span className="text-[9px] uppercase font-bold tracking-wider text-slate-700">
           + Altri {hiddenCount} stop...
         </span>
       </button>
@@ -125,9 +160,9 @@ export const TripRouteSequence: React.FC<{
           e.stopPropagation();
           setIsExpanded(false);
         }}
-        className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 ml-2 px-2 py-0.5 rounded cursor-pointer shrink-0 transition-colors border border-slate-200"
+        className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 ml-1 px-2 py-0.5 rounded-md cursor-pointer shrink-0 transition-colors border border-slate-300 shadow-sm"
       >
-        <span className="text-[9px] uppercase font-bold tracking-wider text-slate-600">
+        <span className="text-[9px] uppercase font-bold tracking-wider text-slate-700">
           Riduci
         </span>
       </button>
@@ -137,7 +172,7 @@ export const TripRouteSequence: React.FC<{
   return (
     <div className="flex flex-col gap-1.5 max-w-full">
       <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tratta / Itinerario:</span>
-      <div className="bg-slate-50 text-slate-700 px-3 py-1.5 rounded-xl inline-flex flex-wrap items-center gap-y-1 text-[11px] font-mono border border-slate-200 shadow-sm">
+      <div className="flex flex-wrap items-center gap-y-1.5 w-full">
         {elements}
       </div>
     </div>
