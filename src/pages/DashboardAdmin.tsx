@@ -83,10 +83,12 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     id: string;
     fields: any;
   } | null>(null);
+  const [editFormError, setEditFormError] = useState<string | null>(null);
 
   // Stati Hub
   const [newHubName, setNewHubName] = useState('');
   const [newHubShortCode, setNewHubShortCode] = useState(''); // Sigla
+  const [hubFormError, setHubFormError] = useState<string | null>(null);
   const [newHubCity, setNewHubCity] = useState(''); // Località
   const [newHubAddress, setNewHubAddress] = useState('');
   const [newHubCap, setNewHubCap] = useState('');
@@ -251,18 +253,22 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   // Form Submits
   const handleAddHub = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newHubName || !newHubCity || !newHubShortCode) return;
+    if (!newHubName || !newHubCity || !newHubShortCode) {
+      setHubFormError('Compila tutti i campi obbligatori (Nome, Località, Sigla).');
+      return;
+    }
     if (newHubType === 'CORRISPONDENTE' && (!newHubAddress || !newHubCap || !newHubProvince)) {
-      setConfirmDialogState({ isOpen: true, title: 'Errore Dati', message: 'Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.', confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+      setHubFormError('Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.');
       return;
     }
     
     const normalizedShortCode = newHubShortCode.trim().toUpperCase();
     if (depots.some(d => d.shortCode?.toUpperCase() === normalizedShortCode)) {
-      setConfirmDialogState({ isOpen: true, title: 'Sigla Duplicata', message: `La sigla "${normalizedShortCode}" è già in uso. Inserisci una sigla univoca.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+      setHubFormError(`La sigla "${normalizedShortCode}" è già in uso. Inserisci una sigla univoca.`);
       return;
     }
     
+    setHubFormError(null);
     addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry, newHubType, normalizedShortCode);
     setNewHubName('');
     setNewHubShortCode('');
@@ -581,7 +587,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   <Select
                     label="Tipologia Nodo"
                     value={newHubType}
-                    onChange={(e) => setNewHubType(e.target.value as 'HUB' | 'CORRISPONDENTE')}
+                    onChange={(e) => { setHubFormError(null); setNewHubType(e.target.value as 'HUB' | 'CORRISPONDENTE'); }}
                     options={[
                       { value: 'HUB', label: 'HUB Interno' },
                       { value: 'CORRISPONDENTE', label: 'Corrispondente Esterno' }
@@ -644,6 +650,13 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   value={newHubCountry}
                   onChange={(e) => setNewHubCountry(e.target.value)}
                 />
+                
+                {hubFormError && (
+                  <div className="bg-red-500/20 text-red-400 p-2 rounded-lg text-xs font-bold border border-red-500/50">
+                    {hubFormError}
+                  </div>
+                )}
+
                 <Button type="submit" className="w-full">
                   Crea Stabilimento
                 </Button>
@@ -703,7 +716,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
             </Card>
           </div>
 
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2">
             <Card title="Hub e Corrispondenti Registrati">
               <Table
                 data={depots}
@@ -746,11 +759,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          onClick={() => setEditingItem({
-                            type: 'depot',
-                            id: d.id,
-                            fields: { name: d.name, city: d.city, address: d.address || '', cap: d.cap || '', province: d.province || '', country: d.country || 'Italia', type: d.type || 'HUB', shortCode: d.shortCode || '' }
-                          })}
+                          onClick={() => {
+                            setEditFormError(null);
+                            setEditingItem({
+                              type: 'depot',
+                              id: d.id,
+                              fields: { name: d.name, city: d.city, address: d.address || '', cap: d.cap || '', province: d.province || '', country: d.country || 'Italia', type: d.type || 'HUB', shortCode: d.shortCode || '' }
+                            });
+                          }}
                         >
                           Modifica
                         </Button>
@@ -1867,15 +1883,20 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
               e.preventDefault();
               const { type, id, fields } = editingItem;
               if (type === 'depot') {
+                if (!fields.name || !fields.city || !fields.shortCode) {
+                  setEditFormError('Compila tutti i campi obbligatori (Nome, Località, Sigla).');
+                  return;
+                }
                 if (fields.type === 'CORRISPONDENTE' && (!fields.address || !fields.cap || !fields.province)) {
-                  setConfirmDialogState({ isOpen: true, title: 'Errore Dati', message: 'Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.', confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+                  setEditFormError('Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.');
                   return;
                 }
                 const normalizedShortCode = fields.shortCode?.trim().toUpperCase();
                 if (normalizedShortCode && depots.some(d => d.id !== id && d.shortCode?.toUpperCase() === normalizedShortCode)) {
-                  setConfirmDialogState({ isOpen: true, title: 'Sigla Duplicata', message: `La sigla "${normalizedShortCode}" è già in uso da un altro deposito. Inserisci una sigla univoca.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+                  setEditFormError(`Questa sigla (${normalizedShortCode}) è già utilizzata da un altro hub.`);
                   return;
                 }
+                setEditFormError(null);
                 updateDepot(id, fields.name, fields.city, fields.address, fields.cap, fields.province, fields.country, fields.type, normalizedShortCode);
               } else if (type === 'warehouseModule') {
                 updateWarehouseModule(id, fields.depotId, fields.name, fields.description);
@@ -2475,6 +2496,12 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                     </div>
                   </div>
                 </>
+              )}
+              
+              {editFormError && (
+                <div className="bg-red-500/20 text-red-400 p-3 rounded-lg text-xs font-bold border border-red-500/50 mt-2">
+                  {editFormError}
+                </div>
               )}
 
               <div className="flex gap-2 pt-2 bg-slate-950">
