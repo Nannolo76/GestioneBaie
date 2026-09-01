@@ -256,7 +256,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
       setConfirmDialogState({ isOpen: true, title: 'Errore Dati', message: 'Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.', confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
       return;
     }
-    addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry, newHubType, newHubShortCode.toUpperCase());
+    
+    const normalizedShortCode = newHubShortCode.trim().toUpperCase();
+    if (depots.some(d => d.shortCode?.toUpperCase() === normalizedShortCode)) {
+      setConfirmDialogState({ isOpen: true, title: 'Sigla Duplicata', message: `La sigla "${normalizedShortCode}" è già in uso. Inserisci una sigla univoca.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+      return;
+    }
+    
+    addDepot(newHubName, newHubCity, newHubAddress, newHubCap, newHubProvince, newHubCountry, newHubType, normalizedShortCode);
     setNewHubName('');
     setNewHubShortCode('');
     setNewHubCity('');
@@ -1864,7 +1871,12 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                   setConfirmDialogState({ isOpen: true, title: 'Errore Dati', message: 'Per i Corrispondenti è obbligatorio inserire Indirizzo, CAP e Provincia completi.', confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
                   return;
                 }
-                updateDepot(id, fields.name, fields.city, fields.address, fields.cap, fields.province, fields.country, fields.type, fields.shortCode?.toUpperCase());
+                const normalizedShortCode = fields.shortCode?.trim().toUpperCase();
+                if (normalizedShortCode && depots.some(d => d.id !== id && d.shortCode?.toUpperCase() === normalizedShortCode)) {
+                  setConfirmDialogState({ isOpen: true, title: 'Sigla Duplicata', message: `La sigla "${normalizedShortCode}" è già in uso da un altro deposito. Inserisci una sigla univoca.`, confirmLabel: 'OK', isDanger: true, onConfirm: () => setConfirmDialogState(prev => ({ ...prev, isOpen: false })) });
+                  return;
+                }
+                updateDepot(id, fields.name, fields.city, fields.address, fields.cap, fields.province, fields.country, fields.type, normalizedShortCode);
               } else if (type === 'warehouseModule') {
                 updateWarehouseModule(id, fields.depotId, fields.name, fields.description);
               } else if (type === 'bay') {
