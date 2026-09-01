@@ -529,6 +529,8 @@ async function initializeDb() {
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS cap TEXT`);
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS province TEXT`);
   await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS country TEXT`);
+  await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS type TEXT`);
+  await sql(`ALTER TABLE depots ADD COLUMN IF NOT EXISTS short_code TEXT`);
   await sql(`ALTER TABLE clients ADD COLUMN IF NOT EXISTS default_depot_id TEXT`);
 
   // Aggiorna depotIds dell'admin affinché abbia accesso di default ai 3 principali
@@ -1177,8 +1179,13 @@ export default async function handler(req: any, res: any) {
         defaultDepotId: c.default_depot_id
       }));
 
+      const parsedDepots = depots.map((d: any) => ({
+        ...d,
+        shortCode: d.short_code
+      }));
+
       return res.status(200).json({
-        depots,
+        depots: parsedDepots,
         warehouseModules: parsedModules,
         bayUsages,
         bays: parsedBays,
@@ -1205,13 +1212,13 @@ export default async function handler(req: any, res: any) {
 
       switch (action) {
         case 'ADD_DEPOT':
-          await sql('INSERT INTO depots (id, name, city, address, cap, province, country) VALUES ($1, $2, $3, $4, $5, $6, $7)', [
-            payload.id, payload.name, payload.city, payload.address || null, payload.cap || null, payload.province || null, payload.country || 'Italia'
+          await sql('INSERT INTO depots (id, name, city, address, cap, province, country, type, short_code) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)', [
+            payload.id, payload.name, payload.city, payload.address || null, payload.cap || null, payload.province || null, payload.country || 'Italia', payload.type || 'HUB', payload.shortCode || null
           ]);
           break;
         case 'UPDATE_DEPOT':
-          await sql('UPDATE depots SET name = $1, city = $2, address = $3, cap = $4, province = $5, country = $6 WHERE id = $7', [
-            payload.name, payload.city, payload.address || null, payload.cap || null, payload.province || null, payload.country || 'Italia', payload.id
+          await sql('UPDATE depots SET name = $1, city = $2, address = $3, cap = $4, province = $5, country = $6, type = $7, short_code = $8 WHERE id = $9', [
+            payload.name, payload.city, payload.address || null, payload.cap || null, payload.province || null, payload.country || 'Italia', payload.type || 'HUB', payload.shortCode || null, payload.id
           ]);
           break;
         case 'DELETE_DEPOT':
