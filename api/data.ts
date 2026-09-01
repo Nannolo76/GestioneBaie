@@ -1181,7 +1181,7 @@ export default async function handler(req: any, res: any) {
 
       const parsedDepots = depots.map((d: any) => ({
         ...d,
-        shortCode: d.short_code
+        shortCode: d.shortCode || d.short_code || null
       }));
 
       return res.status(200).json({

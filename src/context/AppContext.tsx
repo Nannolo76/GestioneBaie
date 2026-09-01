@@ -581,7 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const updateDepot = (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB', shortCode?: string) => {
     setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city, address, cap, province, country, type, shortCode } : d)));
     logActivity(selectedDepotId, `Aggiornato nodo: ${name} (${city})`, 'INFO');
-    saveAction('UPDATE_DEPOT', { id, name, city, address, cap, province, country, shortCode });
+    saveAction('UPDATE_DEPOT', { id, name, city, address, cap, province, country, type, shortCode });
   };
 
   const deleteDepot = (id: string) => {
