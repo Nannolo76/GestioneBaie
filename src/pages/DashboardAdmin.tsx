@@ -749,7 +749,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                           onClick={() => setEditingItem({
                             type: 'depot',
                             id: d.id,
-                            fields: { name: d.name, city: d.city, address: d.address || '', cap: d.cap || '', province: d.province || '', country: d.country || 'Italia' }
+                            fields: { name: d.name, city: d.city, address: d.address || '', cap: d.cap || '', province: d.province || '', country: d.country || 'Italia', type: d.type || 'HUB', shortCode: d.shortCode || '' }
                           })}
                         >
                           Modifica
