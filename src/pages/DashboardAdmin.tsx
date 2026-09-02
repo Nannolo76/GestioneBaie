@@ -1038,9 +1038,17 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                         size="sm"
                         variant="danger"
                         onClick={() => {
-                          if (confirm(`Rimuovendo ${bu.name}, le ralle collegate torneranno ad uso Generico. Rimuovere?`)) {
-                            deleteBayUsage(bu.id);
-                          }
+                          setConfirmDialogState({
+                            isOpen: true,
+                            title: 'Conferma Rimozione',
+                            message: `Rimuovendo ${bu.name}, le ralle collegate torneranno ad uso Generico. Sei sicuro di voler procedere?`,
+                            confirmLabel: 'Rimuovi',
+                            isDanger: true,
+                            onConfirm: () => {
+                              deleteBayUsage(bu.id);
+                              setConfirmDialogState(prev => ({ ...prev, isOpen: false }));
+                            }
+                          });
                         }}
                       >
                         Elimina

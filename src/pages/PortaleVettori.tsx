@@ -5,6 +5,7 @@ import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { Table } from '../components/ui/Table';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 
 export const PortaleVettori: React.FC = () => {
   const {
@@ -22,6 +23,12 @@ export const PortaleVettori: React.FC = () => {
 
   const [formError, setFormError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [confirmDialogState, setConfirmDialogState] = useState<Omit<React.ComponentProps<typeof ConfirmDialog>, 'onCancel'>>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   // Form Booking
   const [targetDepotId, setTargetDepotId] = useState(depots[0]?.id || '');
@@ -140,9 +147,17 @@ export const PortaleVettori: React.FC = () => {
   };
 
   const handleCancelBooking = (bookingId: string) => {
-    if (confirm('Sei sicuro di voler annullare questo slot prenotato?')) {
-      updateBookingStatus(bookingId, 'ANNULLATO');
-    }
+    setConfirmDialogState({
+      isOpen: true,
+      title: 'Conferma Annullamento',
+      message: 'Sei sicuro di voler annullare questo slot prenotato?',
+      confirmLabel: 'Annulla Prenotazione',
+      isDanger: true,
+      onConfirm: () => {
+        updateBookingStatus(bookingId, 'ANNULLATO');
+        setConfirmDialogState(prev => ({ ...prev, isOpen: false }));
+      }
+    });
   };
 
   if (!isApproved) {
@@ -511,6 +526,10 @@ export const PortaleVettori: React.FC = () => {
           </Card>
         </div>
       </div>
+      <ConfirmDialog 
+        {...confirmDialogState} 
+        onCancel={() => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))} 
+      />
     </div>
   );
 };

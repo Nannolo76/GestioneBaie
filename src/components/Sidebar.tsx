@@ -1,6 +1,8 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { useResizer } from '../hooks/useResizer';
+import { ConfirmDialog } from './ui/ConfirmDialog';
+import { useState } from 'react';
 
 interface SidebarProps {
   activeTab: string;
@@ -21,12 +23,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     setSelectedDepotId,
   } = useApp();
 
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
   const handleLogout = () => {
-    if (confirm('Sei sicuro di voler effettuare il logout?')) {
-      setCurrentRole(null);
-      setCurrentUser(null);
-      setCurrentCarrierId('');
-    }
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    setCurrentRole(null);
+    setCurrentUser(null);
+    setCurrentCarrierId('');
+    setShowLogoutConfirm(false);
   };
 
   const currentCarrierName = carriers.find((c) => c.id === currentCarrierId)?.name || 'Vettore';
@@ -296,6 +303,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
           <span>🚪</span> Esci dal Portale
         </button>
       </div>
+
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        title="Conferma Logout"
+        message="Sei sicuro di voler effettuare il logout da questa postazione?"
+        confirmLabel="Logout"
+        cancelLabel="Annulla"
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+        variant="warning"
+      />
     </div>
   );
 };
