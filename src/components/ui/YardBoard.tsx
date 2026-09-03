@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Badge } from './Badge';
-import { Table } from './Table';
-import { Card } from './Card';
 import { TripRouteSequence } from './TripRouteSequence';
 
 export const YardBoard: React.FC = () => {
@@ -221,3 +219,4 @@ export const YardBoard: React.FC = () => {
     </div>
   );
 };
+

@@ -73,7 +73,6 @@ export const MonitorYard: React.FC = () => {
     shipments,
     clients,
     addShipment,
-    deleteShipment,
     deleteShipments,
     bindShipmentsToBooking,
     unbindShipmentFromBooking,
@@ -86,7 +85,6 @@ export const MonitorYard: React.FC = () => {
   const [guardiolaView, setGuardiolaView] = useState<'station' | 'bays' | 'gate' | 'expected' | 'rapid' | 'schedule' | 'anomalies'>('station');
   
   // Stati TMS Spedizioni / Viaggi
-  const [stationSubTab, setStationSubTab] = useState<'arrivi' | 'partenze'>('partenze');
   const [selectedShipmentIdsForCheckIn, setSelectedShipmentIdsForCheckIn] = useState<string[]>([]);
   const [activeLinkingShipmentId, setActiveLinkingShipmentId] = useState<string | null>(null);
   const [linkingBookingId, setLinkingBookingId] = useState<string>('');
@@ -150,9 +148,6 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormRealDestinationCity, setShipmentFormRealDestinationCity] = useState('');
   const [shipmentFormRealDestinationCap, setShipmentFormRealDestinationCap] = useState('');
   const [shipmentFormRealDestinationProvince, setShipmentFormRealDestinationProvince] = useState('');
-  
-  const [shipmentFormHubOrigineOperativo, setShipmentFormHubOrigineOperativo] = useState('');
-  const [shipmentFormHubDestinazioneOperativo, setShipmentFormHubDestinazioneOperativo] = useState('');
   const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND'>('OUTBOUND');
   
   const [isRoutingAmbiguous, setIsRoutingAmbiguous] = useState(false);
@@ -5806,3 +5801,5 @@ const getBookingStatusBadge = (status: Booking['status']) => {
       return null;
   }
 };
+
+

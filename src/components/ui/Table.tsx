@@ -19,7 +19,7 @@ interface TableProps<T> {
   keyExtractor?: (row: T) => string;
 }
 
-export function Table<T>({ 
+function TableInner<T>({ 
   columns, 
   data, 
   emptyMessage = 'Nessun dato trovato', 
@@ -147,3 +147,5 @@ export function Table<T>({
     </div>
   );
 }
+
+export const Table = React.memo(TableInner) as typeof TableInner;
