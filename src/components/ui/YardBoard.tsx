@@ -66,170 +66,158 @@ export const YardBoard: React.FC = () => {
   const formattedDate = !isNaN(dateObj.getTime()) 
     ? dateObj.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' }) 
     : displayDate;
-
   return (
-    <div className="space-y-6 animate-fade-in">
-      <Card
-        title={`STATION BOARD - ${stationSubTab === 'arrivi' ? 'ARRIVI' : 'PARTENZE'} DEL ${formattedDate}`}
-        accent={stationSubTab === 'arrivi' ? 'orange' : 'green'}
-        headerAction={
-          <div className="flex gap-2 font-mono">
+    <div className="space-y-6 animate-fade-in font-mono">
+      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
+        {/* Header Tabellone */}
+        <div className="bg-black text-white p-4 border-b border-slate-800 flex justify-between items-center">
+          <div>
+            <h2 className={`text-xl font-bold tracking-[0.2em] ${stationSubTab === 'arrivi' ? 'text-amber-400' : 'text-emerald-400'}`}>
+              [ STATION BOARD ] {stationSubTab === 'arrivi' ? 'ARRIVI' : 'PARTENZE'}
+            </h2>
+            <p className="text-xs text-slate-400 tracking-widest mt-1">
+              DATA: {formattedDate} // HUB: {depots.find(d => d.id === selectedDepotId)?.name || selectedDepotId}
+            </p>
+          </div>
+          
+          <div className="flex gap-2">
             <button
               onClick={() => setStationSubTab('arrivi')}
-              className={`px-4 py-2 font-mono text-xs font-bold uppercase transition-all rounded-lg cursor-pointer border ${
+              className={`px-4 py-2 text-xs font-bold uppercase transition-all rounded cursor-pointer border ${
                 stationSubTab === 'arrivi'
-                  ? 'bg-[#004B97] text-white border-[#004B97] shadow-xs'
-                  : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
+                  ? 'bg-amber-500 text-black border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]'
+                  : 'bg-transparent text-slate-400 border-slate-700 hover:text-white hover:bg-white/10'
               }`}
             >
-              🛬 Arrivi ({arrivi.length})
+              ▶ Arrivi ({arrivi.length})
             </button>
             <button
               onClick={() => setStationSubTab('partenze')}
-              className={`px-4 py-2 font-mono text-xs font-bold uppercase transition-all rounded-lg cursor-pointer border ${
+              className={`px-4 py-2 text-xs font-bold uppercase transition-all rounded cursor-pointer border ${
                 stationSubTab === 'partenze'
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                  : 'bg-transparent text-gray-500 border-black/10 hover:text-black hover:bg-white/20'
+                  ? 'bg-emerald-500 text-black border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]'
+                  : 'bg-transparent text-slate-400 border-slate-700 hover:text-white hover:bg-white/10'
               }`}
             >
-              🛫 Partenze ({partenze.length})
+              ▶ Partenze ({partenze.length})
             </button>
           </div>
-        }
-      >
-        <Table
-          data={activeData}
-          emptyMessage={`Nessun ${stationSubTab === 'arrivi' ? 'arrivo' : 'viaggio in partenza'} per questo stabilimento.`}
-          columns={[
-            {
-              header: 'Stato',
-              className: "w-28 text-center",
-              accessor: (g) => {
-                const bookedShipment = g.shipments.find((s: any) => s.bookingId);
-                const booking = bookedShipment ? bookings.find(b => b.id === bookedShipment.bookingId) : null;
-                
-                if (!booking) return <Badge variant="warning">DA ABBINARE</Badge>;
-                if (booking.status === 'COMPLETATO') return <Badge variant="success">COMPLETATO</Badge>;
-                if (booking.status === 'IN_BAIA') return <Badge variant="primary" className="animate-pulse">IN BAIA</Badge>;
-                if (booking.status === 'AL_CANCELLO') return <Badge variant="success">IN PIAZZALE</Badge>;
-                return <Badge variant="info">IN VIAGGIO</Badge>;
-              }
-            },
-            {
-              header: 'Viaggio',
-              accessor: (g) => {
-                const firstShipment = g.shipments[0];
-                return (
-                  <div className="text-xs font-sans">
-                    {g.tripId ? (
-                      <span className="font-bold text-amber-600 block bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 w-max mb-1">
-                        INT: {g.tripId}
-                      </span>
-                    ) : (
-                      <span className="font-bold text-gray-700 block italic">Viaggio Diretto</span>
-                    )}
-                    {(firstShipment?.clientTripNumber || firstShipment?.orderNumber) && (
-                      <span className="text-[10px] text-gray-500 font-bold block mt-1 uppercase">
-                        CLI: {firstShipment?.clientTripNumber || firstShipment?.orderNumber}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-            },
-            {
-              header: 'Orario',
-              accessor: (g) => (
-                <div className="text-lg font-mono font-bold text-gray-800 tracking-tight">
-                  {g.expectedTime || '--:--'}
-                </div>
-              )
-            },
-            {
-              header: 'Prevista Cons.',
-              accessor: (g) => {
-                const deliveryDates = g.shipments.map((s: any) => s.expectedDeliveryDate).filter(Boolean);
-                const firstDeliveryDate = deliveryDates.length > 0 ? deliveryDates[0] : null;
-                
-                return firstDeliveryDate ? (
-                  <div className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 w-max">
-                    {new Date(firstDeliveryDate).toLocaleDateString('it-IT')}
-                  </div>
-                ) : (
-                  <span className="text-gray-400 text-xs">-</span>
-                );
-              }
-            },
-            {
-              header: 'Committente',
-              accessor: (g) => {
-                const firstShipment = g.shipments[0];
-                const clientName = clients.find(c => c.id === firstShipment?.clientId)?.name || 'Multi-Committente';
-                return (
-                  <div className="text-xs font-sans font-bold uppercase text-gray-700">
-                    {clientName}
-                  </div>
-                );
-              }
-            },
-            {
-              header: 'Vettore & Targa',
-              accessor: (g) => {
-                const carrierName = carriers.find(c => c.id === g.carrierId)?.name || 'Vettore Non Assegnato';
-                const bookedShipment = g.shipments.find((s: any) => s.bookingId);
-                const booking = bookedShipment ? bookings.find(b => b.id === bookedShipment.bookingId) : null;
-                
-                return (
-                  <div className="text-xs font-mono">
-                    <span className="font-bold text-gray-800 block truncate max-w-[120px]">{carrierName}</span>
-                    {booking?.licensePlate ? (
-                      <span className="text-[11px] text-blue-700 font-bold bg-blue-50 px-1 border border-blue-200 rounded mt-0.5 inline-block">
-                        {booking.licensePlate}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-gray-400 italic">Targa assente</span>
-                    )}
-                  </div>
-                );
-              }
-            },
-            {
-              header: 'Itinerario',
-              accessor: (g) => (
-                <TripRouteSequence shipments={g.shipments} depots={depots} selectedDepotId={selectedDepotId} />
-              )
-            },
-            {
-              header: 'Carico',
-              accessor: (g) => (
-                <div className="text-xs font-mono">
-                  <span className="font-bold text-gray-800">{g.totalPallets} PLT</span>
-                  <span className="block text-[10px] text-gray-500">{g.totalGrossWeight} kg</span>
-                  {g.shipments.length > 1 && (
-                    <span className="text-[9px] text-amber-600 font-bold">Multi-drop ({g.shipments.length})</span>
-                  )}
-                </div>
-              )
-            },
-            {
-              header: 'Baia',
-              className: "w-20 text-center",
-              accessor: (g) => {
-                const bookedShipment = g.shipments.find((s: any) => s.bookingId);
-                const booking = bookedShipment ? bookings.find(b => b.id === bookedShipment.bookingId) : null;
-                const bay = booking?.bayId ? bays.find(b => b.id === booking.bayId) : null;
-                
-                if (!bay) return <span className="text-gray-300 text-xs">-</span>;
-                return (
-                  <span className="font-mono font-bold text-lg text-emerald-600 bg-emerald-50 w-8 h-8 flex items-center justify-center rounded-lg mx-auto border border-emerald-200">
-                    {bay.name}
-                  </span>
-                );
-              }
-            }
-          ]}
-        />
-      </Card>
+        </div>
+
+        {/* Tabella Dati */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+            <thead className="bg-slate-800/80 text-slate-400 text-[10px] uppercase tracking-widest border-b border-slate-700">
+              <tr>
+                <th className="px-4 py-3 font-normal text-center">Stato</th>
+                <th className="px-4 py-3 font-normal">Orario</th>
+                <th className="px-4 py-3 font-normal">Vettore / Targa</th>
+                <th className="px-4 py-3 font-normal">Viaggio / CLI</th>
+                <th className="px-4 py-3 font-normal">Committente</th>
+                <th className="px-4 py-3 font-normal">Itinerario</th>
+                <th className="px-4 py-3 font-normal">Carico</th>
+                <th className="px-4 py-3 font-normal text-center">Baia</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50 bg-slate-900 text-slate-200">
+              {activeData.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-12 text-center text-slate-500 italic tracking-widest">
+                    NESSUN {stationSubTab === 'arrivi' ? 'ARRIVO' : 'VIAGGIO IN PARTENZA'} PREVISTO
+                  </td>
+                </tr>
+              ) : (
+                activeData.map((g, index) => {
+                  const bookedShipment = g.shipments.find((s: any) => s.bookingId);
+                  const booking = bookedShipment ? bookings.find(b => b.id === bookedShipment.bookingId) : null;
+                  const firstShipment = g.shipments[0];
+                  const carrierName = carriers.find(c => c.id === g.carrierId)?.name || 'N/D';
+                  const clientName = clients.find(c => c.id === firstShipment?.clientId)?.name || 'Multi-Committente';
+                  const bay = booking?.bayId ? bays.find(b => b.id === booking.bayId) : null;
+
+                  return (
+                    <tr key={g.id || index} className="hover:bg-slate-800/50 transition-colors">
+                      {/* STATO */}
+                      <td className="px-4 py-3 text-center">
+                        {!booking ? <Badge variant="secondary" className="border-slate-600 text-slate-400">DA ABBINARE</Badge> :
+                         booking.status === 'COMPLETATO' ? <Badge variant="secondary" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">COMPLETATO</Badge> :
+                         booking.status === 'IN_BAIA' ? <Badge variant="secondary" className="border-amber-500/50 text-amber-400 bg-amber-500/20 animate-pulse">IN BAIA</Badge> :
+                         booking.status === 'AL_CANCELLO' ? <Badge variant="secondary" className="border-sky-500/50 text-sky-400 bg-sky-500/20">IN PIAZZALE</Badge> :
+                         <Badge variant="secondary" className="border-indigo-500/30 text-indigo-400 bg-indigo-500/10">IN VIAGGIO</Badge>}
+                      </td>
+                      
+                      {/* ORARIO */}
+                      <td className="px-4 py-3">
+                        <div className={`text-xl font-bold tracking-tight ${stationSubTab === 'arrivi' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {g.expectedTime || '--:--'}
+                        </div>
+                      </td>
+
+                      {/* VETTORE & TARGA */}
+                      <td className="px-4 py-3">
+                        <div className="font-bold text-slate-200 truncate max-w-[140px] uppercase">{carrierName}</div>
+                        {booking?.licensePlate ? (
+                          <div className="text-[11px] text-slate-900 font-bold bg-slate-300 px-1.5 py-0.5 rounded-sm inline-block mt-0.5 tracking-widest border border-slate-400">
+                            {booking.licensePlate}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-slate-600 mt-0.5">Targa assente</div>
+                        )}
+                      </td>
+
+                      {/* VIAGGIO */}
+                      <td className="px-4 py-3">
+                        {g.tripId ? (
+                          <span className="font-bold text-indigo-300 block">INT: {g.tripId}</span>
+                        ) : (
+                          <span className="text-slate-500 italic block text-xs">Viaggio Diretto</span>
+                        )}
+                        {(firstShipment?.clientTripNumber || firstShipment?.orderNumber) && (
+                          <span className="text-[10px] text-slate-400 block uppercase">
+                            CLI: {firstShipment?.clientTripNumber || firstShipment?.orderNumber}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* COMMITTENTE */}
+                      <td className="px-4 py-3 font-bold text-slate-300 uppercase text-xs truncate max-w-[120px]">
+                        {clientName}
+                      </td>
+
+                      {/* ITINERARIO */}
+                      <td className="px-4 py-3">
+                        <div className="bg-slate-900 rounded p-1 border border-slate-700/50">
+                           <TripRouteSequence shipments={g.shipments} depots={depots} selectedDepotId={selectedDepotId} />
+                        </div>
+                      </td>
+
+                      {/* CARICO */}
+                      <td className="px-4 py-3">
+                        <div className="text-emerald-400 font-bold">{g.totalPallets} PLT</div>
+                        <div className="text-[10px] text-slate-500">{g.totalGrossWeight} kg</div>
+                        {g.shipments.length > 1 && (
+                          <div className="text-[9px] text-amber-500 font-bold mt-0.5">Multi-drop ({g.shipments.length})</div>
+                        )}
+                      </td>
+
+                      {/* BAIA */}
+                      <td className="px-4 py-3 text-center">
+                        {bay ? (
+                          <div className="font-bold text-2xl text-amber-400 bg-black w-10 h-10 flex items-center justify-center rounded border border-slate-700 mx-auto shadow-[0_0_10px_rgba(245,158,11,0.1)]">
+                            {bay.name.replace('BAIA ', '')}
+                          </div>
+                        ) : (
+                          <span className="text-slate-700 text-xl font-bold">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };

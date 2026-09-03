@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Depot, Bay, Carrier, Booking, ActivityLog, WarehouseModule, ActivityType, ReportSchedule, User, BookingNote, QualityChecklist, ChecklistFailureAlert, BayUsage, AnomalyLog, Client, PalletType, Shipment, ComuneItaliano, SystemParameter } from '../types';
 import { saveAction } from '../utils/api';
-import { useAlert } from './AlertContext';
 
 interface AppContextType {
   depots: Depot[];
@@ -334,16 +333,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentCarrierId, setCurrentCarrierId] = useState<string>('');
   const [selectedDepotId, setSelectedDepotId] = useState<string>('depot-milano');
 
-  const { showAlert } = useAlert();
-  const handleError = (action: string, _err: any) => {
-    showAlert({
-      title: 'Errore di Sincronizzazione',
-      message: `Impossibile completare l'operazione (${action}). Il server ha restituito un errore. Le modifiche non sono state salvate.`,
-      isDanger: true,
-      confirmLabel: 'OK'
-    });
-  };
-
   // Helper per inviare le modifiche al database serverless rimosso, ora importato da api.ts
 
   // Caricamento iniziale dal Database Postgres di Vercel
@@ -571,176 +560,121 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // --- AZIONI CONFIGURAZIONE / ADMIN ---
-  const addDepot = async (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB', shortCode?: string) => {
+  const addDepot = (name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB', shortCode?: string) => {
     const prefix = type === 'CORRISPONDENTE' ? 'corr-' : 'depot-';
     const id = `${prefix}${Date.now()}`;
     const newDepot: Depot = { id, name, city, address, cap, province, country, type, shortCode };
-    try {
-      await saveAction('ADD_DEPOT', newDepot);
-      setDepots((prev) => [...prev, newDepot]);
-      logActivity(id, `Creato nuovo stabilimento/nodo: ${name} (${city})`, 'SUCCESS');
-    } catch (err) {
-      handleError('ADD_DEPOT', err);
-    }
+    setDepots((prev) => [...prev, newDepot]);
+    logActivity(id, `Creato nuovo stabilimento/nodo: ${name} (${city})`, 'SUCCESS');
+    saveAction('ADD_DEPOT', newDepot);
   };
 
-  const updateDepot = async (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB', shortCode?: string) => {
-    const payload = { id, name, city, address, cap, province, country, type, shortCode };
-    try {
-      await saveAction('UPDATE_DEPOT', payload);
-      setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, ...payload } : d)));
-      logActivity(selectedDepotId, `Aggiornato nodo: ${name} (${city})`, 'INFO');
-    } catch (err) {
-      handleError('UPDATE_DEPOT', err);
-    }
+  const updateDepot = (id: string, name: string, city: string, address?: string, cap?: string, province?: string, country?: string, type: 'HUB' | 'CORRISPONDENTE' = 'HUB', shortCode?: string) => {
+    setDepots((prev) => prev.map((d) => (d.id === id ? { ...d, name, city, address, cap, province, country, type, shortCode } : d)));
+    logActivity(selectedDepotId, `Aggiornato nodo: ${name} (${city})`, 'INFO');
+    saveAction('UPDATE_DEPOT', { id, name, city, address, cap, province, country, type, shortCode });
   };
 
-  const deleteDepot = async (id: string) => {
-    try {
-      await saveAction('DELETE_DEPOT', { id });
-      setDepots((prev) => prev.filter((d) => d.id !== id));
-      logActivity(selectedDepotId, `Eliminato stabilimento con ID: ${id}`, 'WARNING');
-    } catch (err) {
-      handleError('DELETE_DEPOT', err);
-    }
+  const deleteDepot = (id: string) => {
+    setDepots((prev) => prev.filter((d) => d.id !== id));
+    logActivity(selectedDepotId, `Eliminato stabilimento con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_DEPOT', { id });
   };
 
-  const addWarehouseModule = async (depotId: string, name: string, description?: string) => {
+  const addWarehouseModule = (depotId: string, name: string, description?: string) => {
     const id = `module-${Date.now()}`;
     const newModule: WarehouseModule = { id, depotId, name, description };
-    try {
-      await saveAction('ADD_WAREHOUSE_MODULE', newModule);
-      setWarehouseModules((prev) => [...prev, newModule]);
-      logActivity(depotId, `Creato nuovo modulo di magazzino: ${name}`, 'SUCCESS');
-    } catch (err) {
-      handleError('ADD_WAREHOUSE_MODULE', err);
-    }
+    setWarehouseModules((prev) => [...prev, newModule]);
+    logActivity(depotId, `Creato nuovo modulo di magazzino: ${name}`, 'SUCCESS');
+    saveAction('ADD_WAREHOUSE_MODULE', newModule);
   };
 
-  const updateWarehouseModule = async (id: string, depotId: string, name: string, description?: string) => {
-    const payload = { id, depotId, name, description };
-    try {
-      await saveAction('UPDATE_WAREHOUSE_MODULE', payload);
-      setWarehouseModules((prev) => prev.map((m) => (m.id === id ? { ...m, ...payload } : m)));
-      logActivity(depotId, `Aggiornato modulo magazzino: ${name}`, 'INFO');
-    } catch (err) {
-      handleError('UPDATE_WAREHOUSE_MODULE', err);
-    }
+  const updateWarehouseModule = (id: string, depotId: string, name: string, description?: string) => {
+    setWarehouseModules((prev) => prev.map((m) => (m.id === id ? { ...m, depotId, name, description } : m)));
+    logActivity(depotId, `Aggiornato modulo magazzino: ${name}`, 'INFO');
+    saveAction('UPDATE_WAREHOUSE_MODULE', { id, depotId, name, description });
   };
 
-  const deleteWarehouseModule = async (id: string) => {
-    try {
-      await saveAction('DELETE_WAREHOUSE_MODULE', { id });
-      setWarehouseModules((prev) => prev.filter((m) => m.id !== id));
-      logActivity(selectedDepotId, `Eliminato modulo magazzino con ID: ${id}`, 'WARNING');
-    } catch (err) {
-      handleError('DELETE_WAREHOUSE_MODULE', err);
-    }
+  const deleteWarehouseModule = (id: string) => {
+    setWarehouseModules((prev) => prev.filter((m) => m.id !== id));
+    logActivity(selectedDepotId, `Eliminato modulo magazzino con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_WAREHOUSE_MODULE', { id });
   };
 
-  const addBay = async (depotId: string, name: string, moduleId?: string, bayUsageId?: string) => {
+  const addBay = (depotId: string, name: string, moduleId?: string, bayUsageId?: string) => {
     const id = `bay-${Date.now()}`;
     const newBay: Bay = { id, depotId, moduleId, name, status: 'DISPONIBILE', bayUsageId };
-    try {
-      await saveAction('ADD_BAY', newBay);
-      setBays((prev) => [...prev, newBay]);
-      logActivity(depotId, `Aggiunta nuova baia: ${name}`, 'SUCCESS');
-    } catch (err) {
-      handleError('ADD_BAY', err);
-    }
+    setBays((prev) => [...prev, newBay]);
+    logActivity(depotId, `Aggiunta nuova baia: ${name}`, 'SUCCESS');
+    saveAction('ADD_BAY', newBay);
   };
 
-  const updateBay = async (id: string, name: string, moduleId?: string, bayUsageId?: string) => {
-    const payload = { id, name, moduleId, bayUsageId };
-    try {
-      await saveAction('UPDATE_BAY', payload);
-      setBays((prev) => prev.map((b) => (b.id === id ? { ...b, ...payload } : b)));
-      logActivity(selectedDepotId, `Aggiornata baia: ${name}`, 'INFO');
-    } catch (err) {
-      handleError('UPDATE_BAY', err);
-    }
+  const updateBay = (id: string, name: string, moduleId?: string, bayUsageId?: string) => {
+    setBays((prev) => prev.map((b) => (b.id === id ? { ...b, name, moduleId, bayUsageId } : b)));
+    logActivity(selectedDepotId, `Aggiornata baia: ${name}`, 'INFO');
+    saveAction('UPDATE_BAY', { id, name, moduleId, bayUsageId });
   };
 
-  const deleteBay = async (id: string) => {
-    try {
-      await saveAction('DELETE_BAY', { id });
-      setBays((prev) => prev.filter((b) => b.id !== id));
-      logActivity(selectedDepotId, `Eliminata baia con ID: ${id}`, 'WARNING');
-    } catch (err) {
-      handleError('DELETE_BAY', err);
-    }
+  const deleteBay = (id: string) => {
+    setBays((prev) => prev.filter((b) => b.id !== id));
+    logActivity(selectedDepotId, `Eliminata baia con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_BAY', { id });
   };
 
-  const updateBayStatus = async (bayId: string, status: Bay['status']) => {
-    const targetBay = bays.find((b) => b.id === bayId);
-    if (!targetBay) return;
-    const currentBookingId = status === 'MANUTENZIONE' ? null : targetBay.currentBookingId;
-    
-    try {
-      await saveAction('UPDATE_BAY_STATUS', { bayId, status, currentBookingId });
-      setBays((prev) =>
-        prev.map((b) => {
-          const updatedBay = { ...b, status };
-          if (b.id === bayId) {
-            if (status === 'MANUTENZIONE') {
-              updatedBay.currentBookingId = undefined;
-            }
-            return updatedBay;
+  const updateBayStatus = (bayId: string, status: Bay['status']) => {
+    setBays((prev) =>
+      prev.map((b) => {
+        const updatedBay = { ...b, status };
+        if (b.id === bayId) {
+          if (status === 'MANUTENZIONE') {
+            updatedBay.currentBookingId = undefined;
           }
-          return b;
-        })
-      );
+          return updatedBay;
+        }
+        return b;
+      })
+    );
+    const targetBay = bays.find((b) => b.id === bayId);
+    if (targetBay) {
       logActivity(targetBay.depotId, `Stato della baia ${targetBay.name} modificato in: ${status}`, status === 'MANUTENZIONE' ? 'WARNING' : 'INFO');
-    } catch (err) {
-      handleError('UPDATE_BAY_STATUS', err);
     }
+    const currentBookingId = status === 'MANUTENZIONE' ? null : (bays.find(b => b.id === bayId)?.currentBookingId);
+    saveAction('UPDATE_BAY_STATUS', { id: bayId, status, currentBookingId });
   };
 
-  const updateBayUsage = async (bayId: string, bayUsageId?: string) => {
-    try {
-      await saveAction('UPDATE_BAY_USAGE', { id: bayId, usageId: bayUsageId });
-      setBays((prev) =>
-        prev.map((b) => (b.id === bayId ? { ...b, bayUsageId } : b))
-      );
-      const targetBay = bays.find((b) => b.id === bayId);
-      if (targetBay) {
-        logActivity(targetBay.depotId, `Aggiornato uso baia per ${targetBay.name}`, 'INFO');
-      }
-    } catch (err) {
-      handleError('UPDATE_BAY_USAGE', err);
+  const updateBayUsage = (bayId: string, bayUsageId?: string) => {
+    setBays((prev) =>
+      prev.map((b) => (b.id === bayId ? { ...b, bayUsageId } : b))
+    );
+    const targetBay = bays.find((b) => b.id === bayId);
+    if (targetBay) {
+      logActivity(targetBay.depotId, `Aggiornato uso baia per ${targetBay.name}`, 'INFO');
     }
+    saveAction('UPDATE_BAY_USAGE', { id: bayId, usageId: bayUsageId });
   };
 
-  const addBayUsage = async (name: string, description?: string) => {
+  const addBayUsage = (name: string, description?: string) => {
     const id = `bu-${Date.now()}`;
     const newUsage: BayUsage = { id, name, description };
-    try {
-      await saveAction('ADD_BAY_USAGE', newUsage);
-      setBayUsages((prev) => [...prev, newUsage]);
-      logActivity(selectedDepotId, `Creato nuovo Uso Baia: ${name}`, 'SUCCESS');
-    } catch (err) {
-      handleError('ADD_BAY_USAGE', err);
-    }
+    setBayUsages((prev) => [...prev, newUsage]);
+    logActivity(selectedDepotId, `Creato nuovo Uso Baia: ${name}`, 'SUCCESS');
+    saveAction('ADD_BAY_USAGE', newUsage);
   };
 
-  const deleteBayUsage = async (id: string) => {
-    try {
-      await saveAction('DELETE_BAY_USAGE', { id });
-      setBayUsages((prev) => prev.filter((bu) => bu.id !== id));
-      setBays((prevBays) =>
-        prevBays.map((b) => (b.bayUsageId === id ? { ...b, bayUsageId: undefined } : b))
-      );
-      setBookings((prevBookings) =>
-        prevBookings.map((b) => (b.clientUsageId === id ? { ...b, clientUsageId: undefined } : b))
-      );
-      logActivity(selectedDepotId, `Eliminato Uso Baia: ${id}`, 'WARNING');
-    } catch (err) {
-      handleError('DELETE_BAY_USAGE', err);
-    }
+  const deleteBayUsage = (id: string) => {
+    setBayUsages((prev) => prev.filter((bu) => bu.id !== id));
+    setBays((prevBays) =>
+      prevBays.map((b) => (b.bayUsageId === id ? { ...b, bayUsageId: undefined } : b))
+    );
+    setBookings((prevBookings) =>
+      prevBookings.map((b) => (b.clientUsageId === id ? { ...b, clientUsageId: undefined } : b))
+    );
+    logActivity(selectedDepotId, `Eliminato Uso Baia: ${id}`, 'WARNING');
+    saveAction('DELETE_BAY_USAGE', { id });
   };
 
   // --- AZIONI VETTORI ---
-  const addCarrier = async (name: string, email: string, vatNumber?: string, licensePlate?: string, licensePlateTrailer?: string) => {
+  const addCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string, licensePlateTrailer?: string) => {
     const id = `carrier-${Date.now()}`;
     const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
     const cleanTrailer = licensePlateTrailer ? licensePlateTrailer.replace(/\s+/g, '').toUpperCase() : undefined;
@@ -754,16 +688,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       licensePlate: cleanPlate,
       licensePlateTrailer: cleanTrailer,
     };
-    try {
-      await saveAction('ADD_CARRIER', newCarrier);
-      setCarriers((prev) => [...prev, newCarrier]);
-      logActivity(selectedDepotId, `Creato anagrafica vettore da Admin: ${name}`, 'SUCCESS');
-    } catch (err) {
-      handleError('ADD_CARRIER', err);
-    }
+    setCarriers((prev) => [...prev, newCarrier]);
+    logActivity(selectedDepotId, `Creato anagrafica vettore da Admin: ${name}`, 'SUCCESS');
+    saveAction('ADD_CARRIER', newCarrier);
   };
 
-  const registerCarrier = async (name: string, email: string, vatNumber?: string, licensePlate?: string) => {
+  const registerCarrier = (name: string, email: string, vatNumber?: string, licensePlate?: string) => {
     const id = `carrier-${Date.now()}`;
     const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
     
@@ -775,83 +705,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       vatNumber,
       licensePlate: cleanPlate,
     };
-    try {
-      await saveAction('ADD_CARRIER', newCarrier);
-      setCarriers((prev) => [...prev, newCarrier]);
-    } catch (err) {
-      handleError('ADD_CARRIER', err);
-    }
+    setCarriers((prev) => [...prev, newCarrier]);
+    saveAction('ADD_CARRIER', newCarrier);
   };
 
-  const approveCarrier = async (carrierId: string) => {
-    try {
-      await saveAction('APPROVE_CARRIER', { id: carrierId });
-      setCarriers((prev) =>
-        prev.map((c) => (c.id === carrierId ? { ...c, status: 'APPROVATO' as const } : c))
-      );
-      const carrier = carriers.find((c) => c.id === carrierId);
-      if (carrier) {
-        logActivity(selectedDepotId, `Approvato vettore: ${carrier.name}. Generata abilitazione all'accesso.`, 'SUCCESS');
-      }
-    } catch (err) {
-      handleError('APPROVE_CARRIER', err);
+  const approveCarrier = (carrierId: string) => {
+    setCarriers((prev) =>
+      prev.map((c) => (c.id === carrierId ? { ...c, status: 'APPROVATO' as const } : c))
+    );
+    const carrier = carriers.find((c) => c.id === carrierId);
+    if (carrier) {
+      logActivity(selectedDepotId, `Approvato vettore: ${carrier.name}. Generata abilitazione all'accesso.`, 'SUCCESS');
     }
+    saveAction('APPROVE_CARRIER', { id: carrierId });
   };
 
-  const rejectCarrier = async (carrierId: string) => {
-    try {
-      await saveAction('REJECT_CARRIER', { id: carrierId });
-      setCarriers((prev) =>
-        prev.map((c) => (c.id === carrierId ? { ...c, status: 'RIFIUTATO' as const } : c))
-      );
-      const carrier = carriers.find((c) => c.id === carrierId);
-      if (carrier) {
-        logActivity(selectedDepotId, `Richiesta vettore rifiutata: ${carrier.name}`, 'WARNING');
-      }
-    } catch (err) {
-      handleError('REJECT_CARRIER', err);
+  const rejectCarrier = (carrierId: string) => {
+    setCarriers((prev) =>
+      prev.map((c) => (c.id === carrierId ? { ...c, status: 'RIFIUTATO' as const } : c))
+    );
+    const carrier = carriers.find((c) => c.id === carrierId);
+    if (carrier) {
+      logActivity(selectedDepotId, `Richiesta vettore rifiutata: ${carrier.name}`, 'WARNING');
     }
+    saveAction('REJECT_CARRIER', { id: carrierId });
   };
 
-  const updateCarrierProfile = async (id: string, email: string, licensePlate?: string, phone?: string, licensePlateTrailer?: string) => {
+  const updateCarrierProfile = (id: string, email: string, licensePlate?: string, phone?: string, licensePlateTrailer?: string) => {
     const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
     const cleanTrailer = licensePlateTrailer ? licensePlateTrailer.replace(/\s+/g, '').toUpperCase() : undefined;
+
+    setCarriers((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer } : c))
+    );
+    logActivity(selectedDepotId, `Vettore ${id} ha aggiornato il proprio profilo anagrafico.`, 'INFO');
     const updatedCarrier = carriers.find(c => c.id === id);
-    const payload = updatedCarrier ? { id, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer, name: updatedCarrier.name, vatNumber: updatedCarrier.vatNumber } : { id, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer };
-    
-    try {
-      await saveAction('UPDATE_CARRIER_PROFILE', payload);
-      setCarriers((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer } : c))
-      );
-      logActivity(selectedDepotId, `Vettore ${id} ha aggiornato il proprio profilo anagrafico.`, 'INFO');
-    } catch (err) {
-      handleError('UPDATE_CARRIER_PROFILE', err);
+    if (updatedCarrier) {
+      saveAction('UPDATE_CARRIER_PROFILE', { id, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer, name: updatedCarrier.name, vatNumber: updatedCarrier.vatNumber });
+    } else {
+      saveAction('UPDATE_CARRIER_PROFILE', { id, email, licensePlate: cleanPlate, phone, licensePlateTrailer: cleanTrailer });
     }
   };
 
-  const updateCarrier = async (id: string, name: string, email: string, vatNumber?: string, licensePlate?: string) => {
+  const updateCarrier = (id: string, name: string, email: string, vatNumber?: string, licensePlate?: string) => {
     const cleanPlate = licensePlate ? licensePlate.replace(/\s+/g, '').toUpperCase() : undefined;
-    const payload = { id, name, email, vatNumber, licensePlate: cleanPlate };
-    try {
-      await saveAction('UPDATE_CARRIER', payload);
-      setCarriers((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, name, email, vatNumber, licensePlate: cleanPlate } : c))
-      );
-      logActivity(selectedDepotId, `Aggiornata anagrafica vettore da Admin: ${name}`, 'INFO');
-    } catch (err) {
-      handleError('UPDATE_CARRIER', err);
-    }
+    setCarriers((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, name, email, vatNumber, licensePlate: cleanPlate } : c))
+    );
+    logActivity(selectedDepotId, `Aggiornata anagrafica vettore da Admin: ${name}`, 'INFO');
+    saveAction('UPDATE_CARRIER', { id, name, email, vatNumber, licensePlate: cleanPlate });
   };
 
-  const deleteCarrier = async (id: string) => {
-    try {
-      await saveAction('DELETE_CARRIER', { id });
-      setCarriers((prev) => prev.filter((c) => c.id !== id));
-      logActivity(selectedDepotId, `Eliminato vettore con ID: ${id}`, 'WARNING');
-    } catch (err) {
-      handleError('DELETE_CARRIER', err);
-    }
+  const deleteCarrier = (id: string) => {
+    setCarriers((prev) => prev.filter((c) => c.id !== id));
+    logActivity(selectedDepotId, `Eliminato vettore con ID: ${id}`, 'WARNING');
+    saveAction('DELETE_CARRIER', { id });
   };
 
   // --- AZIONI PRENOTAZIONI ---

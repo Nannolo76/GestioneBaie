@@ -2,6 +2,8 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { exportToCsv } from '../utils/exportUtils';
 
 export const ReportStatistiche: React.FC = () => {
   const {
@@ -60,6 +62,21 @@ export const ReportStatistiche: React.FC = () => {
     ? Math.round(loadingTimes.reduce((a, b) => a + b, 0) / loadingTimes.length)
     : 30; // Fallback
 
+  const handleExportCsv = () => {
+    exportToCsv(activeBookings, 'report_attivita', [
+      { header: 'ID Booking', key: 'id' },
+      { header: 'Vettore', key: (b) => carriers.find(c => c.id === b.carrierId)?.name || b.carrierId },
+      { header: 'Stato', key: 'status' },
+      { header: 'Targa', key: 'licensePlate' },
+      { header: 'Check-In', key: 'timeInGate' },
+      { header: 'In Baia', key: 'timeInBay' },
+      { header: 'Fine Baia', key: 'timeOutBay' },
+      { header: 'Check-Out', key: 'timeOutGate' },
+      { header: 'Turnaround (min)', key: calculateTurnaround },
+      { header: 'Sosta in Baia (min)', key: calculateLoadingTime },
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       {/* Intestazione */}
@@ -72,7 +89,10 @@ export const ReportStatistiche: React.FC = () => {
             Analisi delle performance e tempi di turnaround dell'Hub: {activeDepot?.name}
           </p>
         </div>
-        <Badge variant="primary">REPORT GIORNALIERO // LIVE</Badge>
+        <div className="flex items-center gap-4">
+          <Badge variant="primary">REPORT GIORNALIERO // LIVE</Badge>
+          <Button size="sm" variant="secondary" onClick={handleExportCsv}>📥 Esporta CSV</Button>
+        </div>
       </div>
 
       {/* Grid delle statistiche chiave (Widgets) */}

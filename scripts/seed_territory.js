@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
 import fs from 'fs';
-import path from 'path';
+
 
 // Manual env load
 const envPath = 'C:\\Users\\IvanoFiorito\\OneDrive - LOGISTICA UNO EUROPE SRL\\Desktop\\antigravity project\\GestioneBaie\\.env.local';

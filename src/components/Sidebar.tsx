@@ -89,9 +89,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             {(currentRole === 'GUARDIA' || currentRole === 'PREPOSTO') && (
               <div className="flex flex-col gap-1 mt-1 border-t border-white/5 pt-1.5">
                 <div className="flex justify-between items-center">
-                  <span className="text-white/60">Plant:</span>
+                  <label className="text-white/60">Plant:</label>
                   {currentUser?.role === 'ADMIN' ? (
                     <select
+                      aria-label="Seleziona Plant"
                       value={selectedDepotId}
                       onChange={(e) => setSelectedDepotId(e.target.value)}
                       className="bg-slate-900 border border-white/20 text-[10px] text-white font-mono rounded p-1 max-w-[160px] outline-none cursor-pointer focus:border-[#11BCEC]"
@@ -104,6 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
                     </select>
                   ) : currentUser?.depotIds && currentUser.depotIds.length > 1 ? (
                     <select
+                      aria-label="Seleziona Plant"
                       value={selectedDepotId}
                       onChange={(e) => setSelectedDepotId(e.target.value)}
                       className="bg-slate-900 border border-white/20 text-[10px] text-white font-mono rounded p-1 max-w-[160px] outline-none cursor-pointer focus:border-[#11BCEC]"
@@ -140,7 +142,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             <>
               <button
                 onClick={() => setActiveTab('admin-dashboard')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-dashboard'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -153,7 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </button>
               <button
                 onClick={() => setActiveTab('admin-modules')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-modules'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -166,7 +168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </button>
               <button
                 onClick={() => setActiveTab('admin-carriers')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-carriers'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -179,7 +181,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </button>
               <button
                 onClick={() => setActiveTab('admin-activities')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-activities'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -192,7 +194,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </button>
               <button
                 onClick={() => setActiveTab('admin-bayusages')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-bayusages'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -205,7 +207,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </button>
               <button
                 onClick={() => setActiveTab('admin-reports')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'admin-reports'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -219,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               <div className="my-2 border-t border-white/10" />
               <button
                 onClick={() => setActiveTab('yard-monitor')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'yard-monitor'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -229,7 +231,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
               </button>
               <button
                 onClick={() => setActiveTab('analytics')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'analytics'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'
@@ -245,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
             <>
               <button
                 onClick={() => setActiveTab('carrier-portal')}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer mb-0.5 ${
                   activeTab === 'carrier-portal'
                     ? 'bg-white/20 text-white shadow-xs border border-white/20'
                     : 'text-white/70 hover:text-white hover:bg-white/10 border border-transparent'

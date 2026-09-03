@@ -58,7 +58,7 @@ export function TerritoryAutocomplete({
     const customStr = localStorage.getItem('custom_territories');
     let custom: TerritoryRecord[] = [];
     if (customStr) {
-      try { custom = JSON.parse(customStr); } catch (e) {}
+      try { custom = JSON.parse(customStr); } catch { /* ignore */ }
     }
     return [...custom, ...territoryData];
   }, [territoryData]);
@@ -111,7 +111,7 @@ export function TerritoryAutocomplete({
     const customStr = localStorage.getItem('custom_territories');
     let custom: TerritoryRecord[] = [];
     if (customStr) {
-      try { custom = JSON.parse(customStr); } catch (e) {}
+      try { custom = JSON.parse(customStr); } catch { /* ignore */ }
     }
     custom.push(newRecord);
     localStorage.setItem('custom_territories', JSON.stringify(custom));

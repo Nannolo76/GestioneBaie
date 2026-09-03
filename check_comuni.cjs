@@ -2,7 +2,7 @@ const fs = require('fs');
 const data = JSON.parse(fs.readFileSync('./comuni_raw.json', 'utf8'));
 
 // Format: { comune, cap, provincia }
-const result = data.map(c => {
+data.map(c => {
   // c.cap is an array in this dataset usually. Let's take the first one or generic.
   // We'll see the exact schema of the first item to adjust.
   return c;

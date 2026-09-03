@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   
   try {
     console.log('Creating table...');
-    await sql
+    await sql`
       CREATE TABLE IF NOT EXISTS anagrafica_territoriale (
         id SERIAL PRIMARY KEY,
         regione TEXT NOT NULL,
@@ -16,10 +16,10 @@ export default async function handler(req, res) {
         cap TEXT NOT NULL,
         istat_code TEXT UNIQUE NOT NULL
       );
-    ;
-    await sqlCREATE INDEX IF NOT EXISTS idx_territoriale_comune ON anagrafica_territoriale(comune);;
+    `;
+    await sql`CREATE INDEX IF NOT EXISTS idx_territoriale_comune ON anagrafica_territoriale(comune);`;
     
-    const checkCount = await sqlSELECT count(*) as count FROM anagrafica_territoriale;
+    const checkCount = await sql`SELECT count(*) as count FROM anagrafica_territoriale`;
     const count = parseInt(checkCount.rows[0].count);
     if (count >= 7900) {
       return res.status(200).json({ status: 'already seeded fully', count });
@@ -49,13 +49,13 @@ export default async function handler(req, res) {
     const jsonStr = JSON.stringify(mapped);
     
     // In Vercel Postgres, we use standard parameterization
-    const queryStr = 
+    const queryStr = `
       INSERT INTO anagrafica_territoriale (regione, provincia, provincia_sigla, comune, cap, istat_code)
       SELECT regione, provincia, provincia_sigla, comune, cap, istat_code 
-      FROM json_to_recordset(::json)
+      FROM json_to_recordset('${jsonStr}'::json)
       AS x(regione text, provincia text, provincia_sigla text, comune text, cap text, istat_code text)
       ON CONFLICT (istat_code) DO NOTHING
-    ;
+    `;
     
     // Note: Vercel's sql.query function is what the user was told to use for dynamic queries
     await sql.query(queryStr, [jsonStr]);

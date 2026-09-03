@@ -28,12 +28,12 @@ export default async function handler(req, res) {
       
       const jsonStr = JSON.stringify(chunk);
       const safeJsonStr = jsonStr.replace(/'/g, "''");
-      const queryStr = 
+      const queryStr = `
         INSERT INTO anagrafica_comuni (comune, cap, provincia)
-        SELECT comune, cap, provincia FROM json_to_recordset(' + safeJsonStr + '::json)
+        SELECT comune, cap, provincia FROM json_to_recordset('${safeJsonStr}'::json)
         AS x(comune text, cap text, provincia text)
         ON CONFLICT DO NOTHING
-      ;
+      `;
       await client.query(queryStr);
       
       const newCount = count + chunk.length;

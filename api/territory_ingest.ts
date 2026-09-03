@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     const client = await dbPool.connect();
     
     try {
-      await client.query( + "" + 
+      await client.query(`
         CREATE TABLE IF NOT EXISTS anagrafica_territoriale (
           id SERIAL PRIMARY KEY,
           regione TEXT NOT NULL,
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
           istat_code TEXT UNIQUE NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_territoriale_comune ON anagrafica_territoriale(comune);
-       + "" + );
+      `);
       
       let chunk = [];
       if (req.body && Array.isArray(req.body)) {
@@ -42,14 +42,14 @@ export default async function handler(req, res) {
         const com = c.comune.replace(/'/g, "''");
         const cap = c.cap.replace(/'/g, "''");
         const istat = c.istat_code.replace(/'/g, "''");
-        values.push( + "" + ('', '', '', '', '', '') + "" + );
+        values.push(`('${reg}', '${prov}', '${sigla}', '${com}', '${cap}', '${istat}')`);
       }
       
-      const queryStr =  + "" + 
+      const queryStr = `
         INSERT INTO anagrafica_territoriale (regione, provincia, provincia_sigla, comune, cap, istat_code)
-        VALUES 
+        VALUES ${values.join(',')}
         ON CONFLICT (istat_code) DO NOTHING
-       + "" + ;
+      `;
       
       await client.query(queryStr);
       

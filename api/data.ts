@@ -24,7 +24,7 @@ if (!process.env.DATABASE_URL) {
         }
       });
     }
-  } catch (e) {
+  } catch {
     console.error('Failed to manually load .env.local file:', e);
   }
 }
@@ -40,7 +40,7 @@ function readDb() {
     try {
       inMemoryDb = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
       return inMemoryDb;
-    } catch (e) {
+    } catch {
       console.error("Failed to read mock DB from disk:", e);
     }
   }
@@ -70,7 +70,7 @@ function writeDb(data: any) {
   inMemoryDb = data;
   try {
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (e) {
+  } catch {
     console.warn("Failed to write mock DB to disk (normal in serverless/read-only env):", e);
   }
 }
@@ -156,7 +156,7 @@ async function mockSql(query: string, params: any[] = []): Promise<any[]> {
     cols.forEach((col, idx) => {
       let val = params[idx];
       if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-        try { val = JSON.parse(val); } catch (e) {}
+        try { val = JSON.parse(val); } catch {}
       }
       row[col] = val;
     });
@@ -194,7 +194,7 @@ async function mockSql(query: string, params: any[] = []): Promise<any[]> {
                   if (valMatch) {
                     let val = params[parseInt(valMatch[1]) - 1];
                     if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
-                      try { val = JSON.parse(val); } catch (e) {}
+                      try { val = JSON.parse(val); } catch {}
                     }
                     row[col] = val;
                   } else {
@@ -536,7 +536,7 @@ async function initializeDb() {
   // Aggiorna depotIds dell'admin affinché abbia accesso di default ai 3 principali
   try {
     await sql("UPDATE users SET depot_ids = '[\"depot-milano\",\"depot-roma\",\"depot-bari\"]' WHERE id = 'user-1'");
-  } catch (err) {
+  } catch {
     console.error("Errore durante aggiornamento depotIds admin:", err);
   }
 
@@ -930,7 +930,7 @@ async function initializeDb() {
           console.log('Seed anagrafica_comuni completed successfully');
         }
       }
-    } catch (seedErr) {
+    } catch {
       console.error('Failed to seed anagrafica_comuni:', seedErr);
     }
   }
@@ -1099,7 +1099,7 @@ export default async function handler(req: any, res: any) {
         if (u.depot_ids) {
           try {
             depotIds = typeof u.depot_ids === 'string' ? JSON.parse(u.depot_ids) : u.depot_ids;
-          } catch (e) {
+          } catch {
             depotIds = [u.depot_id];
           }
         } else {
@@ -1594,7 +1594,7 @@ export default async function handler(req: any, res: any) {
     }
 
     return res.status(405).json({ error: 'Metodo non consentito' });
-  } catch (error: any) {
+  } catch {
     console.error('Errore Database Serverless:', error);
     return res.status(500).json({ error: error.message || 'Errore interno del server' });
   }

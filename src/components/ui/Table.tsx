@@ -13,10 +13,42 @@ interface TableProps<T> {
   emptyMessage?: string;
   rowClassName?: (row: T) => string;
   expandableContent?: (row: T) => React.ReactNode;
+  selectable?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+  keyExtractor?: (row: T) => string;
 }
 
-export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato', rowClassName, expandableContent }: TableProps<T>) {
+export function Table<T>({ 
+  columns, 
+  data, 
+  emptyMessage = 'Nessun dato trovato', 
+  rowClassName, 
+  expandableContent,
+  selectable,
+  selectedIds = [],
+  onSelectionChange,
+  keyExtractor
+}: TableProps<T>) {
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+
+  const handleSelectAll = () => {
+    if (!onSelectionChange || !keyExtractor) return;
+    if (selectedIds.length === data.length) {
+      onSelectionChange([]);
+    } else {
+      onSelectionChange(data.map(keyExtractor));
+    }
+  };
+
+  const handleSelectRow = (id: string) => {
+    if (!onSelectionChange) return;
+    if (selectedIds.includes(id)) {
+      onSelectionChange(selectedIds.filter(i => i !== id));
+    } else {
+      onSelectionChange([...selectedIds, id]);
+    }
+  };
 
   const toggleRow = (index: number) => {
     const newExpanded = new Set(expandedRows);
@@ -29,10 +61,21 @@ export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato', 
   };
 
   return (
-    <div className="w-full overflow-x-auto border border-black/10 rounded-xl bg-white shadow-xs">
+    <div className="w-full overflow-x-auto border border-black/10 rounded-xl bg-white shadow-md">
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="bg-gray-50/50 border-b border-black/10">
+            {selectable && (
+              <th className="w-10 p-3 text-center">
+                <input 
+                  type="checkbox" 
+                  checked={data.length > 0 && selectedIds.length === data.length}
+                  onChange={handleSelectAll}
+                  className="rounded border-gray-300 text-[#11BCEC] focus:ring-[#11BCEC] cursor-pointer"
+                  aria-label="Seleziona tutti"
+                />
+              </th>
+            )}
             {expandableContent && (
               <th className="w-10 p-3"></th>
             )}
@@ -49,7 +92,7 @@ export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato', 
         <tbody className="divide-y divide-black/5 font-mono text-[11px]">
           {data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length + (expandableContent ? 1 : 0)} className="p-8 text-center text-gray-400">
+              <td colSpan={columns.length + (expandableContent ? 1 : 0) + (selectable ? 1 : 0)} className="p-8 text-center text-gray-400">
                 {emptyMessage}
               </td>
             </tr>
@@ -57,12 +100,26 @@ export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato', 
             data.map((row, rowIndex) => {
               const customClass = rowClassName ? rowClassName(row) : '';
               const isExpanded = expandedRows.has(rowIndex);
+              const rowId = keyExtractor ? keyExtractor(row) : String(rowIndex);
+              const isSelected = selectedIds.includes(rowId);
+              
               return (
-                <React.Fragment key={rowIndex}>
+                <React.Fragment key={rowId}>
                   <tr 
-                    className={`transition-colors ${customClass} ${expandableContent ? 'cursor-pointer hover:bg-gray-50/50' : 'hover:bg-gray-50/30'}`}
+                    className={`transition-colors ${customClass} ${isSelected ? 'bg-blue-50/50' : ''} ${expandableContent ? 'cursor-pointer hover:bg-gray-50/50' : 'hover:bg-gray-50/30'}`}
                     onClick={() => expandableContent && toggleRow(rowIndex)}
                   >
+                    {selectable && (
+                      <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          type="checkbox" 
+                          checked={isSelected}
+                          onChange={() => handleSelectRow(rowId)}
+                          className="rounded border-gray-300 text-[#11BCEC] focus:ring-[#11BCEC] cursor-pointer"
+                          aria-label={`Seleziona riga ${rowId}`}
+                        />
+                      </td>
+                    )}
                     {expandableContent && (
                       <td className="p-3 text-gray-400 w-10 text-center">
                         {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -76,7 +133,7 @@ export function Table<T>({ columns, data, emptyMessage = 'Nessun dato trovato', 
                   </tr>
                   {expandableContent && isExpanded && (
                     <tr className="bg-gray-50/50">
-                      <td colSpan={columns.length + 1} className="p-0 border-b border-black/5">
+                      <td colSpan={columns.length + (selectable ? 1 : 0) + 1} className="p-0 border-b border-black/5">
                         {expandableContent(row)}
                       </td>
                     </tr>

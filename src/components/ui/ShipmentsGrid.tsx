@@ -3,15 +3,20 @@ import { useApp } from '../../context/AppContext';
 import { Badge } from './Badge';
 import { Input, Select } from './Input';
 import { Button } from './Button';
+import { exportToCsv } from '../../utils/exportUtils';
 
 export const ShipmentsGrid: React.FC = () => {
-  const { shipments, selectedDepotId, clients, carriers } = useApp();
+  const { shipments, selectedDepotId, clients, carriers, updateShipmentStatus } = useApp();
 
   // Filters state
   const [globalSearch, setGlobalSearch] = useState('');
   const [filterClient, setFilterClient] = useState('');
   const [filterTrip, setFilterTrip] = useState('');
   const [filterCity, setFilterCity] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+
+  // Bulk actions state
+  const [selectedShipmentIds, setSelectedShipmentIds] = useState<string[]>([]);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -58,6 +63,17 @@ export const ShipmentsGrid: React.FC = () => {
         if (sCity !== filterCity) return false;
       }
 
+      // Filter by Status
+      if (filterStatus) {
+        if (filterStatus === 'IN_VIAGGIO' && !s.bookingId) return false;
+        if (filterStatus !== 'IN_VIAGGIO') {
+          const sStatus = s.status || 'DA_PIANIFICARE';
+          if (filterStatus === 'DA_PIANIFICARE' && (sStatus !== 'DA_PIANIFICARE' || s.bookingId)) return false;
+          if (filterStatus === 'PIANIFICATO' && (sStatus !== 'PIANIFICATO' || s.bookingId)) return false;
+          if (filterStatus === 'COMPLETATO' && sStatus !== 'COMPLETATO') return false;
+        }
+      }
+
       // Global Search (DDT, Delivery, Client Name)
       if (globalSearch) {
         const query = globalSearch.toLowerCase();
@@ -81,7 +97,7 @@ export const ShipmentsGrid: React.FC = () => {
     });
 
     return result;
-  }, [shipments, selectedDepotId, filterClient, filterTrip, filterCity, globalSearch, clients]);
+  }, [shipments, selectedDepotId, filterClient, filterTrip, filterCity, filterStatus, globalSearch, clients]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredShipments.length / ITEMS_PER_PAGE) || 1;
@@ -113,10 +129,61 @@ export const ShipmentsGrid: React.FC = () => {
     }
   };
 
+  const handleSelectAll = () => {
+    if (selectedShipmentIds.length === paginatedShipments.length) {
+      setSelectedShipmentIds([]);
+    } else {
+      setSelectedShipmentIds(paginatedShipments.map(s => s.id));
+    }
+  };
+
+  const handleSelectRow = (id: string) => {
+    if (selectedShipmentIds.includes(id)) {
+      setSelectedShipmentIds(selectedShipmentIds.filter(i => i !== id));
+    } else {
+      setSelectedShipmentIds([...selectedShipmentIds, id]);
+    }
+  };
+
+  const handleBulkStatusChange = (newStatus: string) => {
+    if (!updateShipmentStatus) return;
+    selectedShipmentIds.forEach(id => {
+      updateShipmentStatus(id, newStatus);
+    });
+    setSelectedShipmentIds([]);
+  };
+
+  const handleExportCsv = () => {
+    exportToCsv(filteredShipments, 'spedizioni_export', [
+      { header: 'ID', key: 'id' },
+      { header: 'DDT', key: 'orderNumber' },
+      { header: 'Delivery', key: 'orderNumber2' },
+      { header: 'Committente', key: (r) => clients.find(c => c.id === r.clientId)?.name || '' },
+      { header: 'Destinatario', key: (r) => r.realDestinationName || r.subjectName || '' },
+      { header: 'Città', key: (r) => r.realDestinationCity || r.originOrDestination || r.city || '' },
+      { header: 'Pallet', key: 'palletPlaces' },
+      { header: 'Peso', key: 'grossWeight' },
+      { header: 'Viaggio', key: 'tripId' },
+      { header: 'Stato', key: 'status' }
+    ]);
+  };
+
   return (
-    <div className="flex flex-col h-full bg-white animate-fade-in border border-black/10 rounded-xl overflow-hidden shadow-sm">
+    <div className="flex flex-col h-full bg-white animate-fade-in border border-black/10 rounded-xl overflow-hidden shadow-md">
       {/* Header & Filters */}
       <div className="bg-gray-50 border-b border-black/10 p-4 space-y-4 shrink-0">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center space-x-2">
+            {selectedShipmentIds.length > 0 && (
+              <>
+                <span className="text-sm text-gray-500">{selectedShipmentIds.length} selezionate</span>
+                <Button size="sm" variant="success" onClick={() => handleBulkStatusChange('COMPLETATO')}>Segna Completate</Button>
+                <Button size="sm" variant="primary" onClick={() => handleBulkStatusChange('DA_PIANIFICARE')}>Rimetti in Magazzino</Button>
+              </>
+            )}
+          </div>
+          <Button size="sm" variant="secondary" onClick={handleExportCsv}>📥 Esporta CSV</Button>
+        </div>
         <div className="flex flex-col md:flex-row md:items-end gap-4">
           <div className="flex-1">
             <Input 
@@ -164,6 +231,23 @@ export const ShipmentsGrid: React.FC = () => {
               className="bg-white"
             />
           </div>
+          <div className="w-full md:w-48">
+            <Select 
+              label="Stato" 
+              options={[
+                { value: '', label: 'Tutti gli Stati' },
+                { value: 'DA_PIANIFICARE', label: 'IN MAGAZZINO' },
+                { value: 'PIANIFICATO', label: 'PIANIFICATO' },
+                { value: 'IN_VIAGGIO', label: 'IN VIAGGIO / A BORDO' },
+                { value: 'COMPLETATO', label: 'CONSEGNATO' },
+              ]}
+              value={filterStatus}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -172,6 +256,15 @@ export const ShipmentsGrid: React.FC = () => {
         <table className="w-full text-left border-collapse text-xs font-mono whitespace-nowrap">
           <thead className="sticky top-0 bg-gray-100 z-10 shadow-sm">
             <tr className="border-b border-black/10">
+              <th className="px-4 py-3 w-10 text-center">
+                <input 
+                  type="checkbox" 
+                  checked={paginatedShipments.length > 0 && selectedShipmentIds.length === paginatedShipments.length}
+                  onChange={handleSelectAll}
+                  className="rounded border-gray-300 text-[#11BCEC] focus:ring-[#11BCEC] cursor-pointer"
+                  aria-label="Seleziona tutte le spedizioni in questa pagina"
+                />
+              </th>
               <th className="px-4 py-3 text-gray-500 uppercase tracking-widest font-bold">Riferimenti Documentali</th>
               <th className="px-4 py-3 text-gray-500 uppercase tracking-widest font-bold">Dati Destinatario</th>
               <th className="px-4 py-3 text-gray-500 uppercase tracking-widest font-bold">Dati Fisici del Carico</th>
@@ -181,8 +274,19 @@ export const ShipmentsGrid: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-black/5 bg-white">
             {paginatedShipments.length > 0 ? (
-              paginatedShipments.map((shipment) => (
-                <tr key={shipment.id} className="hover:bg-gray-50/80 transition-colors group">
+              paginatedShipments.map((shipment) => {
+                const isSelected = selectedShipmentIds.includes(shipment.id);
+                return (
+                <tr key={shipment.id} className={`hover:bg-gray-50/80 transition-colors group ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                  <td className="px-4 py-3 text-center">
+                    <input 
+                      type="checkbox" 
+                      checked={isSelected}
+                      onChange={() => handleSelectRow(shipment.id)}
+                      className="rounded border-gray-300 text-[#11BCEC] focus:ring-[#11BCEC] cursor-pointer"
+                      aria-label={`Seleziona spedizione ${shipment.id}`}
+                    />
+                  </td>
                   <td className="px-4 py-3 align-top max-w-[200px]">
                     <div className="flex flex-col gap-1 truncate">
                       <span className="font-bold text-black text-[13px] truncate">
@@ -264,10 +368,11 @@ export const ShipmentsGrid: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))
+              )}
+              )
             ) : (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-gray-500">
+                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center justify-center">
                     <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
