@@ -1,4 +1,4 @@
-export function exportToCsv(data: any[], filename: string, columns: { header: string; key: string | ((row: any) => string) }[]) {
+export function exportToCsv(data: any[], filename: string, columns: { header: string; key: string | ((row: any) => any) }[]) {
   if (!data || data.length === 0) return;
 
   const escapeCSV = (val: any) => {
@@ -30,3 +30,4 @@ export function exportToCsv(data: any[], filename: string, columns: { header: st
   link.click();
   document.body.removeChild(link);
 }
+

@@ -145,7 +145,7 @@ export const ShipmentsGrid: React.FC = () => {
     }
   };
 
-  const handleBulkStatusChange = (newStatus: string) => {
+  const handleBulkStatusChange = (newStatus: "DA_PIANIFICARE" | "PIANIFICATO" | "COMPLETATO") => {
     if (!updateShipmentStatus) return;
     selectedShipmentIds.forEach(id => {
       updateShipmentStatus(id, newStatus);
@@ -419,3 +419,4 @@ export const ShipmentsGrid: React.FC = () => {
     </div>
   );
 };
+

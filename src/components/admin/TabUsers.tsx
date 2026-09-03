@@ -27,7 +27,7 @@ export const TabUsers: React.FC<TabUsersProps> = ({ setEditingItem, setConfirmDi
     // Simulate sending email to User
     console.log(`Simulated Email Sent to ${newUserEmail} for account creation.`);
     
-    addUser(newUserName, newUserEmail, newUserRole, newUserDepotIds[0], newUserDepotIds, newUserUsername);
+    addUser(newUserName, newUserEmail, newUserRole, newUserDepotIds, newUserUsername);
     setNewUserName('');
     setNewUserUsername('');
     setNewUserEmail('');
@@ -217,3 +217,4 @@ export const TabUsers: React.FC<TabUsersProps> = ({ setEditingItem, setConfirmDi
 </>
   );
 };
+
