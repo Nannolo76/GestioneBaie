@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect } from 'react';
+import { DraggableModal } from '../components/ui/DraggableModal';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
 
@@ -640,22 +641,14 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
       )}
 
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in font-sans">
-          <div className="bg-slate-950 border border-white/10 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden text-white">
-            <div className="bg-slate-900 border-b border-white/5 p-4 flex justify-between items-center">
-              <h3 className="font-bold text-xs uppercase tracking-widest text-[#11BCEC] flex items-center gap-2">
-                <span className="inline-block w-2 h-2 rounded-full bg-[#11BCEC] animate-pulse"></span>
-                [ MODIFICA ELEMENTO ]
-              </h3>
-              <button 
-                onClick={() => setEditingItem(null)}
-                className="text-slate-400 hover:text-white transition-colors cursor-pointer text-sm font-bold bg-transparent border-none"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <form onSubmit={(e) => {
+        <DraggableModal
+          isOpen={!!editingItem}
+          onClose={() => setEditingItem(null)}
+          title={"Modifica Elemento"}
+          width="max-w-md w-full"
+          headerClassName="bg-slate-900 text-[#11BCEC]"
+        >
+          <form onSubmit={(e) => {
               e.preventDefault();
               const { type, id, fields } = editingItem;
               if (type === 'depot') {
@@ -1285,8 +1278,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
                 <Button type="submit" className="flex-1 !text-slate-950 font-extrabold hover:!text-white">Salva Modifiche</Button>
               </div>
             </form>
-          </div>
-        </div>
+        </DraggableModal>
       )}
       
       <ConfirmDialog 
@@ -1296,4 +1288,5 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     </div>
   );
 };
+
 

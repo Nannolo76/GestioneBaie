@@ -1,5 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useMemo } from 'react';
+import { DraggableModal } from '../components/ui/DraggableModal';
 import { useApp } from '../context/AppContext';
 import { Button } from '../components/ui/Button';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
@@ -3717,17 +3718,14 @@ export const MonitorYard: React.FC = () => {
 
       {/* --- MODAL 1: CHECK-IN NOTE E PATENTE (GUARDIOLA) --- */}
       {checkInBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-black/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#003a75] to-[#004B97] text-white p-4">
-              <h3 className="font-bold text-sm uppercase tracking-wide">
-                Registrazione Check-In Cancello
-              </h3>
-              <p className="text-[10px] text-white/70 font-mono mt-1">
-                Ticket: {checkInBooking.ticketNumber || 'N/D'} | Veicolo: {checkInBooking.licensePlate}
-              </p>
-            </div>
-            <div className="p-4 space-y-3 font-sans text-xs">
+        <DraggableModal
+          isOpen={!!checkInBooking}
+          onClose={() => setCheckInBooking(null)}
+          title={"Gestione Documenti / Check-in: " + checkInBooking.shipmentId}
+          width="max-w-3xl"
+          headerClassName="bg-gradient-to-r from-emerald-500 to-teal-600"
+        >
+          <div className="p-4 space-y-3 font-sans text-xs">
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   label="Targa Rimorchio"
@@ -3894,28 +3892,19 @@ export const MonitorYard: React.FC = () => {
                 Conferma Ingresso
               </Button>
             </div>
-          </div>
-        </div>
+        </DraggableModal>
       )}
 
       {/* --- MODAL 2: GESTIONE DETTAGLIO BAIA ATTIVA --- */}
       {activeBayDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto animate-fade-in print:hidden">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full border border-black/10 overflow-hidden my-8">
-            
-            <div className="bg-gradient-to-r from-[#004B97] to-[#0062b8] text-white p-4 flex justify-between items-start">
-              <div>
-                <h3 className="font-bold text-sm uppercase tracking-wide">
-                  Gestione Attiva Baia: {activeBayDetail.bay.name}
-                </h3>
-                <span className="text-[9px] font-mono text-white/70 block mt-0.5">
-                  Modulo: {warehouseModules.find(m => m.id === activeBayDetail.bay.moduleId)?.name || 'Generico'}
-                </span>
-              </div>
-              <Badge variant="warning">{activeBayDetail.booking.ticketNumber || 'Triage'}</Badge>
-            </div>
-
-            <div className="p-5 space-y-5 font-sans text-xs">
+        <DraggableModal
+          isOpen={!!activeBayDetail}
+          onClose={() => setActiveBayDetail(null)}
+          title={"Gestione Baia: " + activeBayDetail.bay.name}
+          width="max-w-4xl lg:max-w-6xl"
+          headerClassName="bg-gradient-to-r from-slate-700 to-slate-900"
+        >
+          <div className="p-5 space-y-5 font-sans text-xs">
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 border-b border-black/5 pb-4 bg-gray-50/50 p-3 rounded-lg font-mono">
                 <div>
@@ -4682,26 +4671,19 @@ export const MonitorYard: React.FC = () => {
                 </Button>
               )}
             </div>
-          </div>
-        </div>
+        </DraggableModal>
       )}
 
       {/* MODALE DI INSERIMENTO / MODIFICA SPEDIZIONE MANUALE */}
       {isNewShipmentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl max-w-5xl lg:max-w-6xl w-full border border-black/10 overflow-hidden my-8">
-            <div className="bg-gradient-to-r from-orange-500 to-amber-600 text-white p-4 flex justify-between items-center">
-              <h3 className="font-bold text-sm uppercase tracking-wide">
-                {shipmentFormId ? "Modifica Spedizione Manuale" : "Nuovo Viaggio / Inserimento Spedizioni"}
-              </h3>
-              <button 
-                onClick={() => { resetShipmentForm(); setIsNewShipmentModalOpen(false); }}
-                className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
-              >
-                ×
-              </button>
-            </div>
-            <form onSubmit={handleSaveShipmentForm} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <DraggableModal
+          isOpen={isNewShipmentModalOpen}
+          onClose={() => { resetShipmentForm(); setIsNewShipmentModalOpen(false); }}
+          title={shipmentFormId ? "Modifica Spedizione Manuale" : "Nuovo Viaggio / Inserimento Spedizioni"}
+          width="max-w-5xl lg:max-w-6xl"
+          headerClassName="bg-gradient-to-r from-orange-500 to-amber-600"
+        >
+          <form onSubmit={handleSaveShipmentForm} className="p-6 space-y-4">
               
               {/* SMART BOUNDS & LIVE TIMELINE */}
               <div className="bg-gray-50 p-4 rounded-xl border border-black/10 flex flex-col mb-4">
@@ -5329,27 +5311,19 @@ export const MonitorYard: React.FC = () => {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
+        </DraggableModal>
       )}
 
       {/* MODALE DI IMPORTAZIONE MASSIVA DA CSV/TXT */}
       {isImportShipmentModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden">
-          <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full border border-black/10 overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 flex justify-between items-center shrink-0">
-              <h3 className="font-bold text-sm uppercase tracking-wide">
-                {isPreviewMode ? "Anteprima Importazione" : "Importazione Spedizioni da File (CSV/TXT)"}
-              </h3>
-              <button 
-                onClick={() => { setIsImportShipmentModalOpen(false); setImportError(''); setImportSuccess(''); setIsPreviewMode(false); setImportPreviewData([]); }}
-                className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4 overflow-y-auto flex-grow">
+        <DraggableModal
+          isOpen={isImportShipmentModalOpen}
+          onClose={() => setIsImportShipmentModalOpen(false)}
+          title={"Importazione Massiva Spedizioni"}
+          width="max-w-3xl"
+          headerClassName="bg-gradient-to-r from-blue-500 to-indigo-600"
+        >
+          <div className="p-6 space-y-4 overflow-y-auto flex-grow">
               {!isPreviewMode ? (
                 <>
                   <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-[10px] text-blue-800 font-mono leading-relaxed">
@@ -5497,30 +5471,19 @@ export const MonitorYard: React.FC = () => {
                 </>
               )}
             </div>
-          </div>
-        </div>
+        </DraggableModal>
       )}
 
       {/* MODALE DI RISOLUZIONE RAPIDA DEL ROUTING */}
       {isQuickResolutionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in print:hidden overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full border border-black/10 overflow-hidden my-8">
-            <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">⚠️</span>
-                <h3 className="font-bold text-sm uppercase tracking-wide">
-                  Risoluzione Rapida / Revisione Import Spedizioni
-                </h3>
-              </div>
-              <button 
-                onClick={() => { setIsQuickResolutionModalOpen(false); setSelectedResolutionIds([]); }}
-                className="text-white hover:text-gray-200 font-bold text-lg cursor-pointer font-mono"
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <DraggableModal
+          isOpen={isQuickResolutionModalOpen}
+          onClose={() => setIsQuickResolutionModalOpen(false)}
+          title={"Risoluzione Rapida Routing (Multipla)"}
+          width="max-w-4xl lg:max-w-6xl"
+          headerClassName="bg-gradient-to-r from-purple-500 to-pink-600"
+        >
+          <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
               <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs leading-relaxed">
                 Le seguenti spedizioni presentano tratte geografiche ambigue (es. più hub nella stessa zona) o inserite da importazione CSV con dati incompleti.
                 Conferma l'hub suggerito o assegna manualmente l'hub corretto verificando la disponibilità delle baie in tempo reale.
@@ -5722,8 +5685,7 @@ export const MonitorYard: React.FC = () => {
                 Chiudi Risoluzione Rapida
               </Button>
             </div>
-          </div>
-        </div>
+        </DraggableModal>
       )}
 
       {/* POPUP CONFLITTO TARGA SPEDIZIONE/CHECK-IN */}
@@ -5801,5 +5763,7 @@ const getBookingStatusBadge = (status: Booking['status']) => {
       return null;
   }
 };
+
+
 
 
