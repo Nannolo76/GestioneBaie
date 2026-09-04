@@ -118,14 +118,14 @@ export const TabHubs: React.FC<TabHubsProps> = ({ adminTab, setEditingItem, setC
     setNewBayName(''); setSelectedModuleForBay(''); setSelectedUsageForBay('');
   };
 
-  /* unused
+  const handleAddModule = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newModName || !newModHubId) return;
     addWarehouseModule(newModHubId, newModName, newModDesc);
     setNewModName(''); setNewModDesc('');
   };
 
-  /* unused
+  const handleAddUsage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUsageName) return;
     addBayUsage(newUsageName, newUsageDesc);
@@ -133,7 +133,8 @@ export const TabHubs: React.FC<TabHubsProps> = ({ adminTab, setEditingItem, setC
   };
 
   return (
-
+    <>
+      {adminTab === 'hubs' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
           <div className="space-y-6">
             <Card title="Nuovo Hub o Corrispondente" accent="orange">
@@ -630,7 +631,8 @@ export const TabHubs: React.FC<TabHubsProps> = ({ adminTab, setEditingItem, setC
             </Card>
           </div>
         </div>
-      
+      )}
+    </>
   );
 };
 
