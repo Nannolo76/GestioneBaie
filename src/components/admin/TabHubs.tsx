@@ -10,12 +10,13 @@ import { Badge } from '../ui/Badge';
 
 
 interface TabHubsProps {
+  adminTab: string;
   setEditingItem: (item: any) => void;
   setConfirmDialogState: (state: any) => void;
   comuni: any[];
 }
 
-export const TabHubs: React.FC<TabHubsProps> = ({ setEditingItem, setConfirmDialogState, comuni }) => {
+export const TabHubs: React.FC<TabHubsProps> = ({ adminTab, setEditingItem, setConfirmDialogState, comuni }) => {
   const {
     depots,
     warehouseModules,
@@ -632,6 +633,7 @@ export const TabHubs: React.FC<TabHubsProps> = ({ setEditingItem, setConfirmDial
       
   );
 };
+
 
 
 

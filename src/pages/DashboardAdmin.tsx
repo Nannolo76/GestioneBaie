@@ -571,8 +571,9 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
       </div>
 
       {/* --- TAB: HUB & BAIE --- */}
-      {adminTab === 'hubs' && (
+      {['hubs', 'modules', 'bayusages'].includes(adminTab) && (
         <TabHubs
+          adminTab={adminTab}
           setEditingItem={setEditingItem}
           setConfirmDialogState={setConfirmDialogState}
           comuni={comuni}
@@ -1288,5 +1289,6 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
     </div>
   );
 };
+
 
 
