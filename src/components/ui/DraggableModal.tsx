@@ -56,8 +56,8 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] pointer-events-none flex items-center justify-center p-4">
-      {/* Sfondo non bloccante: usiamo pointer-events-none per consentire click sulla griglia sottostante */}
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      {/* Sfondo leggermente oscurato bloccante */}
       <div 
         className={`pointer-events-auto bg-white rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-300 flex flex-col ${width} w-full max-h-[90vh] ${className}`}
         style={{ 
@@ -92,3 +92,4 @@ export const DraggableModal: React.FC<DraggableModalProps> = ({
     </div>
   );
 };
+
