@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import { comuniData } from '../src/data/comuni.js';
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET') return res.status(405).json({error: 'Method not allowed'});
   
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
     } finally {
       client.release();
     }
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message, stack: err.stack });
   }
 }

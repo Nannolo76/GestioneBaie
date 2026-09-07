@@ -14,22 +14,22 @@ interface TabHubsProps {
   setEditingItem: (item: any) => void;
   setConfirmDialogState: (state: any) => void;
   comuni: any[];
+  handleDelete: (type: string, id: string, name: string) => void;
 }
 
-export const TabHubs: React.FC<TabHubsProps> = ({ adminTab, setEditingItem, setConfirmDialogState, comuni }) => {
+export const TabHubs: React.FC<TabHubsProps> = ({ adminTab, setEditingItem, setConfirmDialogState, comuni, handleDelete }) => {
   const {
     depots,
     warehouseModules,
     bays,
     bayUsages,
     addDepot,
-    
     addWarehouseModule,
-    
     addBay,
-    
     updateBayStatus,
-    addBayUsage
+    addBayUsage,
+    updateBayUsage,
+    deleteBayUsage
   } = useApp();
 
   // Stati Hub
@@ -69,6 +69,8 @@ export const TabHubs: React.FC<TabHubsProps> = ({ adminTab, setEditingItem, setC
       if (!newModHubId && hubs.length > 0) setNewModHubId(hubs[0].id);
     }
   }, [depots, selectedHubForBay, newModHubId]);
+
+  const activeHubModules = warehouseModules.filter((m: any) => m.depotId === selectedHubForBay);
 
   // Autocomplete
   const handleHubCityChange = (val: string) => {

@@ -577,6 +577,7 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
           setEditingItem={setEditingItem}
           setConfirmDialogState={setConfirmDialogState}
           comuni={comuni}
+          handleDelete={handleDelete}
         />
       )}
 

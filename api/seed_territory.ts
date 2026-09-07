@@ -1,6 +1,6 @@
 import { sql } from '@vercel/postgres';
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method !== 'GET') return res.status(405).json({error: 'Method not allowed'});
   
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ status: 'no more data to seed', count });
     }
     
-    const mapped = chunk.map(c => ({
+    const mapped = chunk.map((c: any) => ({
       regione: c.regione.nome,
       provincia: c.provincia.nome,
       provincia_sigla: c.sigla,
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
       total_now: count + chunk.length
     });
       
-  } catch (err) {
+  } catch (err: any) {
     return res.status(500).json({ error: err.message, stack: err.stack });
   }
 }
