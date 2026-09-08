@@ -1,17 +1,19 @@
 import React, { useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
-import { parseFile, SupportedFormat } from '../../utils/parser';
-import { aggregateTripsAndShipments, mapRawRowToSystem, NormalizationResult } from '../../utils/normalization';
-import { ImportTemplate } from '../../types';
+import type { SupportedFormat } from '../../utils/parser';
+import { parseFile } from '../../utils/parser';
+import type { NormalizationResult } from '../../utils/normalization';
+import { aggregateTripsAndShipments, mapRawRowToSystem } from '../../utils/normalization';
+import type { ImportTemplate } from '../../types';
 import { Upload, FileText, CheckCircle, AlertTriangle, ChevronRight, X, Save } from 'lucide-react';
-import Button from '../ui/Button';
+import { Button } from '../ui/Button';
 
 interface ImportWizardProps {
   onClose: () => void;
 }
 
 export default function ImportWizard({ onClose }: ImportWizardProps) {
-  const { addBooking, addShipment, state } = useApp();
+  const { addBooking, addShipment, depots, clients } = useApp();
   
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [file, setFile] = useState<File | null>(null);
@@ -108,7 +110,7 @@ export default function ImportWizard({ onClose }: ImportWizardProps) {
     setTimeout(() => {
       try {
         const mappedRows = rawRecords.map(r => mapRawRowToSystem(r, mapping));
-        const result = aggregateTripsAndShipments(mappedRows, state.depots || [], state.clients || []);
+        const result = aggregateTripsAndShipments(mappedRows, depots || [], clients || []);
         setDryRunResult(result);
         setStep(3);
       } catch (err: any) {
@@ -125,8 +127,25 @@ export default function ImportWizard({ onClose }: ImportWizardProps) {
     
     setTimeout(() => {
       // Inserimento effettivo
-      dryRunResult.bookings.forEach(b => {
-        addBooking(b as any);
+      dryRunResult.bookings.forEach((b: any) => {
+        addBooking(
+          b.depotId || '',
+          b.date || '',
+          b.activityType || '',
+          b.licensePlate || '',
+          b.driverName || '',
+          b.driverPhone,
+          b.notes,
+          b.palletPlaces,
+          b.driverLicense,
+          b.driverLicenseRelease,
+          b.orderNumber,
+          b.clientUsageId,
+          b.licensePlateTrailer,
+          b.driverLicenseExpiry,
+          b.orderNumber2,
+          b.clientId
+        );
       });
       dryRunResult.shipments.forEach(s => {
         addShipment(s as any);
