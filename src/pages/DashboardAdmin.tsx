@@ -14,6 +14,7 @@ import { TabUsers } from '../components/admin/TabUsers';
 import { TabClients } from '../components/admin/TabClients';
 import { TabPalletTypes } from '../components/admin/TabPalletTypes';
 import { TabComuni } from '../components/admin/TabComuni';
+import ImportWizard from '../components/import/ImportWizard';
 
 export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments' }> = ({ defaultTab = 'hubs' }) => {
   const {
@@ -84,6 +85,8 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
   }, []);
 
   const [adminTab, setAdminTab] = useState<'hubs' | 'users' | 'carriers' | 'modules' | 'activities' | 'reports' | 'bayusages' | 'anomalies' | 'clients' | 'pallettypes' | 'shipments' | 'comuni'>(defaultTab);
+
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   // Stato Modifica Generale (Edit Modal)
   const [editingItem, setEditingItem] = useState<{
@@ -475,6 +478,11 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
             Configurazione Plant stabilimenti, baie, moduli magazzino, anagrafiche usi baia e validazione vettori
           </p>
         </div>
+        <div>
+          <Button onClick={() => setShowImportWizard(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow">
+            📥 IMPORTA DATI
+          </Button>
+        </div>
       </div>
 
       {/* Sotto-Navigazione Amministrativa (Tabs) */}
@@ -599,11 +607,17 @@ export const DashboardAdmin: React.FC<{ defaultTab?: 'hubs' | 'users' | 'carrier
 
       {/* --- TAB: GESTIONE ANOMALIE --- */}
       {adminTab === 'anomalies' && (
-        <TabAnomalies
+        <TabAnomalies 
+          activeResolveAnomalyId={activeResolveAnomalyId}
           setActiveResolveAnomalyId={setActiveResolveAnomalyId}
+          resolveNotes={resolveNotes}
           setResolveNotes={setResolveNotes}
+          resolveAnomaly={resolveAnomaly}
         />
       )}
+
+      {/* Import Wizard Modal */}
+      {showImportWizard && <ImportWizard onClose={() => setShowImportWizard(false)} />}
 
       {/* --- TAB: SCHEDULATORE REPORT --- */}
       {adminTab === 'reports' && (

@@ -274,3 +274,11 @@ export interface ComuneItaliano {
   provincia: string;
 }
 
+export interface ImportTemplate {
+  id: string;
+  name: string;
+  clientId?: string;
+  mappingRules: Record<string, string>; // Maps "Raw Column Name" -> "System Field Path" (e.g., 'booking.date', 'shipment.palletPlaces')
+  createdAt?: string;
+}
+

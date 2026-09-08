@@ -16,6 +16,7 @@ import { ShipmentsGrid } from '../components/ui/ShipmentsGrid';
 import { YardBoard } from '../components/ui/YardBoard';
 import { useResizer } from '../hooks/useResizer';
 import { useAlert } from '../context/AlertContext';
+import ImportWizard from '../components/import/ImportWizard';
 export interface TripGroup {
   id: string;
   tripId: string;
@@ -84,6 +85,7 @@ export const MonitorYard: React.FC = () => {
   const alert = useAlert();
   // Stato navigazione sottomenu a sinistra (Opzione A)
   const [guardiolaView, setGuardiolaView] = useState<'station' | 'bays' | 'gate' | 'expected' | 'rapid' | 'schedule' | 'anomalies'>('station');
+  const [showImportWizard, setShowImportWizard] = useState(false);
   
   // Stati TMS Spedizioni / Viaggi
   const [selectedShipmentIdsForCheckIn, setSelectedShipmentIdsForCheckIn] = useState<string[]>([]);
@@ -1794,7 +1796,12 @@ export const MonitorYard: React.FC = () => {
               Stabilimento: {activeDepot?.name} ({activeDepot?.city})
             </p>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 items-center">
+            {['ADMIN', 'GUARDIA_CANCELLO'].includes(currentRole || '') && (
+              <Button size="sm" onClick={() => setShowImportWizard(true)} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded shadow mr-2">
+                📥 IMPORTA DATI
+              </Button>
+            )}
             <Badge variant="success">ATTIVO</Badge>
             <Badge variant="primary">
               {activeBays.filter((b) => b.status === 'DISPONIBILE').length} / {activeBays.length} Baie Libere
@@ -5738,6 +5745,7 @@ export const MonitorYard: React.FC = () => {
         {...confirmDialogState} 
         onCancel={() => setConfirmDialogState(prev => ({ ...prev, isOpen: false }))} 
       />
+      {showImportWizard && <ImportWizard onClose={() => setShowImportWizard(false)} />}
     </div>
   );
 };
