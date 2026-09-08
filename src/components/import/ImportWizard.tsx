@@ -143,8 +143,7 @@ export default function ImportWizard({ onClose }: ImportWizardProps) {
           b.clientUsageId,
           b.licensePlateTrailer,
           b.driverLicenseExpiry,
-          b.orderNumber2,
-          b.clientId
+          b.orderNumber2
         );
       });
       dryRunResult.shipments.forEach(s => {
@@ -232,7 +231,7 @@ export default function ImportWizard({ onClose }: ImportWizardProps) {
                     onChange={(e) => setTemplateName(e.target.value)}
                     className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-48"
                   />
-                  <Button variant="outline" size="sm" onClick={handleSaveTemplate}>
+                  <Button variant="secondary" size="sm" onClick={handleSaveTemplate}>
                     <Save className="w-4 h-4 mr-2" />
                     Salva Template
                   </Button>
@@ -284,7 +283,7 @@ export default function ImportWizard({ onClose }: ImportWizardProps) {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={runDryRun} isLoading={isProcessing}>
+                <Button onClick={runDryRun}>
                   Procedi all'Analisi Dati <ChevronRight className="w-5 h-5 ml-1" />
                 </Button>
               </div>
@@ -378,10 +377,9 @@ export default function ImportWizard({ onClose }: ImportWizardProps) {
               </div>
 
               <div className="flex justify-between items-center mt-6">
-                <Button variant="outline" onClick={() => setStep(2)}>Torna Indietro</Button>
+                <Button variant="secondary" onClick={() => setStep(2)}>Torna Indietro</Button>
                 <Button 
                   onClick={commitData} 
-                  isLoading={isProcessing} 
                   className={dryRunResult.errors.length > 0 ? "bg-orange-600 hover:bg-orange-700" : "bg-green-600 hover:bg-green-700"}
                 >
                   {dryRunResult.errors.length > 0 ? "Bypassa Errori e Importa Dati Validi" : "Conferma e Importa Dati"} 
@@ -403,7 +401,7 @@ export default function ImportWizard({ onClose }: ImportWizardProps) {
               </p>
               <div className="flex space-x-4">
                 <Button onClick={onClose} size="lg">Torna al Gestionale</Button>
-                <Button variant="outline" onClick={() => {
+                <Button variant="secondary" onClick={() => {
                   setStep(1);
                   setFile(null);
                   setRawRecords([]);
