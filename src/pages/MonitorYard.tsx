@@ -151,6 +151,8 @@ export const MonitorYard: React.FC = () => {
   const [shipmentFormRealDestinationCity, setShipmentFormRealDestinationCity] = useState('');
   const [shipmentFormRealDestinationCap, setShipmentFormRealDestinationCap] = useState('');
   const [shipmentFormRealDestinationProvince, setShipmentFormRealDestinationProvince] = useState('');
+  const [shipmentFormHubOrigineOperativo, setShipmentFormHubOrigineOperativo] = useState('');
+  const [shipmentFormHubDestinazioneOperativo, setShipmentFormHubDestinazioneOperativo] = useState('');
   const [shipmentFormTipoOperazioneHub, setShipmentFormTipoOperazioneHub] = useState<'INBOUND' | 'OUTBOUND'>('OUTBOUND');
   
   const [isRoutingAmbiguous, setIsRoutingAmbiguous] = useState(false);
