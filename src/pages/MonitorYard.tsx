@@ -2324,7 +2324,7 @@ export const MonitorYard: React.FC = () => {
 
                 {/* GRIGLIA SPEDIZIONI (SHIPMENTS GRID) */}
                 <div className="h-[700px] border border-black/10 rounded-xl overflow-hidden shadow-sm bg-white">
-                  <ShipmentsGrid />
+                  <ShipmentsGrid onEditShipment={handleEditShipmentClick} />
                 </div>
               </div>
             )}

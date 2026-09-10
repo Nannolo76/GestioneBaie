@@ -5,7 +5,11 @@ import { Input, Select } from './Input';
 import { Button } from './Button';
 import { exportToCsv } from '../../utils/exportUtils';
 
-export const ShipmentsGrid: React.FC = () => {
+interface ShipmentsGridProps {
+  onEditShipment?: (shipment: any) => void;
+}
+
+export const ShipmentsGrid: React.FC<ShipmentsGridProps> = ({ onEditShipment }) => {
   const { shipments, selectedDepotId, clients, carriers, updateShipmentStatus } = useApp();
 
   // Filters state
@@ -270,6 +274,7 @@ export const ShipmentsGrid: React.FC = () => {
               <th className="px-4 py-3 text-gray-500 uppercase tracking-widest font-bold">Dati Fisici del Carico</th>
               <th className="px-4 py-3 text-gray-500 uppercase tracking-widest font-bold">Assegnazione Viaggio</th>
               <th className="px-4 py-3 text-gray-500 uppercase tracking-widest font-bold">Stato Spedizione</th>
+              <th className="px-4 py-3 text-center text-gray-500 uppercase tracking-widest font-bold">Azioni</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-black/5 bg-white">
@@ -367,12 +372,17 @@ export const ShipmentsGrid: React.FC = () => {
                       )}
                     </div>
                   </td>
+                  <td className="px-4 py-3 align-middle text-center">
+                    <Button size="sm" variant="secondary" onClick={() => onEditShipment && onEditShipment(shipment)}>
+                      Modifica
+                    </Button>
+                  </td>
                 </tr>
               )}
               )
             ) : (
               <tr>
-                <td colSpan={6} className="px-4 py-12 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
                   <div className="flex flex-col items-center justify-center">
                     <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
