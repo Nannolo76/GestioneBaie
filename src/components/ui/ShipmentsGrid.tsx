@@ -373,8 +373,8 @@ export const ShipmentsGrid: React.FC<ShipmentsGridProps> = ({ onEditShipment }) 
                     </div>
                   </td>
                   <td className="px-4 py-3 align-middle text-center">
-                    <Button size="sm" variant="secondary" onClick={() => onEditShipment && onEditShipment(shipment)}>
-                      Modifica
+                    <Button size="sm" variant="primary" onClick={() => onEditShipment && onEditShipment(shipment)} className="whitespace-nowrap font-bold shadow-xs">
+                      ✏️ Modifica
                     </Button>
                   </td>
                 </tr>

@@ -987,6 +987,7 @@ export const MonitorYard: React.FC = () => {
 
   const handleEditShipmentClick = (s: Shipment) => {
     setShipmentFormId(s.id);
+    setShipmentFormClient(s.clientId || '');
     setShipmentFormCarrier(s.carrierId);
     setShipmentFormType(s.activityType);
     setShipmentFormExpectedDate(s.expectedDate);
@@ -4886,7 +4887,7 @@ export const MonitorYard: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Select
                   label="Vettore Assegnato *"
-                  options={carriers.filter(c => c.status === 'APPROVATO').map(c => ({ value: c.id, label: c.name }))}
+                  options={carriers.filter(c => c.status === 'APPROVATO' || c.id === shipmentFormCarrier).map(c => ({ value: c.id, label: c.name }))}
                   value={shipmentFormCarrier}
                   onChange={(e) => setShipmentFormCarrier(e.target.value)}
                   required
@@ -5081,11 +5082,11 @@ export const MonitorYard: React.FC = () => {
                                     }}
                                   >
                                     <option value="" disabled>Seleziona Nodo Anagrafico...</option>
-                                    {depots.filter(d => row.tipoStop === 'HUB_TRANSIT' ? (d.type === 'HUB' || !d.type) : d.type === 'CORRISPONDENTE').map(d => (
+                                    {depots.filter(d => d.id === row.destinationNodeId || (row.tipoStop === 'HUB_TRANSIT' ? (d.type === 'HUB' || !d.type) : (d.type === 'CORRISPONDENTE' || d.name.toLowerCase().includes('corr')))).map(d => (
                                       <option key={d.id} value={d.id}>{d.name}</option>
                                     ))}
                                   </select>
-                                  {depots.filter(d => row.tipoStop === 'HUB_TRANSIT' ? (d.type === 'HUB' || !d.type) : d.type === 'CORRISPONDENTE').length === 0 && (
+                                  {depots.filter(d => d.id === row.destinationNodeId || (row.tipoStop === 'HUB_TRANSIT' ? (d.type === 'HUB' || !d.type) : (d.type === 'CORRISPONDENTE' || d.name.toLowerCase().includes('corr')))).length === 0 && (
                                     <p className="text-[10px] text-red-500 bg-red-50 p-1 rounded font-medium border border-red-200 text-left mt-1">
                                       Nessun {row.tipoStop === 'HUB_TRANSIT' ? 'Hub' : 'Corrispondente'} anagrafico trovato. Per procedere, creane uno dal Pannello Admin.
                                     </p>
